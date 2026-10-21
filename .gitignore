@@ -1,2 +1,6 @@
-/target
-/lib
+node_modules/
+/dist
+/src-tauri/target
+/src-tauri/lib
+/src-tauri/gen/schemas
+*.tsbuildinfo

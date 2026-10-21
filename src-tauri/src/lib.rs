@@ -1,0 +1,45 @@
+//! AiReader: a desktop reader for EPUB, PDF, TXT, Markdown, MOBI/AZW3, FB2, DOCX and CBZ.
+
+pub mod commands;
+pub mod formats;
+pub mod library;
+pub mod model;
+pub mod protocol;
+pub mod search;
+
+use tauri::Manager;
+
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            let root = app.path().app_data_dir()?.join("library");
+            let library = library::Library::open(&root)?;
+            // Ignore flags (e.g. `-psn_…` added by macOS) and keep the first existing file.
+            let startup = std::env::args_os()
+                .skip(1)
+                .map(std::path::PathBuf::from)
+                .find(|p| p.is_file());
+            app.manage(commands::AppState::new(library, startup));
+            Ok(())
+        })
+        .register_asynchronous_uri_scheme_protocol("book", protocol::handle)
+        .invoke_handler(tauri::generate_handler![
+            commands::list_books,
+            commands::import_books,
+            commands::take_startup_book,
+            commands::update_book,
+            commands::remove_books,
+            commands::create_group,
+            commands::rename_group,
+            commands::delete_group,
+            commands::open_book,
+            commands::get_chapter,
+            commands::search_book,
+            commands::save_progress,
+            commands::get_settings,
+            commands::set_settings,
+        ])
+        .run(tauri::generate_context!())
+        .expect("failed to run AiReader");
+}
