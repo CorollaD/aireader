@@ -1,0 +1,32 @@
+[package]
+name = "aireader"
+version = "0.1.0"
+edition = "2024"
+description = "A desktop reader for EPUB, PDF, TXT, Markdown, MOBI/AZW3, FB2, DOCX and CBZ"
+
+[dependencies]
+anyhow = "1.0.104"
+base64 = "0.23.1"
+chardetng = "1.0.0"
+directories = "6.0.0"
+eframe = "0.35.0"
+ego-tree = "0.11"
+egui = "0.35.0"
+egui_extras = { version = "0.35.0", features = ["image"] }
+encoding_rs = "0.8.42"
+epub = "2.1.5"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+mobi = "0.8.0"
+natord = "1.0.9"
+pdfium-render = { version = "0.9.4", default-features = false, features = ["pdfium_latest", "thread_safe"] }
+pulldown-cmark = "0.13.4"
+regex = "1.13.1"
+rfd = "0.17.2"
+roxmltree = "0.21.1"
+scraper = "0.29.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
+
+[profile.dev.package."*"]
+opt-level = 2
