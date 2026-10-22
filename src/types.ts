@@ -188,3 +188,12 @@ export interface Suggestion {
   groups: string[];
   author: string | null;
 }
+
+/** A run of text on a PDF page; coordinates are fractions of the unrotated page, from top-left. */
+export interface TextRun {
+  text: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}

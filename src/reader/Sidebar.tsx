@@ -1,6 +1,7 @@
 // Left sidebar: table of contents, bookmarks, and highlights/notes.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { TocEntry } from "../types";
 import type { Bookmark, Highlight, Location, OpenedBook } from "../types";
 import { formatDate } from "../shelf/BookCard";
 import { atOrBefore } from "./locations";
@@ -61,17 +62,7 @@ export default function Sidebar(props: Props) {
           (book.toc.length === 0 ? (
             <div className="side-empty muted small">这本书没有目录</div>
           ) : (
-            book.toc.map((e, i) => (
-              <button
-                key={i}
-                className={`toc-item${i === currentToc ? " active" : ""}`}
-                style={{ paddingLeft: 12 + e.depth * 14 }}
-                onClick={() => props.onNavigate(e.location)}
-                title={e.title}
-              >
-                {e.title}
-              </button>
-            ))
+            <TocTree bookId={book.id} toc={book.toc} current={currentToc} onNavigate={props.onNavigate} />
           ))}
         {tab === "bookmarks" && <Bookmarks {...props} />}
         {tab === "notes" && flow && <Notes {...props} />}
@@ -191,6 +182,110 @@ function Notes(props: Props) {
           </div>
         </div>
       ))}
+    </>
+  );
+}
+
+/** Entries with more than this many items start with only the top level expanded. */
+const COLLAPSE_THRESHOLD = 30;
+
+/** For each entry, the indices of its ancestors (nearest last). */
+function ancestorsOf(toc: TocEntry[]): number[][] {
+  const stack: number[] = [];
+  return toc.map((e, i) => {
+    while (stack.length && toc[stack[stack.length - 1]].depth >= e.depth) stack.pop();
+    const ancestors = [...stack];
+    stack.push(i);
+    return ancestors;
+  });
+}
+
+function loadCollapsed(bookId: string): Set<number> | null {
+  try {
+    const raw = localStorage.getItem(`toc-collapsed:${bookId}`);
+    return raw ? new Set(JSON.parse(raw) as number[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveCollapsed(bookId: string, collapsed: Set<number>) {
+  try {
+    localStorage.setItem(`toc-collapsed:${bookId}`, JSON.stringify([...collapsed]));
+  } catch {
+    // Storage unavailable: the state just isn't remembered.
+  }
+}
+
+function TocTree(props: { bookId: string; toc: TocEntry[]; current: number; onNavigate: (loc: TocEntry["location"]) => void }) {
+  const { toc, current } = props;
+  const ancestors = useMemo(() => ancestorsOf(toc), [toc]);
+  const hasChildren = useMemo(() => toc.map((e, i) => (toc[i + 1]?.depth ?? -1) > e.depth), [toc]);
+  const parents = useMemo(() => toc.map((_, i) => i).filter((i) => hasChildren[i]), [toc, hasChildren]);
+  const [collapsed, setCollapsed] = useState<Set<number>>(() => {
+    const saved = loadCollapsed(props.bookId);
+    if (saved) return saved;
+    // Large tables of contents start with only the top level open.
+    return new Set(toc.length > COLLAPSE_THRESHOLD ? parents : []);
+  });
+
+  const change = (next: Set<number>) => {
+    setCollapsed(next);
+    saveCollapsed(props.bookId, next);
+  };
+
+  // Reading into a collapsed branch opens it, so the current entry is always visible.
+  useEffect(() => {
+    if (current < 0) return;
+    const hidden = ancestors[current].filter((a) => collapsed.has(a));
+    if (hidden.length) {
+      const next = new Set(collapsed);
+      for (const a of hidden) next.delete(a);
+      change(next);
+    }
+    // Only when the current entry changes.
+  }, [current]);
+
+  const toggle = (i: number) => {
+    const next = new Set(collapsed);
+    if (next.has(i)) next.delete(i);
+    else next.add(i);
+    change(next);
+  };
+
+  return (
+    <>
+      {parents.length > 0 && (
+        <div className="toc-tools">
+          <button className="link-button" onClick={() => change(new Set())}>
+            全部展开
+          </button>
+          <button className="link-button" onClick={() => change(new Set(parents))}>
+            全部收起
+          </button>
+        </div>
+      )}
+      {toc.map((e, i) =>
+        ancestors[i].some((a) => collapsed.has(a)) ? null : (
+          <div key={i} className={`toc-row${i === current ? " active" : ""}`} style={{ paddingLeft: 4 + e.depth * 14 }}>
+            {hasChildren[i] ? (
+              <button
+                className="toc-toggle"
+                aria-label={collapsed.has(i) ? "展开" : "收起"}
+                aria-expanded={!collapsed.has(i)}
+                onClick={() => toggle(i)}
+              >
+                {collapsed.has(i) ? "▸" : "▾"}
+              </button>
+            ) : (
+              <span className="toc-toggle-space" />
+            )}
+            <button className={`toc-item${i === current ? " active" : ""}`} onClick={() => props.onNavigate(e.location)} title={e.title}>
+              {e.title}
+            </button>
+          </div>
+        ),
+      )}
     </>
   );
 }

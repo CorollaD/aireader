@@ -43,7 +43,11 @@ export default function ProgressBar({ book, location, stats, onJump }: Props) {
         className={`progress-track${drag !== null ? " dragging" : ""}`}
         ref={track}
         onPointerDown={(e) => {
-          (e.target as HTMLElement).setPointerCapture(e.pointerId);
+          try {
+            (e.target as HTMLElement).setPointerCapture(e.pointerId);
+          } catch {
+            // Capture only keeps the drag alive outside the bar; dragging works without it.
+          }
           setDrag(fractionAt(e.clientX));
         }}
         onPointerMove={(e) => drag !== null && setDrag(fractionAt(e.clientX))}

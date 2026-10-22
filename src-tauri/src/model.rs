@@ -135,6 +135,21 @@ pub trait PageSource: Send + Sync {
     fn page_text(&self, _index: usize) -> Option<String> {
         None
     }
+    /// Positioned text runs for making the rendered page selectable; empty without a text layer.
+    fn text_runs(&self, _index: usize) -> Vec<TextRun> {
+        Vec::new()
+    }
+}
+
+/// A run of text on a page. Coordinates are fractions of the unrotated page size, measured
+/// from the top-left corner.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct TextRun {
+    pub text: String,
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
 }
 
 /// Rendered page as straight (non-premultiplied) RGBA pixels.

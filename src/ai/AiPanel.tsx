@@ -12,8 +12,8 @@ import Markdown from "./Markdown";
 /** A request from the selection toolbar to explain/translate a passage. */
 export interface ChatRequest {
   n: number;
-  chapter: number;
-  range: TextRange;
+  /** Where the passage is in a text book; absent for PDF selections (no notes there). */
+  anchor: { chapter: number; range: TextRange } | null;
   selection: string;
   context: string;
   action: ChatAction;
@@ -189,7 +189,7 @@ export default function AiPanel(props: {
 
   return (
     <aside className="ai-panel">
-      <PanelHead tab={tab} setTab={setTab} onSettings={ai.openSettings} onClose={props.onClose} showChat={flow} />
+      <PanelHead tab={tab} setTab={setTab} onSettings={ai.openSettings} onClose={props.onClose} showChat />
       {tab === "summary" && (
         <div className="ai-body">
           <div className="ai-actions">
@@ -200,7 +200,7 @@ export default function AiPanel(props: {
               总结全书
             </button>
           </div>
-          {!summary && <p className="muted small ai-hint">选择要总结的范围。{flow && "在正文中选中文字，可以让 AI 解释或翻译。"}</p>}
+          {!summary && <p className="muted small ai-hint">选择要总结的范围。在正文中选中文字，可以让 AI 解释或翻译。</p>}
           {summary && (
             <div className="ai-result">
               <div className="ai-result-title">
@@ -233,7 +233,7 @@ export default function AiPanel(props: {
       {tab === "chat" && (
         <div className="ai-body">
           {!chat ? (
-            <p className="muted small ai-hint">在正文中选中文字，点击工具条上的「解释」或「翻译」。</p>
+            <p className="muted small ai-hint">在正文中选中文字，点击工具条上的「解释」或「翻译」。扫描版 PDF 没有文字，无法选中。</p>
           ) : (
             <>
               <blockquote className="ai-quote">
@@ -258,14 +258,16 @@ export default function AiPanel(props: {
                   lastAnswer && (
                     <>
                       <button onClick={() => copy(lastAnswer)}>复制</button>
-                      <button
-                        onClick={() => {
-                          props.onSaveNote(chat.request, lastAnswer);
-                          setNotice("已存为笔记");
-                        }}
-                      >
-                        存为笔记
-                      </button>
+                      {chat.request.anchor && (
+                        <button
+                          onClick={() => {
+                            props.onSaveNote(chat.request, lastAnswer);
+                            setNotice("已存为笔记");
+                          }}
+                        >
+                          存为笔记
+                        </button>
+                      )}
                     </>
                   )
                 )}

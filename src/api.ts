@@ -17,6 +17,7 @@ import type {
   OpenedBook,
   Shelf,
   Suggestion,
+  TextRun,
 } from "./types";
 
 // Custom protocols are exposed as http://<scheme>.localhost on Windows.
@@ -38,6 +39,7 @@ export const api = {
   deleteGroup: (name: string) => invoke<void>("delete_group", { name }),
   openBook: (id: string) => invoke<OpenedBook>("open_book", { id }),
   getChapter: (id: string, index: number) => invoke<Block[]>("get_chapter", { id, index }),
+  getPageText: (id: string, page: number) => invoke<TextRun[]>("get_page_text", { id, page }),
   searchBook: (id: string, query: string) => invoke<Hit[]>("search_book", { id, query }),
   saveProgress: (id: string, position: Location, progress: number) =>
     invoke<void>("save_progress", { id, position, progress }),

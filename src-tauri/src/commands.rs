@@ -473,3 +473,20 @@ pub async fn add_reading_time(
     })
     .await
 }
+
+/// Text runs of a PDF page for the selectable text layer (empty for scans and comics).
+#[tauri::command]
+pub async fn get_page_text(
+    app: AppHandle,
+    id: String,
+    page: usize,
+) -> CmdResult<Vec<crate::model::TextRun>> {
+    blocking(move || {
+        let book = state(&app).open_book(&id).map_err(err)?;
+        Ok(match &book.doc.content {
+            Content::Paged(src) if page < src.page_count() => src.text_runs(page),
+            _ => Vec::new(),
+        })
+    })
+    .await
+}

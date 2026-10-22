@@ -45,6 +45,7 @@ pub fn run() {
             commands::delete_group,
             commands::open_book,
             commands::get_chapter,
+            commands::get_page_text,
             commands::search_book,
             commands::save_progress,
             commands::get_settings,

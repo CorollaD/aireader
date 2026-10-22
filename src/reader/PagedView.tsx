@@ -1,9 +1,9 @@
 // Fixed-layout pages (PDF, comics), rendered by the backend through `book://` URLs.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { pageUrl } from "../api";
+import { api, pageUrl } from "../api";
 import { isTyping } from "../ui";
-import type { Location, OpenedBook } from "../types";
+import type { Location, OpenedBook, TextRun } from "../types";
 import type { Jump } from "./Reader";
 
 const GAP = 14;
@@ -29,6 +29,81 @@ function useSize(ref: React.RefObject<HTMLElement>) {
   return size;
 }
 
+/** Text runs per book and page, fetched once. */
+const textCache = new Map<string, Promise<TextRun[]>>();
+export function pageText(bookId: string, page: number): Promise<TextRun[]> {
+  const key = `${bookId}:${page}`;
+  let p = textCache.get(key);
+  if (!p) {
+    p = api.getPageText(bookId, page).catch(() => []);
+    textCache.set(key, p);
+  }
+  return p;
+}
+
+/**
+ * Invisible, selectable text placed over the page image (like pdf.js). Runs are positioned on
+ * the unrotated page, and the whole layer is rotated with the page.
+ */
+function TextLayer(props: { bookId: string; index: number; width: number; height: number; rotation: number }) {
+  const [runs, setRuns] = useState<TextRun[] | null>(null);
+  const layer = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let alive = true;
+    pageText(props.bookId, props.index).then((r) => alive && setRuns(r));
+    return () => {
+      alive = false;
+    };
+  }, [props.bookId, props.index]);
+  const quarter = props.rotation === 90 || props.rotation === 270;
+  const [w, h] = quarter ? [props.height, props.width] : [props.width, props.height];
+
+  // Stretch each run to its width in the PDF. The rendered width is measured from the DOM (all
+  // reads first, then all writes) because canvas measurements differ from layout by a few %.
+  useLayoutEffect(() => {
+    const spans = [...(layer.current?.querySelectorAll<HTMLElement>(".run") ?? [])];
+    if (!runs || spans.length !== runs.length) return;
+    const natural = spans.map((el) => el.offsetWidth);
+    spans.forEach((el, i) => {
+      el.style.transform = natural[i] > 0 ? `scaleX(${(runs[i].w * w) / natural[i]})` : "";
+    });
+  }, [runs, w, h]);
+
+  if (!runs?.length) return null;
+  return (
+    <div
+      ref={layer}
+      className="text-layer"
+      data-page={props.index}
+      style={{
+        width: w,
+        height: h,
+        left: (props.width - w) / 2,
+        top: (props.height - h) / 2,
+        transform: props.rotation ? `rotate(${props.rotation}deg)` : undefined,
+      }}
+    >
+      {runs.map((r, i) => {
+        const next = runs[i + 1];
+        // Separators make copied text read naturally: a line break between lines, a space
+        // between runs on the same line.
+        const newLine = next && Math.abs(next.y - r.y) > r.h / 2;
+        return (
+          <span key={i}>
+            <span
+              className="run"
+              style={{ left: r.x * w, top: r.y * h, fontSize: r.h * h }}
+            >
+              {r.text}
+            </span>
+            {next && (newLine ? <br /> : <span className="sep"> </span>)}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 /** A page box; the rendered image, once loaded, covers the page-number placeholder. */
 function Page(props: {
   bookId: string;
@@ -40,7 +115,7 @@ function Page(props: {
   style?: React.CSSProperties;
 }) {
   return (
-    <div className="page" style={{ width: props.width, height: props.height, ...props.style }}>
+    <div className="page" data-page={props.index} style={{ width: props.width, height: props.height, ...props.style }}>
       <span className="page-number">{props.index + 1}</span>
       {props.load && (
         <img
@@ -50,8 +125,28 @@ function Page(props: {
           decoding="async"
         />
       )}
+      {props.load && <TextLayer bookId={props.bookId} index={props.index} width={props.width} height={props.height} rotation={props.rotation} />}
     </div>
   );
+}
+
+/** A text selection on a PDF page. */
+export interface PageSelection {
+  page: number;
+  text: string;
+  rect: DOMRect;
+}
+
+/** The current selection inside a text layer, or null. */
+function pageSelection(): PageSelection | null {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  const node = range.startContainer;
+  const layer = (node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement)?.closest<HTMLElement>(".text-layer");
+  const text = sel.toString().trim();
+  if (!layer || !text) return null;
+  return { page: Number(layer.dataset.page), text, rect: range.getBoundingClientRect() };
 }
 
 interface Props {
@@ -63,9 +158,10 @@ interface Props {
   /** Clockwise page rotation in degrees. */
   rotation: number;
   onLocation: (loc: Location, lastVisible: number) => void;
+  onSelect: (selection: PageSelection | null) => void;
 }
 
-export default function PagedView({ book, jump, layout, fit, zoom, rotation, onLocation }: Props) {
+export default function PagedView({ book, jump, layout, fit, zoom, rotation, onLocation, onSelect }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const size = useSize(scroller);
   const [page, setPage] = useState(() => (jump?.loc.kind === "page" ? jump.loc.page : 0));
@@ -165,6 +261,15 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, onL
     return () => window.removeEventListener("keydown", onKey);
   }, [goto, layout, count]);
 
+  useEffect(() => {
+    const onChange = () => {
+      if (window.getSelection()?.isCollapsed) onSelect(null);
+    };
+    document.addEventListener("selectionchange", onChange);
+    return () => document.removeEventListener("selectionchange", onChange);
+  }, [onSelect]);
+  const checkSelection = () => setTimeout(() => onSelect(pageSelection()), 0);
+
   if (count === 0) return <div className="center-msg muted">没有页面</div>;
 
   if (layout === "single") {
@@ -172,7 +277,7 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, onL
     const base = fit === "width" ? size.w - 32 : Math.min(size.w - 32, (size.h - 32) / aspect);
     const w = Math.max(120, base) * zoom;
     return (
-      <div className="paged-scroller single" ref={scroller}>
+      <div className="paged-scroller single" ref={scroller} onMouseUp={checkSelection}>
         <div className="single-stage" style={{ minWidth: w + 32, minHeight: w * aspect + 32 }}>
           {size.w > 0 && (
             <Page key={page} bookId={book.id} index={page} width={w} height={w * aspect} rotation={rotation} load />
@@ -190,7 +295,7 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, onL
   }
 
   return (
-    <div className="paged-scroller" ref={scroller} onScroll={onScroll}>
+    <div className="paged-scroller" ref={scroller} onScroll={onScroll} onMouseUp={checkSelection}>
       <div className="pages" style={{ height: tops[count], width: Math.max(width + 48, size.w) }}>
         {size.w > 0 &&
           aspects.map((aspect, i) =>

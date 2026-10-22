@@ -250,10 +250,11 @@ fn minimal_pdf() -> Vec<u8> {
     let objects = [
         "<< /Type /Catalog /Pages 2 0 R /Outlines 5 0 R >>",
         "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 600] /Contents 4 0 R >>",
-        "<< /Length 0 >>\nstream\n\nendstream",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 600] /Contents 4 0 R /Resources << /Font << /F1 7 0 R >> >> >>",
+        "<< /Length 42 >>\nstream\nBT /F1 24 Tf 30 500 Td (Hello World) Tj ET\nendstream",
         "<< /Type /Outlines /First 6 0 R /Last 6 0 R /Count 1 >>",
         "<< /Title (Start) /Parent 5 0 R /Dest [3 0 R /Fit] >>",
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
     ];
     let mut out = b"%PDF-1.4\n".to_vec();
     let mut offsets = Vec::new();
@@ -299,4 +300,20 @@ fn pdf_render_and_outline() {
     assert_eq!(doc.toc.len(), 1);
     assert_eq!(doc.toc[0].title, "Start");
     assert_eq!(doc.toc[0].location, Location::Page { page: 0 });
+
+    // The text layer: one run where the text was drawn (x = 30/300, baseline at 500 of 600).
+    assert_eq!(
+        src.page_text(0).as_deref().map(str::trim),
+        Some("Hello World")
+    );
+    let runs = src.text_runs(0);
+    assert_eq!(runs.len(), 1, "{runs:?}");
+    let r = &runs[0];
+    assert_eq!(r.text.trim(), "Hello World");
+    assert!((r.x - 0.1).abs() < 0.02, "{r:?}");
+    assert!(
+        r.y > 0.12 && r.y < 0.18 && r.h > 0.01 && r.h < 0.06,
+        "{r:?}"
+    );
+    assert!(r.w > 0.3 && r.w < 0.6, "{r:?}");
 }

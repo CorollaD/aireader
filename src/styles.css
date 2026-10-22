@@ -1535,3 +1535,72 @@ kbd {
 .organize-field input:not([type="checkbox"]) {
   flex: 1;
 }
+
+/* PDF text layer: invisible text over the page image, selectable like pdf.js. */
+.text-layer {
+  position: absolute;
+  transform-origin: center;
+  line-height: 1;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+  z-index: 1;
+}
+.text-layer .run {
+  position: absolute;
+  white-space: pre;
+  color: transparent;
+  font-family: sans-serif;
+  transform-origin: 0 0;
+}
+.text-layer .sep {
+  font-size: 0;
+}
+.text-layer ::selection {
+  background: rgba(47, 111, 222, 0.32);
+  color: transparent;
+}
+.paged-scroller.single .page-turn {
+  z-index: 2;
+}
+
+/* Collapsible table of contents */
+.toc-tools {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 12px 4px;
+}
+.toc-row {
+  display: flex;
+  align-items: center;
+}
+.toc-row.active {
+  background: var(--accent-soft);
+}
+.toc-row .toc-item {
+  flex: 1;
+  min-width: 0;
+  padding-left: 2px;
+  white-space: nowrap;
+  background: none;
+}
+.toc-row.active .toc-item {
+  background: none;
+}
+.toc-toggle,
+.toc-toggle-space {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 26px;
+}
+.toc-toggle {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.toc-toggle:hover {
+  color: var(--fg);
+}

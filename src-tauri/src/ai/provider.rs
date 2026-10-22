@@ -101,7 +101,10 @@ pub fn pricing(model: &ChatModel) -> Option<(f64, f64)> {
 }
 
 /// Streams a reply, calling `on_text` with each fragment; returns the whole text.
-#[allow(clippy::result_large_err, reason = "rig's error type; callers convert it right away")]
+#[allow(
+    clippy::result_large_err,
+    reason = "rig's error type; callers convert it right away"
+)]
 pub async fn stream_text(
     model: &ChatModel,
     request: CompletionRequest,
@@ -119,7 +122,10 @@ pub async fn stream_text(
 }
 
 /// One complete reply as text.
-#[allow(clippy::result_large_err, reason = "rig's error type; callers convert it right away")]
+#[allow(
+    clippy::result_large_err,
+    reason = "rig's error type; callers convert it right away"
+)]
 pub async fn complete_text(
     model: &ChatModel,
     request: CompletionRequest,
@@ -141,8 +147,7 @@ pub fn friendly_error(cfg: &AiConfig, error: &ProviderError) -> String {
             "API Key 无效或没有权限，请在「AI 设置」中检查".into()
         }
         _ if cfg.is_local()
-            && (matches!(error, ProviderError::Http(_))
-                || matches!(status, Some(502..=504))) =>
+            && (matches!(error, ProviderError::Http(_)) || matches!(status, Some(502..=504))) =>
         {
             "连接不到本地模型服务，请确认 Ollama / llama.cpp 已经启动，并检查接口地址".into()
         }

@@ -135,7 +135,12 @@ export function installMock() {
             kind: paged ? "paged" : "flow",
             toc: paged
               ? [0, 2, 4].map((p) => ({ title: `第 ${p + 1} 页`, depth: 0, location: { kind: "page", page: p } }))
-              : [0, 1, 2].map((c) => ({ title: `第${c + 1}回 示例章节`, depth: 0, location: { kind: "flow", chapter: c, block: 0 } })),
+              : [0, 1, 2].flatMap((c) => [
+                  { title: `第${c + 1}回 示例章节`, depth: 0, location: { kind: "flow", chapter: c, block: 0 } },
+                  { title: `${c + 1}.1 小节`, depth: 1, location: { kind: "flow", chapter: c, block: 5 } },
+                  { title: `${c + 1}.1.1 细目`, depth: 2, location: { kind: "flow", chapter: c, block: 6 } },
+                  { title: `${c + 1}.2 小节`, depth: 1, location: { kind: "flow", chapter: c, block: 12 } },
+                ]),
             chapters: paged
               ? []
               : [0, 1, 2].map((c) => ({
@@ -161,6 +166,12 @@ export function installMock() {
           b.lastRead = now();
           return null;
         }
+        case "get_page_text":
+          return [
+            { text: "Attention Is All You Need", x: 0.25, y: 0.2, w: 0.5, h: 0.03 },
+            { text: "The dominant sequence transduction models are based on", x: 0.15, y: 0.4, w: 0.7, h: 0.015 },
+            { text: "complex recurrent or convolutional neural networks.", x: 0.15, y: 0.42, w: 0.65, h: 0.015 },
+          ];
         case "get_annotations":
           return db.annotations.get(a.id as string) ?? { bookmarks: [], highlights: [] };
         case "save_annotations":

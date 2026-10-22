@@ -6,7 +6,7 @@ use std::sync::{Arc, OnceLock};
 use anyhow::{Result, anyhow};
 use pdfium_render::prelude::*;
 
-use crate::model::{Content, Document, Location, PageImage, PageSource, TocEntry};
+use crate::model::{Content, Document, Location, PageImage, PageSource, TextRun, TocEntry};
 
 static PDFIUM: OnceLock<Result<Pdfium, String>> = OnceLock::new();
 static RESOURCE_DIR: OnceLock<PathBuf> = OnceLock::new();
@@ -88,6 +88,46 @@ impl PageSource for PdfSource {
         let page = self.doc.pages().get(index as PdfPageIndex).ok()?;
         let text = page.text().ok()?.all();
         (!text.trim().is_empty()).then_some(text)
+    }
+
+    fn text_runs(&self, index: usize) -> Vec<TextRun> {
+        let Ok(page) = self.doc.pages().get(index as PdfPageIndex) else {
+            return Vec::new();
+        };
+        let (pw, ph) = (page.width().value, page.height().value);
+        let Ok(text) = page.text() else {
+            return Vec::new();
+        };
+        if pw <= 0.0 || ph <= 0.0 {
+            return Vec::new();
+        }
+        text.segments()
+            .iter()
+            .filter_map(|seg| {
+                let t = seg.text();
+                if t.trim().is_empty() {
+                    return None;
+                }
+                let b = seg.bounds();
+                let (left, right, top, bottom) = (
+                    b.left().value,
+                    b.right().value,
+                    b.top().value,
+                    b.bottom().value,
+                );
+                // Vertical text (e.g. margin watermarks) would become one huge glyph box; skip it.
+                if t.chars().count() > 2 && (top - bottom) > 2.0 * (right - left) {
+                    return None;
+                }
+                Some(TextRun {
+                    text: t,
+                    x: left / pw,
+                    y: (ph - top) / ph,
+                    w: (right - left) / pw,
+                    h: (top - bottom) / ph,
+                })
+            })
+            .collect()
     }
 
     fn render(&self, index: usize, width: u32) -> Result<PageImage> {

@@ -31,8 +31,9 @@ export interface ToolbarAction {
 export function SelectionToolbar(props: {
   rect: DOMRect;
   current?: HighlightColor;
-  onColor: (color: HighlightColor) => void;
-  onNote: () => void;
+  /** Without these (PDF text), the toolbar offers only copy and extra actions. */
+  onColor?: (color: HighlightColor) => void;
+  onNote?: () => void;
   onCopy: () => void;
   onRemove?: () => void;
   /** More actions after the built-in ones (e.g. AI). */
@@ -40,17 +41,18 @@ export function SelectionToolbar(props: {
 }) {
   return (
     <div className="float-toolbar" style={placement(props.rect)} onMouseDown={keepSelection} onClick={(e) => e.stopPropagation()}>
-      {COLORS.map((c) => (
-        <button
-          key={c.key}
-          className={`color-dot hl-${c.key}${props.current === c.key ? " on" : ""}`}
-          title={`${c.name}高亮`}
-          aria-label={`${c.name}高亮`}
-          onClick={() => props.onColor(c.key)}
-        />
-      ))}
-      <span className="sep" />
-      <button onClick={props.onNote}>笔记</button>
+      {props.onColor &&
+        COLORS.map((c) => (
+          <button
+            key={c.key}
+            className={`color-dot hl-${c.key}${props.current === c.key ? " on" : ""}`}
+            title={`${c.name}高亮`}
+            aria-label={`${c.name}高亮`}
+            onClick={() => props.onColor?.(c.key)}
+          />
+        ))}
+      {props.onColor && <span className="sep" />}
+      {props.onNote && <button onClick={props.onNote}>笔记</button>}
       <button onClick={props.onCopy}>复制</button>
       {props.onRemove && (
         <button className="danger" onClick={props.onRemove}>

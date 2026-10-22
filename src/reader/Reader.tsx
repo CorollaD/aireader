@@ -11,7 +11,7 @@ import type { ChatAction } from "../types";
 import { NoteEditor, SelectionToolbar } from "./Annotate";
 import FlowView, { type FlowHandle, type FlowSelection } from "./FlowView";
 import { describe, isValid, progressOf, sameLocation, START } from "./locations";
-import PagedView from "./PagedView";
+import PagedView, { pageText, type PageSelection } from "./PagedView";
 import ProgressBar from "./ProgressBar";
 import SettingsPanel from "./SettingsPanel";
 import { SHORTCUTS } from "./shortcuts";
@@ -59,6 +59,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
   const [toast, setToast] = useState<string | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [chatRequest, setChatRequest] = useState<ChatRequest | null>(null);
+  const [pageSel, setPageSel] = useState<PageSelection | null>(null);
   const ai = useAi();
   const searchInput = useRef<HTMLInputElement>(null);
   const flowRef = useRef<FlowHandle>(null);
@@ -193,7 +194,13 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
     );
   };
 
-  /** Sends the current selection to the AI panel. */
+  const openChat = (req: Omit<ChatRequest, "n">) => {
+    setChatRequest((r) => ({ ...req, n: (r?.n ?? 0) + 1 }));
+    setAiOpen(true);
+    setSearch((s) => ({ ...s, open: false }));
+  };
+
+  /** Sends the current text selection to the AI panel. */
   const askAi = (action: ChatAction) => {
     if (!selection) return;
     const { chapter, startBlock, start, endBlock, end, text } = selection;
@@ -203,29 +210,32 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
       const t = flowRef.current?.blockText(chapter, b);
       if (t) context.push(t);
     }
-    setChatRequest((r) => ({
-      n: (r?.n ?? 0) + 1,
-      chapter,
-      range: { startBlock, start, endBlock, end },
-      selection: text,
-      context: context.join("\n").slice(0, 2000),
-      action,
-    }));
-    setAiOpen(true);
-    setSearch((s) => ({ ...s, open: false }));
+    openChat({ anchor: { chapter, range: { startBlock, start, endBlock, end } }, selection: text, context: context.join("\n").slice(0, 2000), action });
     clearSelection();
+  };
+
+  /** Sends a PDF selection to the AI panel, with the page's text as context. */
+  const askAiPage = async (action: ChatAction) => {
+    if (!pageSel) return;
+    const { page, text } = pageSel;
+    window.getSelection()?.removeAllRanges();
+    setPageSel(null);
+    const runs = await pageText(bookId, page);
+    const context = runs.map((r) => r.text).join(" ").slice(0, 2000);
+    openChat({ anchor: null, selection: text, context, action });
   };
 
   /** Stores an AI answer as the note of a highlight on the asked-about passage. */
   const saveAiNote = (req: ChatRequest, answer: string) => {
-    const r = req.range;
+    if (!req.anchor) return;
+    const { chapter, range: r } = req.anchor;
     const existing = ann.data.highlights.find(
-      (h) => h.chapter === req.chapter && h.startBlock === r.startBlock && h.start === r.start && h.endBlock === r.endBlock && h.end === r.end,
+      (h) => h.chapter === chapter && h.startBlock === r.startBlock && h.start === r.start && h.endBlock === r.endBlock && h.end === r.end,
     );
     if (existing) {
       ann.updateHighlight(existing.id, { note: existing.note ? `${existing.note}\n\n${answer}` : answer });
     } else {
-      ann.addHighlight({ chapter: req.chapter, ...r, text: req.selection, color: "blue", note: answer });
+      ann.addHighlight({ chapter, ...r, text: req.selection, color: "blue", note: answer });
     }
   };
 
@@ -297,9 +307,10 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
       } else if (e.key === "Escape") {
         // Open dialogs handle Escape themselves.
         if (document.querySelector(".modal-backdrop")) return;
-        if (selection || activeMark) {
+        if (selection || activeMark || pageSel) {
           clearSelection();
           setActiveMark(null);
+          setPageSel(null);
         } else if (panel) setPanel(false);
         else if (search.open) setSearch((s) => ({ ...s, open: false }));
         else if (aiOpen) setAiOpen(false);
@@ -317,7 +328,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isFlow, settings.fontSize, settings.showToc, panel, search.open, aiOpen, focus, selection, activeMark, update, props.onClose, toggleBookmark, back, forward]);
+  }, [isFlow, settings.fontSize, settings.showToc, panel, search.open, aiOpen, focus, selection, activeMark, pageSel, update, props.onClose, toggleBookmark, back, forward]);
 
   if (error && !book) {
     return (
@@ -475,6 +486,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
               zoom={zoom}
               rotation={rotation}
               onLocation={onLocation}
+              onSelect={setPageSel}
             />
           )}
           {!focus && <ProgressBar book={book} location={location} stats={stats} onJump={(loc) => navigate(loc)} />}
@@ -524,6 +536,24 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
               ? [
                   { label: "解释", title: "让 AI 解释选中的文字", run: () => askAi("explain") },
                   { label: "翻译", title: "让 AI 翻译选中的文字", run: () => askAi("translate") },
+                ]
+              : undefined
+          }
+        />
+      )}
+      {pageSel && (
+        <SelectionToolbar
+          rect={pageSel.rect}
+          onCopy={() => {
+            copy(pageSel.text);
+            window.getSelection()?.removeAllRanges();
+            setPageSel(null);
+          }}
+          extra={
+            ai.ready
+              ? [
+                  { label: "解释", title: "让 AI 解释选中的文字", run: () => askAiPage("explain") },
+                  { label: "翻译", title: "让 AI 翻译选中的文字", run: () => askAiPage("translate") },
                 ]
               : undefined
           }
