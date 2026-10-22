@@ -2,7 +2,7 @@
 //! through a `Channel`; they can be cancelled by id.
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{Result, bail};
 use serde::Serialize;
@@ -11,6 +11,7 @@ use tauri::{AppHandle, Manager};
 
 use super::config::{AiConfig, KeyringStore, SecretStore};
 use super::provider::{self, ChatModel};
+use super::retrieval::BookIndex;
 use super::tasks::{
     self, AiEvent, AiTask, BookBrief, BookEstimate, Runner, Suggestion, SummaryCache,
 };
@@ -27,13 +28,19 @@ pub struct AiState {
     secrets: Box<dyn SecretStore>,
     /// Running tasks by id, for cancellation.
     running: Mutex<HashMap<String, tauri::async_runtime::JoinHandle<()>>>,
+    /// Search indexes of recently asked-about books, newest last.
+    indexes: Mutex<Vec<(String, Arc<BookIndex>)>>,
 }
+
+/// How many book indexes stay in memory.
+const INDEX_CACHE: usize = 3;
 
 impl Default for AiState {
     fn default() -> Self {
         Self {
             secrets: Box::new(KeyringStore),
             running: Mutex::new(HashMap::new()),
+            indexes: Mutex::new(Vec::new()),
         }
     }
 }
@@ -158,6 +165,28 @@ async fn open_book(
     Ok((book, title))
 }
 
+/// The book's search index, built on first use.
+async fn book_index(app: &AppHandle, id: &str) -> Result<Arc<BookIndex>> {
+    {
+        let mut cached = ai_state(app).indexes.lock().unwrap();
+        if let Some(pos) = cached.iter().position(|(k, _)| k == id) {
+            let entry = cached.remove(pos);
+            let index = entry.1.clone();
+            cached.push(entry);
+            return Ok(index);
+        }
+    }
+    let (book, _) = open_book(app, id).await?;
+    let index =
+        tauri::async_runtime::spawn_blocking(move || Arc::new(BookIndex::build(&book.doc))).await?;
+    let mut cached = ai_state(app).indexes.lock().unwrap();
+    cached.push((id.to_owned(), index.clone()));
+    if cached.len() > INDEX_CACHE {
+        cached.remove(0);
+    }
+    Ok(index)
+}
+
 fn cache(app: &AppHandle, id: &str) -> SummaryCache {
     SummaryCache::open(app_state(app).library().ai_dir(id))
 }
@@ -214,6 +243,20 @@ async fn run_task(
         } => {
             let text =
                 tasks::chat(&runner, &book_title, &selection, &context, action, &history).await?;
+            Ok((text, false))
+        }
+        AiTask::Ask {
+            book_id,
+            location,
+            history,
+        } => {
+            let index = book_index(app, &book_id).await?;
+            let title = app_state(app)
+                .library()
+                .get(&book_id)
+                .map(|b| b.title.clone())
+                .unwrap_or_default();
+            let text = tasks::ask(&runner, &title, &index, location, &history).await?;
             Ok((text, false))
         }
     }

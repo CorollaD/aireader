@@ -8,7 +8,7 @@ import { isTyping, Toast } from "../ui";
 import { t } from "../i18n";
 import { Icon } from "../icons";
 import { useOpenSettings } from "../SettingsDialog";
-import AiPanel, { type ChatRequest } from "../ai/AiPanel";
+import AiPanel, { type ChatRequest, type Quote } from "../ai/AiPanel";
 import { useAi } from "../ai/AiContext";
 import type { ChatAction } from "../types";
 import { NoteEditor, SelectionToolbar } from "./Annotate";
@@ -205,7 +205,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
   };
 
   /** Sends the current text selection to the AI panel. */
-  const askAi = (action: ChatAction) => {
+  const askAi = (action: ChatAction | null) => {
     if (!selection) return;
     const { chapter, startBlock, start, endBlock, end, text } = selection;
     // Context: the selected paragraphs plus one on each side, capped.
@@ -219,7 +219,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
   };
 
   /** Sends a PDF selection to the AI panel, with the page's text as context. */
-  const askAiPage = async (action: ChatAction) => {
+  const askAiPage = async (action: ChatAction | null) => {
     if (!pageSel) return;
     const { page, text } = pageSel;
     window.getSelection()?.removeAllRanges();
@@ -230,7 +230,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
   };
 
   /** Stores an AI answer as the note of a highlight on the asked-about passage. */
-  const saveAiNote = (req: ChatRequest, answer: string) => {
+  const saveAiNote = (req: Quote, answer: string) => {
     if (!req.anchor) return;
     const { chapter, range: r } = req.anchor;
     const existing = ann.data.highlights.find(
@@ -576,7 +576,14 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
           {!focus && <ProgressBar book={book} location={location} stats={stats} onJump={(loc) => navigate(loc)} />}
         </section>
         {aiOpen && !focus && (
-          <AiPanel book={book} location={location} chatRequest={chatRequest} onSaveNote={saveAiNote} onClose={() => setAiOpen(false)} />
+          <AiPanel
+            book={book}
+            location={location}
+            chatRequest={chatRequest}
+            onSaveNote={saveAiNote}
+            onNavigate={(loc) => navigate(loc, true)}
+            onClose={() => setAiOpen(false)}
+          />
         )}
         {search.open && isFlow && !focus && (
           <aside className="search-panel">
@@ -622,8 +629,9 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
           extra={
             ai.ready
               ? [
-                  { label: t("reader.explain"), title: t("reader.explainTitle"), run: () => askAi("explain") },
-                  { label: t("reader.translate"), title: t("reader.translateTitle"), run: () => askAi("translate") },
+                  { label: t("reader.explain"), title: t("reader.explainTitle"), icon: "sparkles", run: () => askAi("explain") },
+                  { label: t("reader.translate"), title: t("reader.translateTitle"), icon: "languages", run: () => askAi("translate") },
+                  { label: t("reader.ask"), title: t("reader.askTitle"), icon: "message", run: () => askAi(null) },
                 ]
               : undefined
           }
@@ -640,8 +648,9 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
           extra={
             ai.ready
               ? [
-                  { label: t("reader.explain"), title: t("reader.explainTitle"), run: () => askAiPage("explain") },
-                  { label: t("reader.translate"), title: t("reader.translateTitle"), run: () => askAiPage("translate") },
+                  { label: t("reader.explain"), title: t("reader.explainTitle"), icon: "sparkles", run: () => askAiPage("explain") },
+                  { label: t("reader.translate"), title: t("reader.translateTitle"), icon: "languages", run: () => askAiPage("translate") },
+                  { label: t("reader.ask"), title: t("reader.askTitle"), icon: "message", run: () => askAiPage(null) },
                 ]
               : undefined
           }

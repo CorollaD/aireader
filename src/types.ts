@@ -151,7 +151,16 @@ export type AiEvent =
   | { type: "delta"; text: string }
   | { type: "progress"; done: number; total: number; label: string }
   | { type: "done"; text: string; cached: boolean }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "sources"; sources: Source[] };
+
+/** A passage an answer may cite as [n]. */
+export interface Source {
+  n: number;
+  title: string;
+  location: Location;
+  excerpt: string;
+}
 
 export type ChatAction = "explain" | "translate" | "summarize";
 
@@ -171,7 +180,8 @@ export type AiTask =
       context: string;
       action: ChatAction | null;
       history: ChatTurn[];
-    };
+    }
+  | { kind: "ask"; bookId: string; location: Location | null; history: ChatTurn[] };
 
 export interface BookEstimate {
   units: number;

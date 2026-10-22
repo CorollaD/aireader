@@ -1,5 +1,5 @@
-//! The AI features: chapter/page/book summaries, chat about a text selection, and bookshelf
-//! organisation. Everything here works on a [`ChatModel`] and plain data, so it can be tested
+//! The AI features: chapter/page/book summaries, questions about the book, chat about a text
+//! selection, and bookshelf organisation. Everything here works on a [`ChatModel`] and plain data, so it can be tested
 //! with rig's mock models.
 
 use std::collections::{BTreeMap, HashMap};
@@ -11,7 +11,8 @@ use serde::{Deserialize, Serialize};
 
 use super::config::AiConfig;
 use super::provider::{ChatModel, complete_text, estimate_tokens, friendly_error, stream_text};
-use crate::model::{Content, Document};
+use super::retrieval::BookIndex;
+use crate::model::{Content, Document, Location};
 
 const SUMMARY_TOKENS: u64 = 2_048;
 const MERGE_TOKENS: u64 = 4_096;
@@ -60,6 +61,23 @@ pub enum AiTask {
         action: Option<ChatAction>,
         history: Vec<ChatTurn>,
     },
+    /// A question about the whole book, answered from retrieved passages and the text around
+    /// the reader's position. `history` ends with the user's newest message.
+    #[serde(rename_all = "camelCase")]
+    Ask {
+        book_id: String,
+        location: Option<Location>,
+        history: Vec<ChatTurn>,
+    },
+}
+
+/// A numbered passage an answer may cite as `[n]`.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Source {
+    pub n: usize,
+    pub title: String,
+    pub location: Location,
+    pub excerpt: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -79,6 +97,10 @@ pub enum AiEvent {
     },
     Error {
         message: String,
+    },
+    /// The passages given to the model for a question, sent before the answer.
+    Sources {
+        sources: Vec<Source>,
     },
 }
 
@@ -532,6 +554,139 @@ pub async fn chat(
     r.stream_request(request).await
 }
 
+// --- questions about the book -----------------------------------------------------------------
+
+/// Share of the input budget for the text around the reader's position.
+const NEARBY_SHARE: usize = 3;
+const MAX_SOURCES: usize = 12;
+const EXCERPT_CHARS: usize = 90;
+
+/// Picks passages for a question: the ones around the reader's position, then the best keyword
+/// matches, within `budget` tokens. Returned in reading order.
+pub fn select_passages(
+    index: &BookIndex,
+    location: Option<Location>,
+    query: &str,
+    budget: usize,
+) -> Vec<usize> {
+    let mut chosen: Vec<usize> = Vec::new();
+    let mut used = 0;
+    let mut take = |i: usize, limit: usize, chosen: &mut Vec<usize>| -> bool {
+        if chosen.contains(&i) || chosen.len() >= MAX_SOURCES {
+            return chosen.len() < MAX_SOURCES;
+        }
+        let cost = estimate_tokens(&index.passages[i].text);
+        if used + cost > limit {
+            return false;
+        }
+        used += cost;
+        chosen.push(i);
+        true
+    };
+    if let Some(here) = location.and_then(|l| index.passage_at(l)) {
+        // The current passage, then alternately the ones after and before it.
+        let near_limit = budget / NEARBY_SHARE;
+        let mut order = vec![here];
+        for d in 1..=3 {
+            order.push(here + d);
+            if let Some(before) = here.checked_sub(d) {
+                order.push(before);
+            }
+        }
+        for i in order.into_iter().filter(|&i| i < index.passages.len()) {
+            if !take(i, near_limit, &mut chosen) {
+                break;
+            }
+        }
+    }
+    for i in index.search(query, MAX_SOURCES * 2) {
+        if !take(i, budget, &mut chosen) {
+            break;
+        }
+    }
+    chosen.sort_unstable();
+    chosen
+}
+
+pub async fn ask(
+    r: &Runner<'_>,
+    book_title: &str,
+    index: &BookIndex,
+    location: Option<Location>,
+    history: &[ChatTurn],
+) -> Result<String> {
+    let Some(last) = history.iter().rev().find(|t| t.role != "assistant") else {
+        bail!(crate::t!("ai_no_question"))
+    };
+    // The previous question helps with follow-ups such as "what happened to him next?".
+    let query: String = history
+        .iter()
+        .rev()
+        .filter(|t| t.role != "assistant")
+        .take(2)
+        .map(|t| t.text.as_str())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let picked = select_passages(index, location, &query, r.budget);
+    let sources: Vec<Source> = picked
+        .iter()
+        .enumerate()
+        .map(|(k, &i)| {
+            let p = &index.passages[i];
+            Source {
+                n: k + 1,
+                title: p.title.clone(),
+                location: p.location,
+                excerpt: p.text.chars().take(EXCERPT_CHARS).collect(),
+            }
+        })
+        .collect();
+    (r.emit)(AiEvent::Sources {
+        sources: sources.clone(),
+    });
+    let here = location
+        .and_then(|l| index.passage_at(l))
+        .map(|i| index.passages[i].title.clone());
+    let mut system = format!(
+        "{}\n\nThe reader is asking about the book \"{book_title}\". Answer from the numbered \
+         excerpts below and cite the ones you use as [n], e.g. [2] or [1][3]. If the excerpts \
+         don't contain the answer, say so briefly and answer only what they support.",
+        r.system()
+    );
+    if let Some(here) = here {
+        system.push_str(&format!(
+            " The reader is currently in \"{here}\"; \"this chapter\" refers to it."
+        ));
+    }
+    system.push_str("\n\n<excerpts>\n");
+    for (s, &i) in sources.iter().zip(&picked) {
+        system.push_str(&format!(
+            "[{}] ({})\n{}\n\n",
+            s.n, s.title, index.passages[i].text
+        ));
+    }
+    system.push_str("</excerpts>");
+    let mut turns: Vec<Message> = history
+        .iter()
+        .map(|t| {
+            if t.role == "assistant" {
+                Message::assistant(t.text.clone())
+            } else {
+                Message::user(t.text.clone())
+            }
+        })
+        .collect();
+    // `last` is the newest user message, so the list is not empty.
+    let prompt = turns
+        .pop()
+        .unwrap_or_else(|| Message::user(last.text.clone()));
+    let request = CompletionRequest::new(prompt)
+        .messages(turns)
+        .preamble(system)
+        .max_tokens(CHAT_TOKENS);
+    r.stream_request(request).await
+}
+
 // --- bookshelf organisation --------------------------------------------------------------------
 
 #[derive(Clone, Debug, Serialize)]
@@ -826,6 +981,75 @@ mod tests {
                 .count(),
             3
         );
+    }
+
+    fn index() -> BookIndex {
+        use super::super::retrieval::Passage;
+        let p = |c: usize, title: &str, text: &str| Passage {
+            title: title.into(),
+            location: Location::Flow {
+                chapter: c,
+                block: 0,
+            },
+            text: text.into(),
+        };
+        BookIndex::from_passages(vec![
+            p(0, "第一回", "刘备在桃园与关羽、张飞结义。"),
+            p(1, "第二回", "曹操煮酒论英雄。"),
+            p(2, "第三回", "诸葛亮草船借箭。"),
+            p(3, "第四回", "赤壁之战，周瑜火攻。"),
+        ])
+    }
+
+    #[test]
+    fn passages_combine_position_and_matches_in_reading_order() {
+        let index = index();
+        // Near chapter 3 (passages 2..), plus the keyword match in chapter 0.
+        let picked = select_passages(
+            &index,
+            Some(Location::Flow {
+                chapter: 3,
+                block: 0,
+            }),
+            "桃园",
+            10_000,
+        );
+        assert_eq!(picked[0], 0);
+        assert!(picked.contains(&3) && picked.contains(&2));
+        assert!(picked.windows(2).all(|w| w[0] < w[1]));
+        // A tiny budget still returns the best match and nothing over budget.
+        assert_eq!(select_passages(&index, None, "曹操", 20), [1]);
+    }
+
+    #[tokio::test]
+    async fn ask_cites_numbered_sources() {
+        let model = MockCompletionModel::from_stream_turns([streamed(&["见 [1]"])]);
+        let events = Mutex::new(Vec::new());
+        let emit = |e: AiEvent| events.lock().unwrap().push(e);
+        let r = Runner {
+            model: model.clone().erase(),
+            cfg: cfg(),
+            budget: 10_000,
+            emit: &emit,
+        };
+        let history = vec![ChatTurn {
+            role: "user".into(),
+            text: "谁在桃园结义？".into(),
+        }];
+        let s = ask(&r, "三国演义", &index(), None, &history).await.unwrap();
+        assert_eq!(s, "见 [1]");
+        let events = events.lock().unwrap().clone();
+        let AiEvent::Sources { sources } = &events[0] else {
+            panic!("sources first: {events:?}")
+        };
+        assert_eq!(sources[0].n, 1);
+        assert_eq!(sources[0].title, "第一回");
+        let system = model.requests()[0]
+            .system_instructions()
+            .unwrap()
+            .to_owned();
+        assert!(system.contains("[1] (第一回)\n刘备在桃园"));
+        assert!(ask(&r, "书", &index(), None, &[]).await.is_err());
     }
 
     fn briefs() -> Vec<BookBrief> {

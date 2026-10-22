@@ -2,7 +2,7 @@
 // (`npm run dev`, then open http://localhost:1420). Never included in production builds.
 
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { AiConfig, AiEvent, AiTask, Annotations, Block, Book, Location } from "../types";
+import type { AiConfig, AiEvent, AiTask, Annotations, Block, Book, Location, Source } from "../types";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -64,7 +64,7 @@ export function installMock() {
     configured: !!db.ai.provider && !!db.ai.model,
   });
   /** Streams `text` to a Channel in small pieces, then finishes. */
-  const stream = (channel: { id: number }, text: string, progress = false) => {
+  const stream = (channel: { id: number }, text: string, progress = false, sources?: Source[]) => {
     let index = 0;
     const send = (message: AiEvent) =>
       (window as unknown as { __TAURI_INTERNALS__: { runCallback: (id: number, d: unknown) => void } }).__TAURI_INTERNALS__.runCallback(
@@ -73,6 +73,7 @@ export function installMock() {
       );
     const pieces = text.match(/.{1,6}/gs) ?? [];
     let t = 0;
+    if (sources) setTimeout(() => send({ type: "sources", sources }), (t += 80));
     if (progress) [0, 1, 2].forEach((i) => setTimeout(() => send({ type: "progress", done: i, total: 3, label: `正在总结「第${i + 1}回」` }), (t += 150)));
     pieces.forEach((p) => setTimeout(() => send({ type: "delta", text: p }), (t += 40)));
     setTimeout(() => send({ type: "done", text, cached: false }), (t += 60));
@@ -201,6 +202,17 @@ export function installMock() {
           return null;
         case "ai_run": {
           const task = a.task as AiTask;
+          if (task.kind === "ask") {
+            const sources: Source[] = [0, 1, 2].map((c) => ({
+              n: c + 1,
+              title: `第${c + 1}回 示例章节`,
+              location: { kind: "flow", chapter: c, block: 3 },
+              excerpt: "话说天下大势，分久必合，合久必分。周末七国分争，并入于秦。",
+            }));
+            const answer = task.history.length > 1 ? "继续说明：后来**楚汉相争**，又并入于汉 [2]。" : "开篇点明了全书主旨：**天下大势，分久必合，合久必分** [1]。\n\n- 周末七国分争，并入于秦 [1]\n- 楚汉分争，又并入于汉 [2][3]";
+            stream(a.onEvent as { id: number }, answer, false, sources);
+            return null;
+          }
           const text =
             task.kind === "chat"
               ? task.action === "translate"

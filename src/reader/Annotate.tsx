@@ -1,16 +1,16 @@
 // Floating toolbars for a text selection and for an existing highlight, and the note editor.
 
-import { useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Modal } from "../ui";
 import type { HighlightColor } from "../types";
 import { t } from "../i18n";
 import { MOD } from "./shortcuts";
+import { Icon, type IconName } from "../icons";
 
 export const COLORS: HighlightColor[] = ["yellow", "green", "blue", "pink", "purple"];
 
 /** Positions a toolbar above `rect` (or below it near the top of the window). */
-function placement(rect: DOMRect): React.CSSProperties {
-  const width = 300;
+function placement(rect: DOMRect, width: number): React.CSSProperties {
   const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.left + rect.width / 2 - width / 2));
   return rect.top > 70 ? { left, top: rect.top - 50 } : { left, top: rect.bottom + 10 };
 }
@@ -21,6 +21,7 @@ const keepSelection = (e: React.MouseEvent) => e.preventDefault();
 export interface ToolbarAction {
   label: string;
   title?: string;
+  icon?: IconName;
   run: () => void;
 }
 
@@ -35,8 +36,14 @@ export function SelectionToolbar(props: {
   /** More actions after the built-in ones (e.g. AI). */
   extra?: ToolbarAction[];
 }) {
+  const el = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(300);
+  // Centre on the selection using the toolbar's real width (it depends on the buttons shown).
+  useLayoutEffect(() => {
+    if (el.current) setWidth(el.current.offsetWidth);
+  }, [props.extra?.length, !!props.onColor, !!props.onRemove]);
   return (
-    <div className="float-toolbar" style={placement(props.rect)} onMouseDown={keepSelection} onClick={(e) => e.stopPropagation()}>
+    <div ref={el} className="float-toolbar" style={placement(props.rect, width)} onMouseDown={keepSelection} onClick={(e) => e.stopPropagation()}>
       {props.onColor &&
         COLORS.map((c) => (
           <button
@@ -55,11 +62,16 @@ export function SelectionToolbar(props: {
           {t("common.delete")}
         </button>
       )}
-      {props.extra?.map((a) => (
-        <button key={a.label} title={a.title} onClick={a.run}>
-          {a.label}
-        </button>
-      ))}
+      {props.extra && props.extra.length > 0 && (
+        <span className="toolbar-ai">
+          {props.extra.map((a) => (
+            <button key={a.label} title={a.title} onClick={a.run}>
+              {a.icon && <Icon name={a.icon} size={14} />}
+              {a.label}
+            </button>
+          ))}
+        </span>
+      )}
     </div>
   );
 }
