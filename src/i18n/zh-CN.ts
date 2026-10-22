@@ -116,7 +116,7 @@ const zhCN = {
   "shelf.fileFilter": "电子书与文档",
   "shelf.selectedCount": "已选择 {n} 本",
   "shelf.selectAll": "全选",
-  "shelf.setGroups": "设置分组",
+  "shelf.setGroups": "移到分组",
   "shelf.clearSelection": "取消选择",
   "shelf.emptyTitle": "书架还是空的",
   "shelf.emptyFormats": "支持 {formats}",
@@ -149,12 +149,11 @@ const zhCN = {
   "book.readTime": "已读 {time}",
 
   "edit.titleOne": "编辑书籍信息",
-  "edit.titleMany": "设置 {n} 本书的分组",
+  "edit.titleMany": "将 {n} 本书移到分组",
   "edit.bookTitle": "书名",
   "edit.author": "作者",
   "edit.unknown": "未知",
   "edit.groups": "分组",
-  "edit.noGroups": "还没有分组",
   "edit.newGroup": "新分组名称",
 
   "reader.backToShelf": "返回书架",
@@ -311,12 +310,10 @@ const zhCN = {
   "ai.customUrlHint": "例如 {url}",
 
   "org.title": "AI 整理（{n} 本书）",
-  "org.onlyAdd": "只会添加分组，不会移除书原有的分组",
+  "org.onlyAdd": "已有分组的书默认不勾选；勾选后会移到建议的分组",
   "org.apply": "应用 {n} 项",
   "org.running": "正在请 AI 分析书目，书多时需要一些时间…",
   "org.nothing": "AI 没有给出新的分组建议，书架看起来已经整理好了。",
-  "org.current": "现有：{groups}",
-  "org.addGroups": "添加分组",
   "org.setAuthor": "作者设为「{author}」",
 
   "ai.newChat": "新对话",
@@ -368,6 +365,10 @@ const zhCN = {
   "mm.exportSvg": "导出为 SVG 矢量图",
   "mm.copyOutline": "复制大纲",
   "mm.hint": "拖动平移 · ⌘/Ctrl + 滚轮缩放 · 点击节点折叠或展开",
+
+  "edit.keepGroup": "保持各自的分组",
+  "edit.newGroupOption": "新建分组…",
+  "org.moveTo": "移到分组",
 };
 
 export default zhCN;

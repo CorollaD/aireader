@@ -116,7 +116,7 @@ const fr: Messages = {
   "shelf.fileFilter": "Livres numériques et documents",
   "shelf.selectedCount": "{n} sélectionnés",
   "shelf.selectAll": "Tout sélectionner",
-  "shelf.setGroups": "Définir les groupes",
+  "shelf.setGroups": "Déplacer vers un groupe",
   "shelf.clearSelection": "Désélectionner",
   "shelf.emptyTitle": "Votre bibliothèque est vide",
   "shelf.emptyFormats": "Formats pris en charge : {formats}",
@@ -149,12 +149,11 @@ const fr: Messages = {
   "book.readTime": "Lu pendant {time}",
 
   "edit.titleOne": "Modifier les infos du livre",
-  "edit.titleMany": "Définir les groupes de {n} livres",
+  "edit.titleMany": "Déplacer {n} livres vers un groupe",
   "edit.bookTitle": "Titre",
   "edit.author": "Auteur",
   "edit.unknown": "Inconnu",
-  "edit.groups": "Groupes",
-  "edit.noGroups": "Aucun groupe pour l'instant",
+  "edit.groups": "Groupe",
   "edit.newGroup": "Nom du nouveau groupe",
 
   "reader.backToShelf": "Retour à la bibliothèque",
@@ -311,12 +310,10 @@ const fr: Messages = {
   "ai.customUrlHint": "p. ex. {url}",
 
   "org.title": "Ranger avec l'IA ({n} livres)",
-  "org.onlyAdd": "Les groupes sont seulement ajoutés ; les groupes existants sont conservés",
+  "org.onlyAdd": "Les livres qui ont déjà un groupe sont décochés ; cochez-les pour les déplacer",
   "org.apply": "Appliquer {n}",
   "org.running": "L'IA examine vos livres. Cela peut prendre un moment pour une grande bibliothèque…",
   "org.nothing": "L'IA n'a pas de nouveaux groupes à suggérer. Votre bibliothèque semble déjà rangée.",
-  "org.current": "Actuellement : {groups}",
-  "org.addGroups": "Ajouter des groupes",
   "org.setAuthor": "Définir l'auteur sur « {author} »",
 
   "ai.newChat": "Nouvelle conversation",
@@ -368,6 +365,10 @@ const fr: Messages = {
   "mm.exportSvg": "Enregistrer en SVG",
   "mm.copyOutline": "Copier le plan",
   "mm.hint": "Faites glisser pour déplacer · ⌘/Ctrl + molette pour zoomer · cliquez sur un nœud pour le replier ou le déplier",
+
+  "edit.keepGroup": "Garder leurs groupes",
+  "edit.newGroupOption": "Nouveau groupe…",
+  "org.moveTo": "Déplacer vers le groupe",
 };
 
 export default fr;

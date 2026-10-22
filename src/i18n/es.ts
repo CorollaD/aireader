@@ -116,7 +116,7 @@ const es: Messages = {
   "shelf.fileFilter": "Libros electrónicos y documentos",
   "shelf.selectedCount": "{n} seleccionados",
   "shelf.selectAll": "Seleccionar todo",
-  "shelf.setGroups": "Asignar grupos",
+  "shelf.setGroups": "Mover a grupo",
   "shelf.clearSelection": "Anular selección",
   "shelf.emptyTitle": "Tu estantería está vacía",
   "shelf.emptyFormats": "Admite {formats}",
@@ -149,12 +149,11 @@ const es: Messages = {
   "book.readTime": "Leído durante {time}",
 
   "edit.titleOne": "Editar datos del libro",
-  "edit.titleMany": "Asignar grupos a {n} libros",
+  "edit.titleMany": "Mover {n} libros a un grupo",
   "edit.bookTitle": "Título",
   "edit.author": "Autor",
   "edit.unknown": "Desconocido",
-  "edit.groups": "Grupos",
-  "edit.noGroups": "Aún no hay grupos",
+  "edit.groups": "Grupo",
   "edit.newGroup": "Nombre del nuevo grupo",
 
   "reader.backToShelf": "Volver a la estantería",
@@ -311,12 +310,10 @@ const es: Messages = {
   "ai.customUrlHint": "p. ej. {url}",
 
   "org.title": "Organizar con IA ({n} libros)",
-  "org.onlyAdd": "Solo se añaden grupos; los existentes se conservan",
+  "org.onlyAdd": "Los libros que ya tienen grupo no están marcados; márcalos para moverlos",
   "org.apply": "Aplicar {n}",
   "org.running": "La IA está revisando tus libros. Puede tardar un poco si hay muchos…",
   "org.nothing": "La IA no sugiere grupos nuevos. Tu estantería ya parece ordenada.",
-  "org.current": "Ahora: {groups}",
-  "org.addGroups": "Añadir grupos",
   "org.setAuthor": "Poner como autor «{author}»",
 
   "ai.newChat": "Nueva conversación",
@@ -368,6 +365,10 @@ const es: Messages = {
   "mm.exportSvg": "Guardar como SVG",
   "mm.copyOutline": "Copiar esquema",
   "mm.hint": "Arrastra para mover · ⌘/Ctrl + rueda para ampliar · pulsa un nodo para plegarlo o desplegarlo",
+
+  "edit.keepGroup": "Mantener sus grupos",
+  "edit.newGroupOption": "Nuevo grupo…",
+  "org.moveTo": "Mover a grupo",
 };
 
 export default es;

@@ -115,7 +115,7 @@ export function BookRow({ book, selected, selecting, onOpen, onToggle, onMenu }:
         <div className="book-title">{book.title}</div>
         <div className="book-sub">
           {book.author ?? t("common.unknownAuthor")}
-          {book.groups.length > 0 && <span className="row-groups"> · {book.groups.join(t("common.listSeparator"))}</span>}
+          {book.group && <span className="row-groups"> · {book.group}</span>}
         </div>
       </div>
       <span className="row-cell">{book.format}</span>

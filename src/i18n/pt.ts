@@ -116,7 +116,7 @@ const pt: Messages = {
   "shelf.fileFilter": "E-books e documentos",
   "shelf.selectedCount": "{n} selecionados",
   "shelf.selectAll": "Selecionar tudo",
-  "shelf.setGroups": "Definir grupos",
+  "shelf.setGroups": "Mover para grupo",
   "shelf.clearSelection": "Desmarcar",
   "shelf.emptyTitle": "Sua estante está vazia",
   "shelf.emptyFormats": "Formatos aceitos: {formats}",
@@ -149,12 +149,11 @@ const pt: Messages = {
   "book.readTime": "Lido por {time}",
 
   "edit.titleOne": "Editar dados do livro",
-  "edit.titleMany": "Definir grupos de {n} livros",
+  "edit.titleMany": "Mover {n} livros para um grupo",
   "edit.bookTitle": "Título",
   "edit.author": "Autor",
   "edit.unknown": "Desconhecido",
-  "edit.groups": "Grupos",
-  "edit.noGroups": "Ainda não há grupos",
+  "edit.groups": "Grupo",
   "edit.newGroup": "Nome do novo grupo",
 
   "reader.backToShelf": "Voltar à estante",
@@ -311,12 +310,10 @@ const pt: Messages = {
   "ai.customUrlHint": "ex.: {url}",
 
   "org.title": "Organizar com IA ({n} livros)",
-  "org.onlyAdd": "Os grupos são apenas adicionados; os existentes são mantidos",
+  "org.onlyAdd": "Livros que já têm grupo ficam desmarcados; marque-os para movê-los",
   "org.apply": "Aplicar {n}",
   "org.running": "A IA está analisando seus livros. Pode demorar um pouco em estantes grandes…",
   "org.nothing": "A IA não tem novos grupos para sugerir. Sua estante já parece organizada.",
-  "org.current": "Agora: {groups}",
-  "org.addGroups": "Adicionar grupos",
   "org.setAuthor": "Definir autor como “{author}”",
 
   "ai.newChat": "Nova conversa",
@@ -368,6 +365,10 @@ const pt: Messages = {
   "mm.exportSvg": "Salvar como SVG",
   "mm.copyOutline": "Copiar tópicos",
   "mm.hint": "Arraste para mover · ⌘/Ctrl + rolagem para zoom · clique em um nó para recolher ou expandir",
+
+  "edit.keepGroup": "Manter os grupos atuais",
+  "edit.newGroupOption": "Novo grupo…",
+  "org.moveTo": "Mover para o grupo",
 };
 
 export default pt;

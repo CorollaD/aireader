@@ -1,5 +1,6 @@
-// AI bookshelf organisation: ask for group/author suggestions, let the user review and edit
-// them, and apply only what was accepted.
+// AI bookshelf organisation: ask for a group (each book is in one) and missing authors, let the
+// user review and edit the suggestions, and apply only what was accepted. Books that already
+// have a group start unchecked, so nothing is moved without the user's say.
 
 import { useEffect, useState } from "react";
 import { api, errorText } from "../api";
@@ -12,16 +13,10 @@ interface Row {
   suggestion: Suggestion;
   book: Book;
   accept: boolean;
-  /** Editable, separated by 、 or commas. */
-  groups: string;
+  /** The group to move the book to (editable); empty keeps its current group. */
+  group: string;
   acceptAuthor: boolean;
 }
-
-const splitGroups = (s: string) =>
-  s
-    .split(/[、,，;；]/)
-    .map((g) => g.trim())
-    .filter(Boolean);
 
 export default function OrganizeDialog(props: {
   books: Book[];
@@ -48,15 +43,18 @@ export default function OrganizeDialog(props: {
         setRows(
           suggestions
             .filter((s) => byId.has(s.bookId))
-            .map((s) => ({
-              suggestion: s,
-              book: byId.get(s.bookId)!,
-              // Groups the book already has are not new.
-              groups: s.groups.filter((g) => !byId.get(s.bookId)!.groups.includes(g)).join(t("common.listSeparator")),
-              accept: true,
-              acceptAuthor: !!s.author,
-            }))
-            .filter((r) => r.groups || r.suggestion.author),
+            .map((s) => {
+              const book = byId.get(s.bookId)!;
+              return {
+                suggestion: s,
+                book,
+                group: s.group ?? "",
+                // Moving a book out of its group needs an explicit tick; filling gaps doesn't.
+                accept: !book.group || !s.group,
+                acceptAuthor: !!s.author,
+              };
+            })
+            .filter((r) => r.group || r.suggestion.author),
         );
         setPhase("review");
       } catch (e) {
@@ -80,12 +78,12 @@ export default function OrganizeDialog(props: {
       .filter((r) => r.accept)
       .map((r) => {
         const patch: BookPatch = {};
-        const added = splitGroups(r.groups).filter((g) => !r.book.groups.includes(g));
-        if (added.length) patch.groups = [...r.book.groups, ...added];
+        const group = r.group.trim();
+        if (group && group !== r.book.group) patch.group = group;
         if (r.acceptAuthor && r.suggestion.author) patch.author = r.suggestion.author;
         return { id: r.book.id, patch };
       })
-      .filter((c) => c.patch.groups || c.patch.author);
+      .filter((c) => c.patch.group || c.patch.author);
     try {
       await props.onApply(changes);
       props.onClose();
@@ -130,12 +128,19 @@ export default function OrganizeDialog(props: {
                 <div className="organize-main">
                   <div className="ellipsis">
                     <strong>{r.book.title}</strong>
-                    {r.book.groups.length > 0 && <span className="muted small">　{t("org.current", { groups: r.book.groups.join(t("common.listSeparator")) })}</span>}
                   </div>
-                  <label className="organize-field">
-                    <span className="muted small">{t("org.addGroups")}</span>
-                    <input value={r.groups} disabled={!r.accept} onChange={(e) => update(i, { groups: e.target.value })} />
-                  </label>
+                  {r.suggestion.group && (
+                    <label className="organize-field">
+                      <span className={`group-chip${r.book.group ? "" : " none"}`}>{r.book.group ?? t("shelf.ungrouped")}</span>
+                      <span className="muted">→</span>
+                      <input
+                        value={r.group}
+                        disabled={!r.accept}
+                        aria-label={t("org.moveTo")}
+                        onChange={(e) => update(i, { group: e.target.value })}
+                      />
+                    </label>
+                  )}
                   {r.suggestion.author && (
                     <label className="organize-field toggle">
                       <input

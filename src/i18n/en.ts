@@ -116,7 +116,7 @@ const en: Messages = {
   "shelf.fileFilter": "E-books and documents",
   "shelf.selectedCount": "{n} selected",
   "shelf.selectAll": "Select all",
-  "shelf.setGroups": "Set groups",
+  "shelf.setGroups": "Move to group",
   "shelf.clearSelection": "Deselect",
   "shelf.emptyTitle": "Your shelf is empty",
   "shelf.emptyFormats": "Supports {formats}",
@@ -149,12 +149,11 @@ const en: Messages = {
   "book.readTime": "Read for {time}",
 
   "edit.titleOne": "Edit book details",
-  "edit.titleMany": "Set groups for {n} books",
+  "edit.titleMany": "Move {n} books to a group",
   "edit.bookTitle": "Title",
   "edit.author": "Author",
   "edit.unknown": "Unknown",
-  "edit.groups": "Groups",
-  "edit.noGroups": "No groups yet",
+  "edit.groups": "Group",
   "edit.newGroup": "New group name",
 
   "reader.backToShelf": "Back to shelf",
@@ -311,12 +310,10 @@ const en: Messages = {
   "ai.customUrlHint": "e.g. {url}",
 
   "org.title": "AI organize ({n} books)",
-  "org.onlyAdd": "Groups are only added; existing groups are kept",
+  "org.onlyAdd": "Books that already have a group are unchecked; tick them to move them",
   "org.apply": "Apply {n}",
   "org.running": "Asking AI to look through your books. This can take a while for a big shelf…",
   "org.nothing": "AI has no new group suggestions. Your shelf looks organized already.",
-  "org.current": "Now: {groups}",
-  "org.addGroups": "Add groups",
   "org.setAuthor": "Set author to “{author}”",
 
   "ai.newChat": "New chat",
@@ -368,6 +365,10 @@ const en: Messages = {
   "mm.exportSvg": "Save as SVG",
   "mm.copyOutline": "Copy outline",
   "mm.hint": "Drag to move · ⌘/Ctrl + scroll to zoom · click a node to fold or unfold it",
+
+  "edit.keepGroup": "Keep their groups",
+  "edit.newGroupOption": "New group…",
+  "org.moveTo": "Move to group",
 };
 
 export default en;

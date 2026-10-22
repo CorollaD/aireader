@@ -6,7 +6,7 @@ import type { AiConfig, AiEvent, AiTask, Annotations, Block, Book, Location, Sou
 
 const now = () => Math.floor(Date.now() / 1000);
 
-function book(id: string, title: string, author: string | null, format: string, groups: string[], progress = 0): Book {
+function book(id: string, title: string, author: string | null, format: string, group: string | null, progress = 0): Book {
   return {
     id,
     title,
@@ -20,7 +20,7 @@ function book(id: string, title: string, author: string | null, format: string, 
     lastRead: progress > 0 ? now() - Number.parseInt(id, 16) * 600 : null,
     progress,
     position: null,
-    groups,
+    group,
     readSeconds: progress > 0 ? 3600 * progress : 0,
     readingSpeed: null,
     rotation: 0,
@@ -45,11 +45,11 @@ export function installMock() {
   mockWindows("main");
   const db = {
     books: [
-      book("0001", "三国演义", "罗贯中", "TXT", ["小说"], 0.42),
-      book("0002", "Alice's Adventures in Wonderland", "Lewis Carroll", "EPUB", ["小说"], 0.1),
-      book("0003", "Attention Is All You Need", "Vaswani et al.", "PDF", ["技术"]),
-      book("0004", "Rust 程序设计语言", null, "MD", ["技术"], 1),
-      book("0005", "漫画样例", null, "CBZ", []),
+      book("0001", "三国演义", "罗贯中", "TXT", "小说", 0.42),
+      book("0002", "Alice's Adventures in Wonderland", "Lewis Carroll", "EPUB", "小说", 0.1),
+      book("0003", "Attention Is All You Need", "Vaswani et al.", "PDF", "技术"),
+      book("0004", "Rust 程序设计语言", null, "MD", "技术", 1),
+      book("0005", "漫画样例", null, "CBZ", null),
     ],
     groups: ["小说", "技术"],
     settings: {} as unknown,
@@ -92,7 +92,7 @@ export function installMock() {
         case "import_books": {
           const added = (a.paths as string[]).map((p) => {
             const name = p.split("/").pop()!;
-            const b = book(String(nextId++).padStart(4, "0"), name.replace(/\.[^.]+$/, ""), null, "EPUB", a.group ? [a.group as string] : []);
+            const b = book(String(nextId++).padStart(4, "0"), name.replace(/\.[^.]+$/, ""), null, "EPUB", (a.group as string | undefined) ?? null);
             b.added = now();
             db.books.push(b);
             return name;
@@ -104,9 +104,9 @@ export function installMock() {
           const patch = a.patch as Partial<Book>;
           if (patch.title !== undefined) b.title = patch.title;
           if (patch.author !== undefined) b.author = patch.author || null;
-          if (patch.groups) {
-            b.groups = patch.groups;
-            for (const g of patch.groups) if (!db.groups.includes(g)) db.groups.push(g);
+          if (patch.group !== undefined) {
+            b.group = patch.group || null;
+            if (b.group && !db.groups.includes(b.group)) db.groups.push(b.group);
           }
           return b;
         }
@@ -119,11 +119,11 @@ export function installMock() {
           return null;
         case "rename_group":
           db.groups = db.groups.map((g) => (g === a.old ? (a.new as string) : g));
-          for (const b of db.books) b.groups = b.groups.map((g) => (g === a.old ? (a.new as string) : g));
+          for (const b of db.books) if (b.group === a.old) b.group = a.new as string;
           return null;
         case "delete_group":
           db.groups = db.groups.filter((g) => g !== a.name);
-          for (const b of db.books) b.groups = b.groups.filter((g) => g !== a.name);
+          for (const b of db.books) if (b.group === a.name) b.group = null;
           return null;
         case "open_book": {
           const b = find(a.id);
@@ -234,7 +234,7 @@ export function installMock() {
         case "ai_organize":
           return (a.bookIds as string[]).slice(0, 3).map((id, i) => ({
             bookId: id,
-            groups: [["古典", "小说"], ["计算机"], ["漫画"]][i] ?? ["其他"],
+            group: ["古典名著", "计算机", "漫画"][i] ?? "其他",
             author: i === 2 ? "某作者" : null,
           }));
         case "get_settings":

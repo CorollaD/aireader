@@ -116,7 +116,7 @@ const ja: Messages = {
   "shelf.fileFilter": "電子書籍とドキュメント",
   "shelf.selectedCount": "{n} 冊を選択中",
   "shelf.selectAll": "すべて選択",
-  "shelf.setGroups": "グループを設定",
+  "shelf.setGroups": "グループへ移動",
   "shelf.clearSelection": "選択を解除",
   "shelf.emptyTitle": "本棚はまだ空です",
   "shelf.emptyFormats": "対応形式：{formats}",
@@ -149,12 +149,11 @@ const ja: Messages = {
   "book.readTime": "{time} 読みました",
 
   "edit.titleOne": "本の情報を編集",
-  "edit.titleMany": "{n} 冊のグループを設定",
+  "edit.titleMany": "{n} 冊をグループへ移動",
   "edit.bookTitle": "書名",
   "edit.author": "著者",
   "edit.unknown": "不明",
   "edit.groups": "グループ",
-  "edit.noGroups": "まだグループがありません",
   "edit.newGroup": "新しいグループ名",
 
   "reader.backToShelf": "本棚に戻る",
@@ -311,12 +310,10 @@ const ja: Messages = {
   "ai.customUrlHint": "例：{url}",
 
   "org.title": "AI で整理（{n} 冊）",
-  "org.onlyAdd": "グループは追加のみで、既存のグループは外しません",
+  "org.onlyAdd": "すでにグループがある本はオフです。オンにすると移動します",
   "org.apply": "{n} 件を適用",
   "org.running": "AI が本を分析しています。冊数が多いと時間がかかります…",
   "org.nothing": "AI から新しいグループの提案はありません。本棚はすでに整理されているようです。",
-  "org.current": "現在：{groups}",
-  "org.addGroups": "追加するグループ",
   "org.setAuthor": "著者を「{author}」にする",
 
   "ai.newChat": "新しいチャット",
@@ -368,6 +365,10 @@ const ja: Messages = {
   "mm.exportSvg": "SVG として保存",
   "mm.copyOutline": "アウトラインをコピー",
   "mm.hint": "ドラッグで移動 · ⌘/Ctrl + スクロールで拡大縮小 · ノードをクリックで折りたたみ / 展開",
+
+  "edit.keepGroup": "それぞれのグループのまま",
+  "edit.newGroupOption": "新規グループ…",
+  "org.moveTo": "移動先のグループ",
 };
 
 export default ja;

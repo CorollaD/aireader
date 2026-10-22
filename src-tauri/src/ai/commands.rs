@@ -337,7 +337,7 @@ pub async fn ai_organize(app: AppHandle, book_ids: Vec<String>) -> CmdResult<Vec
             title: b.title,
             author: b.author,
             format: b.format,
-            groups: b.groups,
+            group: b.group,
             excerpt,
         });
     }

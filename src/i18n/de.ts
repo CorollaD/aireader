@@ -116,7 +116,7 @@ const de: Messages = {
   "shelf.fileFilter": "E-Books und Dokumente",
   "shelf.selectedCount": "{n} ausgewählt",
   "shelf.selectAll": "Alle auswählen",
-  "shelf.setGroups": "Gruppen festlegen",
+  "shelf.setGroups": "In Gruppe verschieben",
   "shelf.clearSelection": "Auswahl aufheben",
   "shelf.emptyTitle": "Dein Regal ist leer",
   "shelf.emptyFormats": "Unterstützt {formats}",
@@ -149,12 +149,11 @@ const de: Messages = {
   "book.readTime": "{time} gelesen",
 
   "edit.titleOne": "Buchdetails bearbeiten",
-  "edit.titleMany": "Gruppen für {n} Bücher festlegen",
+  "edit.titleMany": "{n} Bücher in eine Gruppe verschieben",
   "edit.bookTitle": "Titel",
   "edit.author": "Autor",
   "edit.unknown": "Unbekannt",
-  "edit.groups": "Gruppen",
-  "edit.noGroups": "Noch keine Gruppen",
+  "edit.groups": "Gruppe",
   "edit.newGroup": "Name der neuen Gruppe",
 
   "reader.backToShelf": "Zurück zum Regal",
@@ -311,12 +310,10 @@ const de: Messages = {
   "ai.customUrlHint": "z. B. {url}",
 
   "org.title": "Mit KI ordnen ({n} Bücher)",
-  "org.onlyAdd": "Gruppen werden nur hinzugefügt; bestehende bleiben erhalten",
+  "org.onlyAdd": "Bücher mit Gruppe sind nicht angehakt; hake sie an, um sie zu verschieben",
   "org.apply": "{n} übernehmen",
   "org.running": "Die KI sieht sich deine Bücher an. Bei vielen Büchern kann das etwas dauern …",
   "org.nothing": "Die KI hat keine neuen Gruppenvorschläge. Dein Regal wirkt schon gut geordnet.",
-  "org.current": "Aktuell: {groups}",
-  "org.addGroups": "Gruppen hinzufügen",
   "org.setAuthor": "Autor auf „{author}“ setzen",
 
   "ai.newChat": "Neuer Chat",
@@ -368,6 +365,10 @@ const de: Messages = {
   "mm.exportSvg": "Als SVG sichern",
   "mm.copyOutline": "Gliederung kopieren",
   "mm.hint": "Ziehen zum Verschieben · ⌘/Strg + Mausrad zum Zoomen · Knoten anklicken zum Ein- und Ausklappen",
+
+  "edit.keepGroup": "Gruppen beibehalten",
+  "edit.newGroupOption": "Neue Gruppe …",
+  "org.moveTo": "In Gruppe verschieben",
 };
 
 export default de;

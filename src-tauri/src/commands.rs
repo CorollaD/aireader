@@ -144,7 +144,7 @@ enum Imported {
 fn import_file(
     app: &AppHandle,
     file: &std::path::Path,
-    groups: &[String],
+    group: Option<&str>,
 ) -> anyhow::Result<Imported> {
     let hash = library::hash_file(file)?;
     if let Some(existing) = state(app).library().find_hash(&hash) {
@@ -153,7 +153,7 @@ fn import_file(
     let root = state(app).library().root().to_owned();
     let prepared = Library::prepare(&root, file, &hash)?;
     let mut lib = state(app).library();
-    if lib.add(prepared, groups) {
+    if lib.add(prepared, group) {
         Ok(Imported::Added(hash[..16].to_owned()))
     } else {
         Ok(Imported::Existing(
@@ -174,7 +174,6 @@ pub async fn import_books(
     blocking(move || {
         let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
         let files = library::collect_files(&paths);
-        let groups: Vec<String> = group.into_iter().filter(|g| !g.trim().is_empty()).collect();
         let mut report = ImportReport::default();
         for (i, file) in files.iter().enumerate() {
             let name = file
@@ -189,7 +188,7 @@ pub async fn import_books(
                     name: name.clone(),
                 },
             );
-            match import_file(&app, file, &groups) {
+            match import_file(&app, file, group.as_deref()) {
                 Ok(Imported::Added(_)) => report.added.push(name),
                 Ok(Imported::Existing(_)) => report.duplicates.push(name),
                 Err(e) => report.failed.push((name, err(e))),
@@ -217,7 +216,7 @@ pub async fn take_startup_book(app: AppHandle) -> CmdResult<Option<String>> {
         let Some(file) = state(&app).startup_file.lock().unwrap().take() else {
             return Ok(None);
         };
-        let id = match import_file(&app, &file, &[]).map_err(err)? {
+        let id = match import_file(&app, &file, None).map_err(err)? {
             Imported::Added(id) | Imported::Existing(id) => id,
         };
         state(&app).library().save().map_err(err)?;

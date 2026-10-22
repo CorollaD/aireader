@@ -17,7 +17,8 @@ export interface Book {
   lastRead: number | null;
   progress: number;
   position: Location | null;
-  groups: string[];
+  /** A book is in at most one group; null = ungrouped. */
+  group: string | null;
   /** Active reading time in seconds. */
   readSeconds: number;
   /** Characters per minute (reflowable) or pages per minute (paged). */
@@ -35,7 +36,8 @@ export interface Shelf {
 export interface BookPatch {
   title?: string;
   author?: string;
-  groups?: string[];
+  /** null removes the book from its group. */
+  group?: string | null;
   rotation?: number;
 }
 
@@ -202,7 +204,8 @@ export interface BookEstimate {
 
 export interface Suggestion {
   bookId: string;
-  groups: string[];
+  /** Only set when it differs from the book's current group. */
+  group: string | null;
   author: string | null;
 }
 

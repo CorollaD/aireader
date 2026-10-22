@@ -3,50 +3,44 @@ import { Modal } from "../ui";
 import type { Book, BookPatch } from "../types";
 import { t } from "../i18n";
 
+// Values of the group picker besides group names.
+const NONE = "\u0000none";
+const KEEP = "\u0000keep";
+const NEW = "\u0000new";
+
 /**
- * Edits one book's title/author/groups, or only the groups of several books. `onSave` gets the
- * checked groups and the groups that were unchecked; groups only some books had stay untouched.
+ * Edits one book's title, author and group, or moves several books to one group. A book is in
+ * at most one group.
  */
 export function EditDialog(props: {
   books: Book[];
   groups: string[];
-  onSave: (patch: BookPatch, removedGroups: string[]) => void;
+  onSave: (patch: BookPatch) => void;
   onClose: () => void;
 }) {
   const single = props.books.length === 1 ? props.books[0] : null;
   const [title, setTitle] = useState(single?.title ?? "");
   const [author, setAuthor] = useState(single?.author ?? "");
-  // For several books, a group is pre-checked only if every book is in it.
-  const [initial] = useState(() => props.groups.filter((g) => props.books.every((b) => b.groups.includes(g))));
-  const [checked, setChecked] = useState<Set<string>>(() => new Set(initial));
+  // Several books in different groups start at "keep"; otherwise at their common group.
+  const [choice, setChoice] = useState(() => {
+    const groups = new Set(props.books.map((b) => b.group ?? NONE));
+    return groups.size === 1 ? [...groups][0] : KEEP;
+  });
   const [newGroup, setNewGroup] = useState("");
-  const allGroups = [...props.groups, ...[...checked].filter((g) => !props.groups.includes(g))];
-
-  const toggle = (g: string) =>
-    setChecked((s) => {
-      const n = new Set(s);
-      if (n.has(g)) n.delete(g);
-      else n.add(g);
-      return n;
-    });
-
-  const addGroup = () => {
-    const g = newGroup.trim();
-    if (g) setChecked((s) => new Set(s).add(g));
-    setNewGroup("");
-  };
+  const mixed = props.books.length > 1 && new Set(props.books.map((b) => b.group ?? NONE)).size > 1;
 
   const save = () => {
-    const patch: BookPatch = { groups: [...checked] };
+    const patch: BookPatch = {};
+    if (choice === NEW) patch.group = newGroup.trim();
+    else if (choice !== KEEP) patch.group = choice === NONE ? null : choice;
     if (single) {
       patch.title = title;
       patch.author = author;
     }
-    props.onSave(
-      patch,
-      initial.filter((g) => !checked.has(g)),
-    );
+    props.onSave(patch);
   };
+
+  const invalid = (!!single && !title.trim()) || (choice === NEW && !newGroup.trim());
 
   return (
     <Modal
@@ -55,7 +49,7 @@ export function EditDialog(props: {
       footer={
         <>
           <button onClick={props.onClose}>{t("common.cancel")}</button>
-          <button className="primary" onClick={save} disabled={!!single && !title.trim()}>
+          <button className="primary" onClick={save} disabled={invalid}>
             {t("common.save")}
           </button>
         </>
@@ -73,29 +67,29 @@ export function EditDialog(props: {
           </label>
         </>
       )}
-      <div className="field">
+      <label className="field">
         <span>{t("edit.groups")}</span>
-        <div className="group-checks">
-          {allGroups.length === 0 && <span className="muted">{t("edit.noGroups")}</span>}
-          {allGroups.map((g) => (
-            <label key={g} className="chip-check">
-              <input type="checkbox" checked={checked.has(g)} onChange={() => toggle(g)} />
+        <select value={choice} onChange={(e) => setChoice(e.target.value)} autoFocus={!single}>
+          {mixed && <option value={KEEP}>{t("edit.keepGroup")}</option>}
+          <option value={NONE}>{t("shelf.ungrouped")}</option>
+          {props.groups.map((g) => (
+            <option key={g} value={g}>
               {g}
-            </label>
+            </option>
           ))}
-        </div>
-        <div className="inline-add">
+          <option value={NEW}>{t("edit.newGroupOption")}</option>
+        </select>
+        {choice === NEW && (
           <input
+            className="inline-add"
             value={newGroup}
+            autoFocus
             placeholder={t("edit.newGroup")}
             onChange={(e) => setNewGroup(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addGroup()}
+            onKeyDown={(e) => e.key === "Enter" && !invalid && save()}
           />
-          <button onClick={addGroup} disabled={!newGroup.trim()}>
-            {t("common.add")}
-          </button>
-        </div>
-      </div>
+        )}
+      </label>
       {single && (
         <div className="muted small">
           {single.fileName} · {(single.size / 1024 / 1024).toFixed(2)} MB

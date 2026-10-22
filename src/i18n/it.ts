@@ -116,7 +116,7 @@ const it: Messages = {
   "shelf.fileFilter": "Ebook e documenti",
   "shelf.selectedCount": "{n} selezionati",
   "shelf.selectAll": "Seleziona tutto",
-  "shelf.setGroups": "Imposta gruppi",
+  "shelf.setGroups": "Sposta nel gruppo",
   "shelf.clearSelection": "Deseleziona",
   "shelf.emptyTitle": "Lo scaffale è vuoto",
   "shelf.emptyFormats": "Supporta {formats}",
@@ -149,12 +149,11 @@ const it: Messages = {
   "book.readTime": "Letto per {time}",
 
   "edit.titleOne": "Modifica dati del libro",
-  "edit.titleMany": "Imposta i gruppi di {n} libri",
+  "edit.titleMany": "Sposta {n} libri in un gruppo",
   "edit.bookTitle": "Titolo",
   "edit.author": "Autore",
   "edit.unknown": "Sconosciuto",
-  "edit.groups": "Gruppi",
-  "edit.noGroups": "Ancora nessun gruppo",
+  "edit.groups": "Gruppo",
   "edit.newGroup": "Nome del nuovo gruppo",
 
   "reader.backToShelf": "Torna allo scaffale",
@@ -311,12 +310,10 @@ const it: Messages = {
   "ai.customUrlHint": "ad es. {url}",
 
   "org.title": "Organizza con IA ({n} libri)",
-  "org.onlyAdd": "I gruppi vengono solo aggiunti; quelli esistenti restano",
+  "org.onlyAdd": "I libri che hanno già un gruppo non sono selezionati; selezionali per spostarli",
   "org.apply": "Applica {n}",
   "org.running": "L'IA sta esaminando i tuoi libri. Con uno scaffale grande può volerci un po'…",
   "org.nothing": "L'IA non ha nuovi gruppi da suggerire. Lo scaffale sembra già in ordine.",
-  "org.current": "Ora: {groups}",
-  "org.addGroups": "Aggiungi gruppi",
   "org.setAuthor": "Imposta come autore «{author}»",
 
   "ai.newChat": "Nuova chat",
@@ -368,6 +365,10 @@ const it: Messages = {
   "mm.exportSvg": "Salva come SVG",
   "mm.copyOutline": "Copia schema",
   "mm.hint": "Trascina per spostare · ⌘/Ctrl + rotella per lo zoom · fai clic su un nodo per comprimerlo o espanderlo",
+
+  "edit.keepGroup": "Mantieni i loro gruppi",
+  "edit.newGroupOption": "Nuovo gruppo…",
+  "org.moveTo": "Sposta nel gruppo",
 };
 
 export default it;

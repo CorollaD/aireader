@@ -116,7 +116,7 @@ const zhTW: Messages = {
   "shelf.fileFilter": "電子書與文件",
   "shelf.selectedCount": "已選取 {n} 本",
   "shelf.selectAll": "全選",
-  "shelf.setGroups": "設定分組",
+  "shelf.setGroups": "移到分組",
   "shelf.clearSelection": "取消選取",
   "shelf.emptyTitle": "書架還是空的",
   "shelf.emptyFormats": "支援 {formats}",
@@ -149,12 +149,11 @@ const zhTW: Messages = {
   "book.readTime": "已讀 {time}",
 
   "edit.titleOne": "編輯書籍資訊",
-  "edit.titleMany": "設定 {n} 本書的分組",
+  "edit.titleMany": "將 {n} 本書移到分組",
   "edit.bookTitle": "書名",
   "edit.author": "作者",
   "edit.unknown": "未知",
   "edit.groups": "分組",
-  "edit.noGroups": "還沒有分組",
   "edit.newGroup": "新分組名稱",
 
   "reader.backToShelf": "返回書架",
@@ -311,12 +310,10 @@ const zhTW: Messages = {
   "ai.customUrlHint": "例如 {url}",
 
   "org.title": "AI 整理（{n} 本書）",
-  "org.onlyAdd": "只會新增分組，不會移除書原有的分組",
+  "org.onlyAdd": "已有分組的書預設不勾選；勾選後會移到建議的分組",
   "org.apply": "套用 {n} 項",
   "org.running": "正在請 AI 分析書目，書多時需要一些時間…",
   "org.nothing": "AI 沒有提出新的分組建議，書架看起來已經整理好了。",
-  "org.current": "現有：{groups}",
-  "org.addGroups": "新增分組",
   "org.setAuthor": "作者設為「{author}」",
 
   "ai.newChat": "新對話",
@@ -368,6 +365,10 @@ const zhTW: Messages = {
   "mm.exportSvg": "匯出為 SVG 向量圖",
   "mm.copyOutline": "拷貝大綱",
   "mm.hint": "拖曳平移 · ⌘/Ctrl + 滾輪縮放 · 點按節點收合或展開",
+
+  "edit.keepGroup": "保持各自的分組",
+  "edit.newGroupOption": "新增分組…",
+  "org.moveTo": "移到分組",
 };
 
 export default zhTW;

@@ -116,7 +116,7 @@ const ko: Messages = {
   "shelf.fileFilter": "전자책 및 문서",
   "shelf.selectedCount": "{n}권 선택됨",
   "shelf.selectAll": "모두 선택",
-  "shelf.setGroups": "그룹 설정",
+  "shelf.setGroups": "그룹으로 이동",
   "shelf.clearSelection": "선택 해제",
   "shelf.emptyTitle": "책장이 비어 있습니다",
   "shelf.emptyFormats": "지원 형식: {formats}",
@@ -149,12 +149,11 @@ const ko: Messages = {
   "book.readTime": "{time} 읽음",
 
   "edit.titleOne": "책 정보 편집",
-  "edit.titleMany": "책 {n}권의 그룹 설정",
+  "edit.titleMany": "책 {n}권을 그룹으로 이동",
   "edit.bookTitle": "제목",
   "edit.author": "저자",
   "edit.unknown": "알 수 없음",
   "edit.groups": "그룹",
-  "edit.noGroups": "아직 그룹이 없습니다",
   "edit.newGroup": "새 그룹 이름",
 
   "reader.backToShelf": "책장으로 돌아가기",
@@ -311,12 +310,10 @@ const ko: Messages = {
   "ai.customUrlHint": "예: {url}",
 
   "org.title": "AI 정리(책 {n}권)",
-  "org.onlyAdd": "그룹은 추가만 하며 기존 그룹은 그대로 둡니다",
+  "org.onlyAdd": "이미 그룹이 있는 책은 선택되지 않습니다. 선택하면 이동합니다",
   "org.apply": "{n}개 적용",
   "org.running": "AI가 책 목록을 분석하고 있습니다. 책이 많으면 시간이 조금 걸립니다…",
   "org.nothing": "AI가 제안한 새 그룹이 없습니다. 책장이 이미 잘 정리된 것 같습니다.",
-  "org.current": "현재: {groups}",
-  "org.addGroups": "추가할 그룹",
   "org.setAuthor": "저자를 '{author}'(으)로 설정",
 
   "ai.newChat": "새 대화",
@@ -368,6 +365,10 @@ const ko: Messages = {
   "mm.exportSvg": "SVG로 저장",
   "mm.copyOutline": "개요 복사",
   "mm.hint": "드래그로 이동 · ⌘/Ctrl + 스크롤로 확대/축소 · 노드를 눌러 접기/펼치기",
+
+  "edit.keepGroup": "각자의 그룹 유지",
+  "edit.newGroupOption": "새 그룹…",
+  "org.moveTo": "이동할 그룹",
 };
 
 export default ko;

@@ -39,7 +39,12 @@ pub struct Book {
     /// Reading progress in `0.0..=1.0`.
     pub progress: f32,
     pub position: Option<Location>,
-    pub groups: Vec<String>,
+    /// The book's group; `None` is "ungrouped". A book is in at most one group.
+    #[serde(default)]
+    pub group: Option<String>,
+    /// Groups from older libraries, where a book could be in several; migrated on load.
+    #[serde(default, rename = "groups", skip_serializing)]
+    legacy_groups: Vec<String>,
     /// Active reading time in seconds.
     #[serde(default)]
     pub read_seconds: u64,
@@ -72,8 +77,19 @@ struct LibraryData {
 pub struct BookPatch {
     pub title: Option<String>,
     pub author: Option<String>,
-    pub groups: Option<Vec<String>>,
+    /// `Some(None)` (JSON `null`) or an empty name removes the book from its group.
+    #[serde(default, deserialize_with = "present")]
+    pub group: Option<Option<String>>,
     pub rotation: Option<u16>,
+}
+
+/// Tells a field that is present but `null` (`Some(None)`) from a missing one (`None`).
+fn present<'de, D, T>(d: D) -> std::result::Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(d).map(Some)
 }
 
 pub struct Library {
@@ -157,12 +173,19 @@ impl Library {
         std::fs::create_dir_all(root.join("books"))?;
         std::fs::create_dir_all(root.join("covers"))?;
         let file = root.join("library.json");
-        let data = match std::fs::read(&file) {
+        let mut data: LibraryData = match std::fs::read(&file) {
             Ok(bytes) => {
                 serde_json::from_slice(&bytes).with_context(|| crate::t!("library_corrupt"))?
             }
             Err(_) => LibraryData::default(),
         };
+        // Books that were in several groups keep the first one.
+        for b in &mut data.books {
+            let legacy = std::mem::take(&mut b.legacy_groups);
+            if b.group.is_none() {
+                b.group = legacy.into_iter().find(|g| !g.trim().is_empty());
+            }
+        }
         Ok(Self {
             root: root.to_owned(),
             data,
@@ -256,7 +279,8 @@ impl Library {
                 last_read: None,
                 progress: 0.0,
                 position: None,
-                groups: Vec::new(),
+                group: None,
+                legacy_groups: Vec::new(),
                 read_seconds: 0,
                 reading_speed: None,
                 rotation: 0,
@@ -272,26 +296,28 @@ impl Library {
         }
     }
 
-    /// Adds a prepared book (into `groups`, if given). Returns `false` if a book with the same
+    /// Adds a prepared book (into `group`, if given). Returns `false` if a book with the same
     /// content was added concurrently.
-    pub fn add(&mut self, prepared: Prepared, groups: &[String]) -> bool {
+    pub fn add(&mut self, prepared: Prepared, group: Option<&str>) -> bool {
         let mut book = prepared.book;
         if self.find_hash(&book.sha256).is_some() {
             return false;
         }
-        for g in groups {
+        let group = group.map(str::trim).filter(|g| !g.is_empty());
+        if let Some(g) = group {
             self.ensure_group(g);
         }
-        book.groups = groups.to_vec();
+        book.group = group.map(str::to_owned);
         self.data.books.push(book);
         true
     }
 
     pub fn update(&mut self, id: &str, patch: BookPatch) -> Result<Book> {
-        if let Some(groups) = &patch.groups {
-            for g in groups {
-                self.ensure_group(g);
-            }
+        let group = patch
+            .group
+            .map(|g| g.map(|g| g.trim().to_owned()).filter(|g| !g.is_empty()));
+        if let Some(Some(g)) = &group {
+            self.ensure_group(g);
         }
         let book = self.get_mut(id)?;
         if let Some(title) = patch.title.map(|t| t.trim().to_owned()) {
@@ -304,9 +330,8 @@ impl Library {
             let author = author.trim();
             book.author = (!author.is_empty()).then(|| author.to_owned());
         }
-        if let Some(mut groups) = patch.groups {
-            groups.dedup();
-            book.groups = groups;
+        if let Some(group) = group {
+            book.group = group;
         }
         if let Some(rotation) = patch.rotation {
             book.rotation = rotation % 360 / 90 * 90;
@@ -392,10 +417,8 @@ impl Library {
             .with_context(|| crate::t!("group_not_found"))?;
         *g = new.to_owned();
         for b in &mut self.data.books {
-            for bg in &mut b.groups {
-                if bg == old {
-                    *bg = new.to_owned();
-                }
+            if b.group.as_deref() == Some(old) {
+                b.group = Some(new.to_owned());
             }
         }
         Ok(())
@@ -405,7 +428,9 @@ impl Library {
     pub fn delete_group(&mut self, name: &str) {
         self.data.groups.retain(|g| g != name);
         for b in &mut self.data.books {
-            b.groups.retain(|g| g != name);
+            if b.group.as_deref() == Some(name) {
+                b.group = None;
+            }
         }
     }
 
@@ -443,7 +468,7 @@ mod tests {
             return Ok(false);
         }
         let prepared = Library::prepare(lib.root(), src, &hash)?;
-        Ok(lib.add(prepared, &[]))
+        Ok(lib.add(prepared, None))
     }
 
     #[test]
@@ -487,7 +512,7 @@ mod tests {
             BookPatch {
                 title: Some("新书名".into()),
                 author: Some(" 某人 ".into()),
-                groups: Some(vec!["小说".into()]),
+                group: Some(Some("小说".into())),
                 rotation: None,
             },
         )
@@ -530,7 +555,7 @@ mod tests {
         let b = lib.get(&id).unwrap();
         assert_eq!(b.title, "新书名");
         assert_eq!(b.author.as_deref(), Some("某人"));
-        assert_eq!(b.groups, ["文学"]);
+        assert_eq!(b.group.as_deref(), Some("文学"));
         assert_eq!(
             b.position,
             Some(Location::Flow {
@@ -545,10 +570,45 @@ mod tests {
         assert_eq!(lib.groups(), ["文学", "技术"]);
 
         lib.delete_group("文学");
-        assert!(lib.get(&id).unwrap().groups.is_empty());
+        assert_eq!(lib.get(&id).unwrap().group, None);
         lib.remove(std::slice::from_ref(&id));
         assert!(lib.get(&id).is_none());
         assert!(!root.join("books").join(&id).exists());
+    }
+
+    #[test]
+    fn books_in_several_groups_keep_the_first() {
+        let root = temp("legacy");
+        std::fs::create_dir_all(&root).unwrap();
+        let book = |id: &str, groups: &str| {
+            format!(
+                r#"{{"id":"{id}","title":"t","author":null,"format":"TXT","fileName":"a.txt","size":1,"sha256":"{id}","hasCover":false,"added":0,"lastRead":null,"progress":0,"position":null,"groups":{groups}}}"#
+            )
+        };
+        let json = format!(
+            r#"{{"books":[{},{}],"groups":["小说","历史"]}}"#,
+            book("a", r#"["小说","历史"]"#),
+            book("b", "[]")
+        );
+        std::fs::write(root.join("library.json"), json).unwrap();
+        let mut lib = Library::open(&root).unwrap();
+        assert_eq!(lib.get("a").unwrap().group.as_deref(), Some("小说"));
+        assert_eq!(lib.get("b").unwrap().group, None);
+        lib.update("a", serde_json::from_str(r#"{"group":null}"#).unwrap())
+            .unwrap();
+        assert_eq!(lib.get("a").unwrap().group, None, "null removes the group");
+        lib.update("a", serde_json::from_str(r#"{"title":"u"}"#).unwrap())
+            .unwrap();
+        assert_eq!(
+            lib.get("a").unwrap().group,
+            None,
+            "a missing field changes nothing"
+        );
+        lib.save().unwrap();
+        let saved = std::fs::read_to_string(root.join("library.json")).unwrap();
+        let saved: serde_json::Value = serde_json::from_str(&saved).unwrap();
+        let first = &saved["books"][0];
+        assert!(first.get("group").is_some() && first.get("groups").is_none());
     }
 
     #[test]

@@ -135,8 +135,8 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
     const q = query.trim().toLowerCase();
     let books = shelf.books;
     if (filter === RECENT) books = books.filter((b) => b.lastRead);
-    else if (filter === UNGROUPED) books = books.filter((b) => b.groups.length === 0);
-    else if (filter !== ALL) books = books.filter((b) => b.groups.includes(filter));
+    else if (filter === UNGROUPED) books = books.filter((b) => !b.group);
+    else if (filter !== ALL) books = books.filter((b) => b.group === filter);
     if (q) books = books.filter((b) => b.title.toLowerCase().includes(q) || (b.author ?? "").toLowerCase().includes(q));
     return sortBooks(books, filter === RECENT ? "recent" : settings.shelfSort);
   }, [shelf.books, filter, query, settings.shelfSort]);
@@ -156,13 +156,9 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
     setMenu({ book, x: Math.min(e.clientX, window.innerWidth - 180), y: Math.min(e.clientY, window.innerHeight - 160) });
   };
 
-  const saveEdit = async (books: Book[], patch: BookPatch, removed: string[]) => {
+  const saveEdit = async (books: Book[], patch: BookPatch) => {
     try {
-      for (const b of books) {
-        const keep = b.groups.filter((g) => !removed.includes(g) && !(patch.groups ?? []).includes(g));
-        const groups = books.length === 1 ? patch.groups : [...keep, ...(patch.groups ?? [])];
-        await api.updateBook(b.id, { ...patch, groups });
-      }
+      for (const b of books) await api.updateBook(b.id, patch);
       setEditing(null);
       refresh();
     } catch (e) {
@@ -198,7 +194,7 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
           <div className="brand">AiReader</div>
           {sideItem(ALL, "library", t("shelf.all"), shelf.books.length)}
           {sideItem(RECENT, "clock", t("shelf.recent"), count((b) => !!b.lastRead))}
-          {sideItem(UNGROUPED, "inbox", t("shelf.ungrouped"), count((b) => b.groups.length === 0))}
+          {sideItem(UNGROUPED, "inbox", t("shelf.ungrouped"), count((b) => !b.group))}
           <div className="side-heading">
             <span>{t("shelf.groups")}</span>
             <button className="icon" title={t("shelf.newGroup")} aria-label={t("shelf.newGroup")} onClick={() => setGroupDialog({ old: null })}>
@@ -207,7 +203,7 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
           </div>
           {shelf.groups.map((g) => (
             <div key={g} className="side-group">
-              {sideItem(g, "folder", g, count((b) => b.groups.includes(g)))}
+              {sideItem(g, "folder", g, count((b) => b.group === g))}
               <span className="side-actions">
                 <button className="icon" title={t("shelf.renameGroup")} onClick={() => setGroupDialog({ old: g })}>
                   <Icon name="edit" size={14} />
@@ -423,7 +419,7 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
         <EditDialog
           books={editing}
           groups={shelf.groups}
-          onSave={(patch, removed) => saveEdit(editing, patch, removed)}
+          onSave={(patch) => saveEdit(editing, patch)}
           onClose={() => setEditing(null)}
         />
       )}

@@ -2396,3 +2396,19 @@ button.cite:hover {
 .menu button:disabled {
   opacity: 0.4;
 }
+
+/* AI organize: current group → suggested group */
+.group-chip {
+  flex-shrink: 0;
+  max-width: 40%;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  background: var(--hover);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-chip.none {
+  color: var(--muted);
+}

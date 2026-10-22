@@ -897,24 +897,37 @@ pub struct BookBrief {
     pub title: String,
     pub author: Option<String>,
     pub format: String,
-    pub groups: Vec<String>,
+    /// The book's current group.
+    pub group: Option<String>,
     /// The beginning of the text, to help classify unfamiliar titles.
     pub excerpt: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// A suggested group (only when it differs from the book's current one) and/or author.
+#[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Suggestion {
     pub book_id: String,
-    #[serde(default)]
-    pub groups: Vec<String>,
-    #[serde(default)]
+    pub group: Option<String>,
     pub author: Option<String>,
+}
+
+/// A suggestion as the model writes it; some models still answer with a `groups` list.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawSuggestion {
+    book_id: String,
+    #[serde(default)]
+    group: Option<String>,
+    #[serde(default)]
+    groups: Vec<String>,
+    #[serde(default)]
+    author: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct SuggestionList {
-    suggestions: Vec<Suggestion>,
+    suggestions: Vec<RawSuggestion>,
 }
 
 fn suggestion_schema() -> serde_json::Value {
@@ -928,10 +941,10 @@ fn suggestion_schema() -> serde_json::Value {
                     "type": "object",
                     "properties": {
                         "bookId": { "type": "string" },
-                        "groups": { "type": "array", "items": { "type": "string" } },
+                        "group": { "type": "string" },
                         "author": { "type": ["string", "null"] }
                     },
-                    "required": ["bookId", "groups", "author"],
+                    "required": ["bookId", "group", "author"],
                     "additionalProperties": false
                 }
             }
@@ -961,28 +974,25 @@ pub fn parse_suggestions(reply: &str, books: &[BookBrief]) -> Result<Vec<Suggest
         if !seen.insert(s.book_id.clone()) {
             continue;
         }
-        let mut groups: Vec<String> = Vec::new();
-        for g in s
-            .groups
-            .iter()
+        let group = s
+            .group
+            .into_iter()
+            .chain(s.groups)
             .map(|g| g.trim().trim_matches(['「', '」', '"']).to_owned())
-        {
-            if !g.is_empty() && g.chars().count() <= 20 && !groups.contains(&g) && groups.len() < 3
-            {
-                groups.push(g);
-            }
-        }
+            .find(|g| !g.is_empty() && g.chars().count() <= 20)
+            // Suggesting the group the book is already in is no suggestion.
+            .filter(|g| book.group.as_deref() != Some(g.as_str()));
         // Only fill in authors that are missing; never overwrite the book's own metadata.
         let author = s
             .author
             .map(|a| a.trim().to_owned())
             .filter(|a| !a.is_empty() && a.chars().count() <= 60 && book.author.is_none());
-        if groups.is_empty() && author.is_none() {
+        if group.is_none() && author.is_none() {
             continue;
         }
         out.push(Suggestion {
             book_id: s.book_id,
-            groups,
+            group,
             author,
         });
     }
@@ -997,9 +1007,10 @@ pub async fn organize(
 ) -> Result<Vec<Suggestion>> {
     let schema = suggestion_schema();
     let mut system = format!(
-        "You are a library assistant who sorts the books on a shelf into groups. Suggest 1–2 \
-         groups per book, preferring existing groups; when a new group is needed, give it a \
-         short name in {} (such as Fiction, History, Computing, Economics, Philosophy). For a \
+        "You are a library assistant who sorts the books on a shelf into groups. Each book \
+         belongs to exactly one group: suggest one group per book, preferring existing groups \
+         and keeping the book's current group when it fits; when a new group is needed, give \
+         it a short name in {} (such as Fiction, History, Computing, Economics, Philosophy). For a \
          book with no author, give the author if you are sure of it, otherwise null. Only make \
          suggestions for the listed books, and copy each bookId exactly.",
         r.cfg.answer_language()
@@ -1013,7 +1024,7 @@ pub async fn organize(
     let listing = serde_json::to_string_pretty(
         &serde_json::json!({ "existingGroups": existing_groups, "books": books }),
     )?;
-    let prompt = format!("Suggest groups for these books:\n{listing}");
+    let prompt = format!("Suggest a group for each of these books:\n{listing}");
     let make = |messages: Vec<Message>| -> Result<CompletionRequest> {
         let mut req = CompletionRequest::new(Message::user(prompt.clone()))
             .messages(messages)
@@ -1313,7 +1324,7 @@ mod tests {
                 title: "三国演义".into(),
                 author: None,
                 format: "TXT".into(),
-                groups: vec![],
+                group: None,
                 excerpt: String::new(),
             },
             BookBrief {
@@ -1321,7 +1332,7 @@ mod tests {
                 title: "Rust 编程".into(),
                 author: Some("某人".into()),
                 format: "EPUB".into(),
-                groups: vec![],
+                group: Some("计算机".into()),
                 excerpt: String::new(),
             },
         ]
@@ -1330,33 +1341,36 @@ mod tests {
     #[test]
     fn suggestions_are_validated() {
         let reply = r#"好的：{"suggestions":[
-            {"bookId":"a","groups":[" 小说 ","历史","小说","古典","多余"],"author":"罗贯中"},
-            {"bookId":"b","groups":["计算机"],"author":"冒名"},
-            {"bookId":"zzz","groups":["x"],"author":null},
-            {"bookId":"a","groups":["重复"],"author":null}
+            {"bookId":"a","group":" 小说 ","author":"罗贯中"},
+            {"bookId":"b","group":"计算机","author":"冒名"},
+            {"bookId":"zzz","group":"x","author":null},
+            {"bookId":"a","group":"重复","author":null}
         ]} 完毕"#;
         let s = parse_suggestions(reply, &briefs()).unwrap();
+        // b is already in 计算机 and has an author, so it gets no suggestion.
         assert_eq!(
             s,
-            vec![
-                Suggestion {
-                    book_id: "a".into(),
-                    groups: vec!["小说".into(), "历史".into(), "古典".into()],
-                    author: Some("罗贯中".into())
-                },
-                Suggestion {
-                    book_id: "b".into(),
-                    groups: vec!["计算机".into()],
-                    author: None
-                },
-            ]
+            vec![Suggestion {
+                book_id: "a".into(),
+                group: Some("小说".into()),
+                author: Some("罗贯中".into())
+            }]
+        );
+        // An old-style list still yields one group.
+        let legacy =
+            r#"{"suggestions":[{"bookId":"b","groups":["", "编程", "计算机"],"author":null}]}"#;
+        assert_eq!(
+            parse_suggestions(legacy, &briefs()).unwrap()[0]
+                .group
+                .as_deref(),
+            Some("编程")
         );
         assert!(parse_suggestions("没有 JSON", &briefs()).is_err());
     }
 
     #[tokio::test]
     async fn organize_retries_once_on_bad_json() {
-        let good = r#"{"suggestions":[{"bookId":"a","groups":["小说"],"author":null}]}"#;
+        let good = r#"{"suggestions":[{"bookId":"a","group":"小说","author":null}]}"#;
         let model = MockCompletionModel::from_turns([
             MockTurn::text("抱歉，我不太确定"),
             MockTurn::text(good),
