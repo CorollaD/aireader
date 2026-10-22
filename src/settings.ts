@@ -12,6 +12,17 @@ export interface Settings {
   lineHeight: number;
   maxWidth: number;
   pageLayout: "continuous" | "single";
+  /** How paged books are scaled before zoom. */
+  pageFit: "width" | "page";
+  /** Reflowable books: vertical scrolling or horizontal pages. */
+  flowMode: "scroll" | "paged";
+  columns: 1 | 2;
+  /** Space after paragraphs, in em. */
+  paragraphSpacing: number;
+  indent: boolean;
+  justify: boolean;
+  /** Horizontal page margin in px. */
+  margin: number;
   showToc: boolean;
   shelfView: "grid" | "list";
   shelfSort: ShelfSort;
@@ -25,6 +36,13 @@ export const DEFAULT_SETTINGS: Settings = {
   lineHeight: 1.8,
   maxWidth: 760,
   pageLayout: "continuous",
+  pageFit: "width",
+  flowMode: "scroll",
+  columns: 1,
+  paragraphSpacing: 0.75,
+  indent: false,
+  justify: true,
+  margin: 32,
   showToc: true,
   shelfView: "grid",
   shelfSort: "recent",

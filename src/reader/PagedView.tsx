@@ -30,12 +30,25 @@ function useSize(ref: React.RefObject<HTMLElement>) {
 }
 
 /** A page box; the rendered image, once loaded, covers the page-number placeholder. */
-function Page(props: { bookId: string; index: number; width: number; height: number; load: boolean; style?: React.CSSProperties }) {
+function Page(props: {
+  bookId: string;
+  index: number;
+  width: number;
+  height: number;
+  rotation: number;
+  load: boolean;
+  style?: React.CSSProperties;
+}) {
   return (
     <div className="page" style={{ width: props.width, height: props.height, ...props.style }}>
       <span className="page-number">{props.index + 1}</span>
       {props.load && (
-        <img src={pageUrl(props.bookId, props.index, renderWidth(props.width))} alt="" draggable={false} decoding="async" />
+        <img
+          src={pageUrl(props.bookId, props.index, renderWidth(props.width), props.rotation)}
+          alt=""
+          draggable={false}
+          decoding="async"
+        />
       )}
     </div>
   );
@@ -45,11 +58,14 @@ interface Props {
   book: OpenedBook;
   jump: Jump | null;
   layout: "continuous" | "single";
+  fit: "width" | "page";
   zoom: number;
-  onLocation: (loc: Location) => void;
+  /** Clockwise page rotation in degrees. */
+  rotation: number;
+  onLocation: (loc: Location, lastVisible: number) => void;
 }
 
-export default function PagedView({ book, jump, layout, zoom, onLocation }: Props) {
+export default function PagedView({ book, jump, layout, fit, zoom, rotation, onLocation }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const size = useSize(scroller);
   const [page, setPage] = useState(() => (jump?.loc.kind === "page" ? jump.loc.page : 0));
@@ -63,17 +79,23 @@ export default function PagedView({ book, jump, layout, zoom, onLocation }: Prop
   const pageRef = useRef(page);
   pageRef.current = page;
 
-  const width = Math.max(120, Math.min(size.w - 48, 1000) * zoom);
+  // Quarter turns swap each page's width and height.
+  const quarter = rotation === 90 || rotation === 270;
+  const aspects = useMemo(() => book.pages.map((a) => (quarter ? 1 / a : a)), [book.pages, quarter]);
+  const fitWidth = Math.min(size.w - 48, 1400);
+  // "Fit page" sizes pages so a typical (first) page fits the window height.
+  const fitPage = Math.min(fitWidth, (size.h - 2 * GAP) / (aspects[0] ?? 1.414));
+  const width = Math.max(120, (fit === "width" ? fitWidth : fitPage) * zoom);
   const tops = useMemo(() => {
     const t: number[] = [];
     let y = GAP;
-    for (const aspect of book.pages) {
+    for (const aspect of aspects) {
       t.push(y);
       y += width * aspect + GAP;
     }
     t.push(y);
     return t;
-  }, [book.pages, width]);
+  }, [aspects, width]);
 
   const goto = useCallback(
     (p: number) => {
@@ -94,7 +116,8 @@ export default function PagedView({ book, jump, layout, zoom, onLocation }: Prop
     if (layout === "continuous" && scroller.current && size.w > 0) scroller.current.scrollTop = tops[pageRef.current] - GAP;
   }, [layout, tops, size.w]);
 
-  useEffect(() => onLocation({ kind: "page", page }), [page, onLocation]);
+  const [lastVisible, setLastVisible] = useState(page);
+  useEffect(() => onLocation({ kind: "page", page }, layout === "single" ? page : lastVisible), [page, lastVisible, layout, onLocation]);
 
   const onScroll = () => {
     const el = scroller.current;
@@ -114,6 +137,7 @@ export default function PagedView({ book, jump, layout, zoom, onLocation }: Prop
     const margin = el.clientHeight * PRELOAD_SCREENS;
     setRange([find(top - margin), find(top + el.clientHeight + margin)]);
     setPage(find(probe));
+    setLastVisible(find(top + el.clientHeight - 1));
   };
   useEffect(onScroll, [tops, layout]);
 
@@ -144,13 +168,15 @@ export default function PagedView({ book, jump, layout, zoom, onLocation }: Prop
   if (count === 0) return <div className="center-msg muted">没有页面</div>;
 
   if (layout === "single") {
-    const aspect = book.pages[page] ?? 1.414;
-    const fit = Math.max(120, Math.min(size.w - 32, (size.h - 32) / aspect));
-    const w = fit * zoom;
+    const aspect = aspects[page] ?? 1.414;
+    const base = fit === "width" ? size.w - 32 : Math.min(size.w - 32, (size.h - 32) / aspect);
+    const w = Math.max(120, base) * zoom;
     return (
       <div className="paged-scroller single" ref={scroller}>
         <div className="single-stage" style={{ minWidth: w + 32, minHeight: w * aspect + 32 }}>
-          {size.w > 0 && <Page key={page} bookId={book.id} index={page} width={w} height={w * aspect} load />}
+          {size.w > 0 && (
+            <Page key={page} bookId={book.id} index={page} width={w} height={w * aspect} rotation={rotation} load />
+          )}
         </div>
         <button className="page-turn left" onClick={() => goto(page - 1)} disabled={page === 0} aria-label="上一页">
           ‹
@@ -158,7 +184,7 @@ export default function PagedView({ book, jump, layout, zoom, onLocation }: Prop
         <button className="page-turn right" onClick={() => goto(page + 1)} disabled={page >= count - 1} aria-label="下一页">
           ›
         </button>
-        {page + 1 < count && <img className="prefetch" src={pageUrl(book.id, page + 1, renderWidth(w))} alt="" />}
+        {page + 1 < count && <img className="prefetch" src={pageUrl(book.id, page + 1, renderWidth(w), rotation)} alt="" />}
       </div>
     );
   }
@@ -167,7 +193,7 @@ export default function PagedView({ book, jump, layout, zoom, onLocation }: Prop
     <div className="paged-scroller" ref={scroller} onScroll={onScroll}>
       <div className="pages" style={{ height: tops[count], width: Math.max(width + 48, size.w) }}>
         {size.w > 0 &&
-          book.pages.map((aspect, i) =>
+          aspects.map((aspect, i) =>
             // Pages far from the viewport are not mounted at all; the container keeps the height.
             i >= range[0] - 10 && i <= range[1] + 10 ? (
               <Page
@@ -176,6 +202,7 @@ export default function PagedView({ book, jump, layout, zoom, onLocation }: Prop
                 index={i}
                 width={width}
                 height={width * aspect}
+                rotation={rotation}
                 load={i >= range[0] && i <= range[1]}
                 style={{ position: "absolute", top: tops[i], left: `calc(50% - ${width / 2}px)` }}
               />

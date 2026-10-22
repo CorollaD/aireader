@@ -2,7 +2,7 @@
 // (`npm run dev`, then open http://localhost:1420). Never included in production builds.
 
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { Block, Book, Location } from "../types";
+import type { AiConfig, AiEvent, AiTask, Annotations, Block, Book, Location } from "../types";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -21,6 +21,9 @@ function book(id: string, title: string, author: string | null, format: string, 
     progress,
     position: null,
     groups,
+    readSeconds: progress > 0 ? 3600 * progress : 0,
+    readingSpeed: null,
+    rotation: 0,
     missing: false,
   };
 }
@@ -50,6 +53,29 @@ export function installMock() {
     ],
     groups: ["小说", "技术"],
     settings: {} as unknown,
+    annotations: new Map<string, Annotations>(),
+    ai: { provider: "", model: "", baseUrl: null, language: "中文", consented: false } as AiConfig,
+    aiKey: false,
+  };
+  const aiStatus = () => ({
+    config: db.ai,
+    hasKey: db.aiKey,
+    local: db.ai.provider === "ollama",
+    configured: !!db.ai.provider && !!db.ai.model,
+  });
+  /** Streams `text` to a Channel in small pieces, then finishes. */
+  const stream = (channel: { id: number }, text: string, progress = false) => {
+    let index = 0;
+    const send = (message: AiEvent) =>
+      (window as unknown as { __TAURI_INTERNALS__: { runCallback: (id: number, d: unknown) => void } }).__TAURI_INTERNALS__.runCallback(
+        channel.id,
+        { index: index++, message },
+      );
+    const pieces = text.match(/.{1,6}/gs) ?? [];
+    let t = 0;
+    if (progress) [0, 1, 2].forEach((i) => setTimeout(() => send({ type: "progress", done: i, total: 3, label: `正在总结「第${i + 1}回」` }), (t += 150)));
+    pieces.forEach((p) => setTimeout(() => send({ type: "delta", text: p }), (t += 40)));
+    setTimeout(() => send({ type: "done", text, cached: false }), (t += 60));
   };
   let nextId = 6;
 
@@ -110,9 +136,18 @@ export function installMock() {
             toc: paged
               ? [0, 2, 4].map((p) => ({ title: `第 ${p + 1} 页`, depth: 0, location: { kind: "page", page: p } }))
               : [0, 1, 2].map((c) => ({ title: `第${c + 1}回 示例章节`, depth: 0, location: { kind: "flow", chapter: c, block: 0 } })),
-            chapters: paged ? [] : [0, 1, 2].map((c) => ({ title: `第${c + 1}回 示例章节`, blocks: chapter(c).length })),
+            chapters: paged
+              ? []
+              : [0, 1, 2].map((c) => ({
+                  title: `第${c + 1}回 示例章节`,
+                  blocks: chapter(c).length,
+                  chars: chapter(c).reduce((n, bl) => n + JSON.stringify(bl).length, 0),
+                })),
             pages: paged ? [1.414, 1.414, 1.414, 1.414, 1.414] : [],
             position: b.position,
+            readSeconds: b.readSeconds,
+            readingSpeed: b.readingSpeed,
+            rotation: b.rotation,
           };
         }
         case "get_chapter":
@@ -126,6 +161,50 @@ export function installMock() {
           b.lastRead = now();
           return null;
         }
+        case "get_annotations":
+          return db.annotations.get(a.id as string) ?? { bookmarks: [], highlights: [] };
+        case "save_annotations":
+          db.annotations.set(a.id as string, a.annotations as Annotations);
+          return null;
+        case "export_notes":
+          return "/Users/demo/Documents/笔记.md";
+        case "add_reading_time": {
+          const b = find(a.id);
+          b.readSeconds += a.seconds as number;
+          if (a.speed) b.readingSpeed = a.speed as number;
+          return b;
+        }
+        case "ai_get_config":
+          return aiStatus();
+        case "ai_set_config":
+          db.ai = a.config as AiConfig;
+          if (typeof a.apiKey === "string") db.aiKey = a.apiKey !== "";
+          return aiStatus();
+        case "ai_test":
+          return "连接成功";
+        case "ai_list_models":
+          return ["qwen3:8b", "llama3.2"];
+        case "ai_estimate_book":
+          return { units: 3, cachedUnits: 1, bookCached: false, inputTokens: 52000, outputTokens: 2700, cost: 0.26 };
+        case "ai_cancel":
+          return null;
+        case "ai_run": {
+          const task = a.task as AiTask;
+          const text =
+            task.kind === "chat"
+              ? task.action === "translate"
+                ? "**译文**：The world under heaven, after a long period of division, tends to unite."
+                : `这句话出自《三国演义》开篇，意思是：\n\n- 天下**分裂久了**必然统一\n- 统一久了又会分裂\n\n${task.history.length ? "（追问回答）" : ""}`
+              : `## 概述\n本章讲述了天下大势分合的规律。\n\n- 要点一：周末七国分争\n- 要点二：楚汉相争\n- 要点三：三国鼎立`;
+          stream(a.onEvent as { id: number }, text, task.kind === "summarizeBook");
+          return null;
+        }
+        case "ai_organize":
+          return (a.bookIds as string[]).slice(0, 3).map((id, i) => ({
+            bookId: id,
+            groups: [["古典", "小说"], ["计算机"], ["漫画"]][i] ?? ["其他"],
+            author: i === 2 ? "某作者" : null,
+          }));
         case "get_settings":
           return db.settings;
         case "set_settings":

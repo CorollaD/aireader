@@ -9,6 +9,8 @@ import type { Book, BookPatch, ImportProgress, Shelf } from "../types";
 import { Confirm, Modal, Toast } from "../ui";
 import { BookCard, BookRow } from "./BookCard";
 import { EditDialog } from "./EditDialog";
+import { useAi } from "../ai/AiContext";
+import OrganizeDialog from "../ai/OrganizeDialog";
 
 const EXTENSIONS = ["epub", "pdf", "txt", "md", "markdown", "mobi", "azw", "azw3", "prc", "fb2", "zip", "docx", "cbz"];
 
@@ -62,6 +64,8 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [dragging, setDragging] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [organizing, setOrganizing] = useState<Book[] | null>(null);
+  const ai = useAi();
 
   const refresh = useCallback(() => {
     api.listBooks().then(setShelf).catch((e) => setToast(errorText(e)));
@@ -203,6 +207,12 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
           </div>
         ))}
         {shelf.groups.length === 0 && <div className="muted small side-empty">用分组整理你的书</div>}
+        <div className="side-footer">
+          <button className="side-item" onClick={ai.openSettings}>
+            <span>AI 设置</span>
+            <span className="count">{ai.ready ? "已配置" : "未配置"}</span>
+          </button>
+        </div>
       </aside>
 
       <main className="shelf-main">
@@ -229,6 +239,14 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
             </button>
           </div>
           <span className="spacer" />
+          {shelf.books.length > 0 && (
+            <button
+              onClick={() => (ai.ready ? setOrganizing(selecting ? selectedBooks : visible) : ai.openSettings())}
+              title={selecting ? "为选中的书建议分组" : "为当前列表中的书建议分组"}
+            >
+              AI 整理
+            </button>
+          )}
           <button onClick={pickFolder}>导入文件夹</button>
           <button className="primary" onClick={pickFiles}>
             导入书籍
@@ -285,6 +303,7 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
                 <span className="row-main">书名</span>
                 <span className="row-cell">格式</span>
                 <span className="row-cell">进度</span>
+                <span className="row-cell">阅读时长</span>
                 <span className="row-cell">最近阅读</span>
                 <span className="row-cell">添加时间</span>
                 <span className="more-space" />
@@ -393,6 +412,17 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
         </div>
       )}
       {dragging && <div className="drop-overlay">松开以导入到{currentGroup ? `「${currentGroup}」` : "书架"}</div>}
+      {organizing && (
+        <OrganizeDialog
+          books={organizing}
+          onClose={() => setOrganizing(null)}
+          onApply={async (changes) => {
+            for (const c of changes) await api.updateBook(c.id, c.patch);
+            refresh();
+            setToast(`已更新 ${changes.length} 本书`);
+          }}
+        />
+      )}
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
     </div>
   );

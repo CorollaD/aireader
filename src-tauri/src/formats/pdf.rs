@@ -84,6 +84,12 @@ impl PageSource for PdfSource {
         self.aspects.get(index).copied().unwrap_or(1.414)
     }
 
+    fn page_text(&self, index: usize) -> Option<String> {
+        let page = self.doc.pages().get(index as PdfPageIndex).ok()?;
+        let text = page.text().ok()?.all();
+        (!text.trim().is_empty()).then_some(text)
+    }
+
     fn render(&self, index: usize, width: u32) -> Result<PageImage> {
         let page = self.doc.pages().get(index as PdfPageIndex)?;
         let config = PdfRenderConfig::new()

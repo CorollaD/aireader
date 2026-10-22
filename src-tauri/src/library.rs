@@ -5,6 +5,8 @@
 //! - `library.json`
 //! - `books/<id>/<original file name>`
 //! - `covers/<id>.jpg`
+//! - `annotations/<id>.json` (see [`crate::annotations`])
+//! - `ai/<id>/` (AI caches)
 
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -38,6 +40,16 @@ pub struct Book {
     pub progress: f32,
     pub position: Option<Location>,
     pub groups: Vec<String>,
+    /// Active reading time in seconds.
+    #[serde(default)]
+    pub read_seconds: u64,
+    /// Measured reading speed: characters per minute for reflowable books, pages per minute
+    /// for paged ones.
+    #[serde(default)]
+    pub reading_speed: Option<f32>,
+    /// Page rotation in degrees (0/90/180/270) for paged books.
+    #[serde(default)]
+    pub rotation: u16,
     /// Set when listing if the stored file has disappeared.
     #[serde(default, skip_deserializing)]
     pub missing: bool,
@@ -50,6 +62,8 @@ struct LibraryData {
     groups: Vec<String>,
     /// Reader preferences owned by the frontend.
     settings: serde_json::Value,
+    /// AI service settings (API keys are kept in the system keychain, not here).
+    ai: crate::ai::config::AiConfig,
 }
 
 /// Editable book fields; `None` leaves a field unchanged.
@@ -59,6 +73,7 @@ pub struct BookPatch {
     pub title: Option<String>,
     pub author: Option<String>,
     pub groups: Option<Vec<String>>,
+    pub rotation: Option<u16>,
 }
 
 pub struct Library {
@@ -240,6 +255,9 @@ impl Library {
                 progress: 0.0,
                 position: None,
                 groups: Vec::new(),
+                read_seconds: 0,
+                reading_speed: None,
+                rotation: 0,
                 missing: false,
             })
         })();
@@ -288,14 +306,21 @@ impl Library {
             groups.dedup();
             book.groups = groups;
         }
+        if let Some(rotation) = patch.rotation {
+            book.rotation = rotation % 360 / 90 * 90;
+        }
         Ok(book.clone())
     }
 
-    /// Removes books from the shelf and deletes their stored copies and covers.
+    /// Removes books from the shelf and deletes their stored copies, covers, annotations and
+    /// AI caches.
     pub fn remove(&mut self, ids: &[String]) {
+        let annotations = crate::annotations::AnnotationStore::new(&self.root);
         for id in ids {
             let _ = std::fs::remove_dir_all(self.root.join("books").join(id));
             let _ = std::fs::remove_file(self.cover_path(id));
+            let _ = std::fs::remove_dir_all(self.ai_dir(id));
+            annotations.delete(id);
         }
         self.data.books.retain(|b| !ids.contains(&b.id));
     }
@@ -305,6 +330,26 @@ impl Library {
         book.position = Some(position);
         book.progress = progress.clamp(0.0, 1.0);
         book.last_read = Some(now());
+        Ok(())
+    }
+
+    /// Directory for a book's AI caches.
+    pub fn ai_dir(&self, id: &str) -> PathBuf {
+        self.root.join("ai").join(id)
+    }
+
+    /// Adds active reading time; `speed` is a measured reading speed sample (characters or
+    /// pages per minute) folded into the stored average.
+    pub fn add_reading_time(&mut self, id: &str, seconds: u64, speed: Option<f32>) -> Result<()> {
+        let book = self.get_mut(id)?;
+        book.read_seconds += seconds;
+        if let Some(sample) = speed.filter(|s| s.is_finite() && *s > 0.0) {
+            // Exponential moving average so the estimate adapts but is not jumpy.
+            book.reading_speed = Some(match book.reading_speed {
+                Some(avg) => avg * 0.8 + sample * 0.2,
+                None => sample,
+            });
+        }
         Ok(())
     }
 
@@ -364,6 +409,14 @@ impl Library {
 
     pub fn settings(&self) -> &serde_json::Value {
         &self.data.settings
+    }
+
+    pub fn ai_config(&self) -> &crate::ai::config::AiConfig {
+        &self.data.ai
+    }
+
+    pub fn set_ai_config(&mut self, config: crate::ai::config::AiConfig) {
+        self.data.ai = config;
     }
 
     pub fn set_settings(&mut self, settings: serde_json::Value) {
@@ -433,6 +486,7 @@ mod tests {
                 title: Some("新书名".into()),
                 author: Some(" 某人 ".into()),
                 groups: Some(vec!["小说".into()]),
+                rotation: None,
             },
         )
         .unwrap();
@@ -458,6 +512,16 @@ mod tests {
             0.5,
         )
         .unwrap();
+        lib.add_reading_time(&id, 60, Some(500.0)).unwrap();
+        lib.add_reading_time(&id, 30, Some(300.0)).unwrap();
+        lib.update(
+            &id,
+            BookPatch {
+                rotation: Some(450),
+                ..Default::default()
+            },
+        )
+        .unwrap();
         lib.save().unwrap();
 
         let mut lib = Library::open(&root).unwrap();
@@ -473,6 +537,9 @@ mod tests {
             })
         );
         assert!(b.last_read.is_some());
+        assert_eq!(b.read_seconds, 90);
+        assert_eq!(b.reading_speed, Some(460.0));
+        assert_eq!(b.rotation, 90);
         assert_eq!(lib.groups(), ["文学", "技术"]);
 
         lib.delete_group("文学");

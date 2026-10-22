@@ -1,6 +1,7 @@
 import { useState, type MouseEvent } from "react";
 import { coverUrl } from "../api";
 import type { Book } from "../types";
+import { formatDuration } from "../reader/locations";
 
 /** Deterministic hue for books without a cover. */
 function hue(text: string): number {
@@ -49,7 +50,7 @@ export function BookCard({ book, selected, selecting, onOpen, onToggle, onMenu }
       className={`book-card${selected ? " selected" : ""}${book.missing ? " missing" : ""}`}
       onClick={selecting ? onToggle : onOpen}
       onContextMenu={onMenu}
-      title={book.missing ? "文件已丢失" : book.title}
+      title={book.missing ? "文件已丢失" : `${book.title}${book.readSeconds > 0 ? `\n已读 ${formatDuration(book.readSeconds)}` : ""}`}
     >
       <div className="cover">
         <Cover book={book} />
@@ -120,6 +121,7 @@ export function BookRow({ book, selected, selecting, onOpen, onToggle, onMenu }:
       </div>
       <span className="row-cell">{book.format}</span>
       <span className="row-cell">{book.missing ? "丢失" : percent(book.progress)}</span>
+      <span className="row-cell">{book.readSeconds > 0 ? formatDuration(book.readSeconds) : "—"}</span>
       <span className="row-cell">{formatDate(book.lastRead)}</span>
       <span className="row-cell">{formatDate(book.added)}</span>
       <button

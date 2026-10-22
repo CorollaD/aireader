@@ -24,9 +24,22 @@
 - 显示每本书的阅读进度和最近阅读时间
 
 **阅读**
+- 书签（⌘/Ctrl+D）、高亮（5 种颜色）与笔记，侧栏「目录 / 书签 / 笔记」，笔记可导出为 Markdown
+- 后退 / 前进（跳转后返回原位置）、可拖动的进度条、输入百分比或页码跳转
+- 文字类书籍可在「滚动」和「分页」（单栏 / 双栏）之间切换；段距、首行缩进、两端对齐、页边距可调
+- 专注模式（F）、全屏、快捷键帮助（?）
+- 阅读时长统计、本章与全书剩余时间估算（按你的实际阅读速度）
+- PDF：适应宽度 / 适应整页、页面旋转
 - 12 种预设背景色（纯白、米白、羊皮纸、护眼绿、薄荷、天青、樱粉、浅灰、深灰、夜间、深蓝、墨黑），也可以用取色器自定义；文字颜色可以自动匹配，也可以自定义；整个界面跟随背景色变化
 - 字体（黑体/宋体/楷体）、字号、行距、版心宽度可调
 - 目录侧栏、全文搜索（结果高亮）、自动保存阅读位置
+
+**AI（基于 [rig](https://github.com/0xPlaygrounds/rig)）**
+- 支持 Claude、OpenAI、DeepSeek、Kimi、智谱、Gemini、OpenRouter，本地的 Ollama、llama.cpp，以及任意 OpenAI 兼容服务（通义、硅基流动、LM Studio 等）
+- 总结本章 / 本页 / 全书（长文自动分段；每章总结按模型缓存；全书总结前显示用量和费用估算）
+- 选中文字后让 AI 解释或翻译，可以继续追问，答案可存为笔记
+- 书架「AI 整理」：AI 建议分组和缺失的作者，逐条确认后才写入
+- API Key 保存在系统钥匙串；使用云端服务前会请你确认发送书籍内容；本地服务直连，不经过系统代理
 
 ## 开发
 
@@ -40,6 +53,7 @@ npm run tauri build                   # 打包安装程序
 ```
 
 - 也可以在命令行直接打开文件：`aireader 书.epub`。不在书架上的书会先导入，再直接进入阅读。
+- `AIREADER_LIBRARY_DIR=/path/to/dir` 让程序使用另一个书库目录（测试用，不影响正常书库）。
 - `npm run dev` 后在普通浏览器中打开 http://localhost:1420，会使用 `src/dev/mock.ts` 中的模拟后端，方便调试界面。生产构建不会包含这部分代码。
 
 ### PDFium
@@ -52,7 +66,9 @@ npm run tauri build                   # 打包安装程序
 
 书库保存在系统应用数据目录下的 `library/` 中（macOS：`~/Library/Application Support/com.aireader.reader/library/`）：
 
-- `library.json`：书籍信息、分组、阅读进度和阅读设置
+- `library.json`：书籍信息、分组、阅读进度、阅读时长、阅读设置和 AI 设置（不含 API Key）
+- `annotations/<id>.json`：书签、高亮与笔记
+- `ai/<id>/summaries.json`：AI 总结缓存
 - `books/<id>/`：导入书籍的副本
 - `covers/<id>.jpg`：封面缩略图
 
@@ -69,13 +85,16 @@ cargo run --example inspect -- book.epub a.pdf  # 打印解析结果：目录、
 ```
 src/                      React 前端
   shelf/                  书架：网格/列表、分组侧栏、编辑对话框
-  reader/                 阅读：文字类视图、分页视图、设置面板
+  reader/                 阅读：文字类视图（滚动/分页、高亮）、PDF 视图、侧栏、进度条、设置面板
+  ai/                     AI 设置、AI 面板、书架整理对话框
   settings.ts             阅读设置与配色方案（背景色预设、根据背景自动计算文字颜色）
   api.ts / types.ts       调用 Tauri 命令的封装，以及与 Rust 对应的数据类型
 src-tauri/                Rust 后端
   src/formats/            各格式解析器（html.rs 由 EPUB 与 MOBI 共用）
   src/model.rs            与格式无关的文档模型：可重排章节，或按页渲染的文档
   src/library.rs          书库：导入、去重、封面、分组、进度（不依赖 Tauri，便于测试）
+  src/annotations.rs      书签与高亮笔记的存储、导出 Markdown
+  src/ai/                 AI：rig 连接与错误处理、设置与钥匙串、总结/划词/整理任务
   src/commands.rs         提供给前端调用的命令
   src/protocol.rs         book:// 协议，用于加载封面、书中图片和 PDF/CBZ 页面
 ```

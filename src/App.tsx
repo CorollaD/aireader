@@ -4,6 +4,7 @@ import { api } from "./api";
 import { DEFAULT_SETTINGS, normalizeSettings, themeVars, type Settings } from "./settings";
 import ShelfView from "./shelf/ShelfView";
 import Reader from "./reader/Reader";
+import { AiProvider } from "./ai/AiContext";
 
 export type UpdateSettings = (patch: Partial<Settings>) => void;
 
@@ -47,9 +48,13 @@ export default function App() {
   }, []);
 
   if (!loaded) return null;
-  return reading ? (
-    <Reader bookId={reading} settings={settings} update={update} onClose={close} />
-  ) : (
-    <ShelfView settings={settings} update={update} onOpen={setReading} />
+  return (
+    <AiProvider>
+      {reading ? (
+        <Reader bookId={reading} settings={settings} update={update} onClose={close} />
+      ) : (
+        <ShelfView settings={settings} update={update} onOpen={setReading} />
+      )}
+    </AiProvider>
   );
 }

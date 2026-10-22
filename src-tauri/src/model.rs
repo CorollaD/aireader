@@ -131,6 +131,10 @@ pub trait PageSource: Send + Sync {
     fn page_aspect(&self, index: usize) -> f32;
     /// Renders the page scaled to `width` pixels.
     fn render(&self, index: usize, width: u32) -> anyhow::Result<PageImage>;
+    /// The page's text layer, if it has one (PDF); `None` for images and scans.
+    fn page_text(&self, _index: usize) -> Option<String> {
+        None
+    }
 }
 
 /// Rendered page as straight (non-premultiplied) RGBA pixels.

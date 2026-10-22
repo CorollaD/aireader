@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::annotations::{self, AnnotationStore, Annotations};
 use crate::formats;
 use crate::library::{self, Book, BookPatch, Library};
 use crate::model::{Block, Content, Document, Location, TocEntry};
@@ -282,6 +283,8 @@ pub async fn delete_group(app: AppHandle, name: String) -> CmdResult<()> {
 pub struct ChapterInfo {
     title: String,
     blocks: usize,
+    /// Text length in characters, for reading-time estimates.
+    chars: usize,
 }
 
 #[derive(Serialize)]
@@ -298,6 +301,9 @@ pub struct OpenedBook {
     /// Height/width of each page (paged books only).
     pages: Vec<f32>,
     position: Option<Location>,
+    read_seconds: u64,
+    reading_speed: Option<f32>,
+    rotation: u16,
 }
 
 #[tauri::command]
@@ -313,6 +319,7 @@ pub async fn open_book(app: AppHandle, id: String) -> CmdResult<OpenedBook> {
                     .map(|c| ChapterInfo {
                         title: c.title.clone(),
                         blocks: c.blocks.len(),
+                        chars: c.blocks.iter().map(|b| b.text().chars().count()).sum(),
                     })
                     .collect(),
                 Vec::new(),
@@ -333,6 +340,9 @@ pub async fn open_book(app: AppHandle, id: String) -> CmdResult<OpenedBook> {
             chapters,
             pages,
             position: entry.position,
+            read_seconds: entry.read_seconds,
+            reading_speed: entry.reading_speed,
+            rotation: entry.rotation,
         })
     })
     .await
@@ -391,6 +401,75 @@ pub async fn set_settings(app: AppHandle, settings: serde_json::Value) -> CmdRes
         let mut lib = state(&app).library();
         lib.set_settings(settings);
         lib.save().map_err(err)
+    })
+    .await
+}
+
+fn annotation_store(app: &AppHandle) -> AnnotationStore {
+    AnnotationStore::new(state(app).library().root())
+}
+
+#[tauri::command]
+pub async fn get_annotations(app: AppHandle, id: String) -> CmdResult<Annotations> {
+    blocking(move || annotation_store(&app).load(&id).map_err(err)).await
+}
+
+#[tauri::command]
+pub async fn save_annotations(
+    app: AppHandle,
+    id: String,
+    annotations: Annotations,
+) -> CmdResult<()> {
+    blocking(move || annotation_store(&app).save(&id, &annotations).map_err(err)).await
+}
+
+/// Writes the book's highlights and notes as Markdown to a file the user picks.
+/// Returns the chosen path, or `None` if the dialog was cancelled.
+#[tauri::command]
+pub async fn export_notes(app: AppHandle, id: String) -> CmdResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    blocking(move || {
+        let entry = state(&app)
+            .library()
+            .get(&id)
+            .cloned()
+            .ok_or("书籍不存在")?;
+        let book = state(&app).open_book(&id).map_err(err)?;
+        let titles: Vec<String> = match &book.doc.content {
+            Content::Flow(chs) => chs.iter().map(|c| c.title.clone()).collect(),
+            Content::Paged(_) => Vec::new(),
+        };
+        let ann = annotation_store(&app).load(&id).map_err(err)?;
+        let markdown =
+            annotations::to_markdown(&entry.title, entry.author.as_deref(), &titles, &ann);
+        let Some(path) = app
+            .dialog()
+            .file()
+            .add_filter("Markdown", &["md"])
+            .set_file_name(format!("{} 笔记.md", entry.title))
+            .blocking_save_file()
+        else {
+            return Ok(None);
+        };
+        let path = path.into_path().map_err(err)?;
+        std::fs::write(&path, markdown).map_err(err)?;
+        Ok(Some(path.display().to_string()))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn add_reading_time(
+    app: AppHandle,
+    id: String,
+    seconds: u64,
+    speed: Option<f32>,
+) -> CmdResult<Book> {
+    blocking(move || {
+        let mut lib = state(&app).library();
+        lib.add_reading_time(&id, seconds, speed).map_err(err)?;
+        lib.save().map_err(err)?;
+        Ok(lib.get(&id).cloned().ok_or("书籍不存在")?)
     })
     .await
 }

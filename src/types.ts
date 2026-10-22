@@ -18,6 +18,12 @@ export interface Book {
   progress: number;
   position: Location | null;
   groups: string[];
+  /** Active reading time in seconds. */
+  readSeconds: number;
+  /** Characters per minute (reflowable) or pages per minute (paged). */
+  readingSpeed: number | null;
+  /** Page rotation in degrees, for paged books. */
+  rotation: number;
   missing: boolean;
 }
 
@@ -30,6 +36,7 @@ export interface BookPatch {
   title?: string;
   author?: string;
   groups?: string[];
+  rotation?: number;
 }
 
 export interface ImportProgress {
@@ -57,10 +64,46 @@ export interface OpenedBook {
   format: string;
   kind: "flow" | "paged";
   toc: TocEntry[];
-  chapters: { title: string; blocks: number }[];
+  chapters: { title: string; blocks: number; chars: number }[];
   /** Height/width ratio of each page (paged books). */
   pages: number[];
   position: Location | null;
+  readSeconds: number;
+  readingSpeed: number | null;
+  rotation: number;
+}
+
+export interface Bookmark {
+  id: string;
+  location: Location;
+  title: string;
+  excerpt: string;
+  created: number;
+}
+
+/**
+ * A highlighted range in a reflowable book. Offsets index the block's text (concatenated
+ * spans) in UTF-16 code units.
+ */
+export interface Highlight {
+  id: string;
+  chapter: number;
+  startBlock: number;
+  start: number;
+  endBlock: number;
+  end: number;
+  text: string;
+  color: HighlightColor;
+  note?: string | null;
+  created: number;
+  updated: number;
+}
+
+export type HighlightColor = "yellow" | "green" | "blue" | "pink" | "purple";
+
+export interface Annotations {
+  bookmarks: Bookmark[];
+  highlights: Highlight[];
 }
 
 export interface Span {
@@ -84,4 +127,64 @@ export interface Hit {
   chapter: number;
   block: number;
   snippet: string;
+}
+
+// --- AI (src-tauri/src/ai) ---
+
+export interface AiConfig {
+  /** rig vendor id (anthropic, openai, deepseek, ollama, …) or "custom". */
+  provider: string;
+  model: string;
+  baseUrl: string | null;
+  language: string;
+  consented: boolean;
+}
+
+export interface AiStatus {
+  config: AiConfig;
+  hasKey: boolean;
+  local: boolean;
+  configured: boolean;
+}
+
+export type AiEvent =
+  | { type: "delta"; text: string }
+  | { type: "progress"; done: number; total: number; label: string }
+  | { type: "done"; text: string; cached: boolean }
+  | { type: "error"; message: string };
+
+export type ChatAction = "explain" | "translate" | "summarize";
+
+export interface ChatTurn {
+  role: "user" | "assistant";
+  text: string;
+}
+
+export type AiTask =
+  | { kind: "summarizeChapter"; bookId: string; chapter: number }
+  | { kind: "summarizePages"; bookId: string; from: number; to: number }
+  | { kind: "summarizeBook"; bookId: string }
+  | {
+      kind: "chat";
+      bookTitle: string;
+      selection: string;
+      context: string;
+      action: ChatAction | null;
+      history: ChatTurn[];
+    };
+
+export interface BookEstimate {
+  units: number;
+  cachedUnits: number;
+  bookCached: boolean;
+  inputTokens: number;
+  outputTokens: number;
+  /** USD, when the model's prices are known. */
+  cost: number | null;
+}
+
+export interface Suggestion {
+  bookId: string;
+  groups: string[];
+  author: string | null;
 }
