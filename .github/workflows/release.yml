@@ -31,11 +31,16 @@ jobs:
           version=$(node -p "require('./src-tauri/tauri.conf.json').version")
           tag="v$version"
           # Reuse the draft when the workflow is run again for the same version.
-          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$tag\") | .id" | head -n 1)
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$tag\" and .draft) | .id" | head -n 1)
           if [ -z "$id" ]; then
-            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --draft --target "$GITHUB_SHA" \
-              --title "AiReader $tag" --notes-file .github/release-notes.md
-            id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$tag\") | .id" | head -n 1)
+            # The id comes from the create call itself: a new draft may not be listed yet.
+            id=$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases" \
+              -f tag_name="$tag" -f target_commitish="$GITHUB_SHA" -f name="AiReader $tag" \
+              -F body=@.github/release-notes.md -F draft=true --jq .id)
+          fi
+          if [ -z "$id" ]; then
+            echo "Could not create the draft release" >&2
+            exit 1
           fi
           echo "id=$id" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -107,4 +112,15 @@ jobs:
       - name: Make the draft public
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "${{ needs.create-release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          ID: ${{ needs.create-release.outputs.id }}
+        run: |
+          # Every platform must have uploaded its installers before anything goes public.
+          names=$(gh api "repos/$GITHUB_REPOSITORY/releases/$ID" --jq '.assets[].name')
+          echo "$names"
+          for pattern in '_aarch64\.dmg$' '_x64\.dmg$' '\.AppImage$' '\.deb$' '\.rpm$' '-setup\.exe$' '\.msi$'; do
+            if ! grep -qE "$pattern" <<< "$names"; then
+              echo "Missing an installer matching $pattern" >&2
+              exit 1
+            fi
+          done
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$ID" -F draft=false -f make_latest=true --jq .html_url
