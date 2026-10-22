@@ -20,12 +20,12 @@ static SPLIT_RE: LazyLock<Regex> = LazyLock::new(|| {
 pub fn load(path: &Path) -> Result<Document> {
     let book = mobi::Mobi::from_path(path)?;
     if book.encryption() != mobi::headers::Encryption::No {
-        bail!("此书受 DRM 保护，无法打开");
+        bail!(crate::t!("mobi_drm"));
     }
     let raw = book.content_as_string_lossy();
     let text = html_part(&raw);
     if text.trim().is_empty() {
-        bail!("无法解码 MOBI 文本内容");
+        bail!(crate::t!("mobi_decode"));
     }
 
     let records = book.raw_records();
@@ -59,11 +59,11 @@ pub fn load(path: &Path) -> Result<Document> {
     }
     for (i, c) in chapters.iter_mut().enumerate() {
         if c.title.is_empty() {
-            c.title = format!("第 {} 节", i + 1);
+            c.title = crate::t!("title_section", n = i + 1);
         }
     }
     if chapters.is_empty() {
-        bail!("MOBI 中没有可显示的内容");
+        bail!(crate::t!("no_content", format = "MOBI"));
     }
     let title = Some(book.title())
         .filter(|t| !t.trim().is_empty())

@@ -64,9 +64,9 @@ impl AppState {
         let path = self
             .library()
             .file_of(id)
-            .ok_or_else(|| anyhow::anyhow!("书籍不存在"))?;
+            .ok_or_else(|| anyhow::anyhow!(crate::t!("book_not_found")))?;
         if !path.exists() {
-            anyhow::bail!("书籍文件已丢失: {}", path.display());
+            anyhow::bail!(crate::t!("book_file_missing", path = path.display()));
         }
         let doc = formats::open(&path)?;
         let mut images = HashMap::new();
@@ -311,7 +311,11 @@ pub async fn open_book(app: AppHandle, id: String) -> CmdResult<OpenedBook> {
     blocking(move || {
         let st = state(&app);
         let book = st.open_book(&id).map_err(err)?;
-        let entry = st.library().get(&id).cloned().ok_or("书籍不存在")?;
+        let entry = st
+            .library()
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| crate::t!("book_not_found"))?;
         let (kind, chapters, pages) = match &book.doc.content {
             Content::Flow(chs) => (
                 "flow",
@@ -356,8 +360,8 @@ pub async fn get_chapter(app: AppHandle, id: String, index: usize) -> CmdResult<
             Content::Flow(chs) => chs
                 .get(index)
                 .map(|c| c.blocks.clone())
-                .ok_or_else(|| "章节不存在".into()),
-            Content::Paged(_) => Err("该书没有文本章节".into()),
+                .ok_or_else(|| crate::t!("chapter_not_found")),
+            Content::Paged(_) => Err(crate::t!("not_text_book")),
         }
     })
     .await
@@ -393,6 +397,12 @@ pub async fn save_progress(
 #[tauri::command]
 pub async fn get_settings(app: AppHandle) -> CmdResult<serde_json::Value> {
     blocking(move || Ok(state(&app).library().settings().clone())).await
+}
+
+/// Language for messages from the backend (errors, generated titles, AI answers on "auto").
+#[tauri::command]
+pub fn set_locale(locale: String) {
+    crate::i18n::set_locale(&locale);
 }
 
 #[tauri::command]
@@ -433,7 +443,7 @@ pub async fn export_notes(app: AppHandle, id: String) -> CmdResult<Option<String
             .library()
             .get(&id)
             .cloned()
-            .ok_or("书籍不存在")?;
+            .ok_or_else(|| crate::t!("book_not_found"))?;
         let book = state(&app).open_book(&id).map_err(err)?;
         let titles: Vec<String> = match &book.doc.content {
             Content::Flow(chs) => chs.iter().map(|c| c.title.clone()).collect(),
@@ -446,7 +456,7 @@ pub async fn export_notes(app: AppHandle, id: String) -> CmdResult<Option<String
             .dialog()
             .file()
             .add_filter("Markdown", &["md"])
-            .set_file_name(format!("{} 笔记.md", entry.title))
+            .set_file_name(crate::t!("notes_file", title = entry.title))
             .blocking_save_file()
         else {
             return Ok(None);
@@ -469,7 +479,9 @@ pub async fn add_reading_time(
         let mut lib = state(&app).library();
         lib.add_reading_time(&id, seconds, speed).map_err(err)?;
         lib.save().map_err(err)?;
-        Ok(lib.get(&id).cloned().ok_or("书籍不存在")?)
+        lib.get(&id)
+            .cloned()
+            .ok_or_else(|| crate::t!("book_not_found"))
     })
     .await
 }

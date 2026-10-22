@@ -1,10 +1,12 @@
+// The AI tab of the Settings dialog: service, model, key, endpoint and answer language.
+
 import { useEffect, useState } from "react";
 import { api, errorText } from "../api";
+import { t } from "../i18n";
 import type { AiConfig, AiStatus } from "../types";
-import { Modal } from "../ui";
-import { LANGUAGES, PROVIDERS, presetOf } from "./presets";
+import { ANSWER_LANGUAGES, PROVIDERS, baseUrlPlaceholder, presetOf, providerLabel } from "./presets";
 
-export default function AiSettingsDialog(props: { status: AiStatus; onSaved: (s: AiStatus) => void; onClose: () => void }) {
+export default function AiSettingsForm(props: { status: AiStatus; onSaved: (s: AiStatus) => void }) {
   const [config, setConfig] = useState<AiConfig>(() => ({
     ...props.status.config,
     provider: props.status.config.provider || "anthropic",
@@ -13,12 +15,13 @@ export default function AiSettingsDialog(props: { status: AiStatus; onSaved: (s:
   // undefined: keep the stored key; "": remove it.
   const [apiKey, setApiKey] = useState<string | undefined>(undefined);
   const [hasKey, setHasKey] = useState(props.status.hasKey);
+  const [savedProvider, setSavedProvider] = useState(props.status.config.provider);
   const [localModels, setLocalModels] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   const preset = presetOf(config.provider);
-  const providerChanged = config.provider !== props.status.config.provider;
+  const providerChanged = config.provider !== savedProvider;
   const models = [...new Set([...(preset?.models ?? []), ...localModels])];
 
   const loadLocal = () => {
@@ -28,7 +31,7 @@ export default function AiSettingsDialog(props: { status: AiStatus; onSaved: (s:
       .then((list) => {
         setLocalModels(list);
         if (list.length && !config.model) setConfig((c) => ({ ...c, model: list[0] }));
-        setMessage(list.length ? { ok: true, text: `找到 ${list.length} 个本地模型` } : { ok: false, text: "没有找到已安装的模型" });
+        setMessage(list.length ? { ok: true, text: t("ai.localFound", { n: list.length }) } : { ok: false, text: t("ai.localNone") });
       })
       .catch((e) => setMessage({ ok: false, text: errorText(e) }));
   };
@@ -51,18 +54,19 @@ export default function AiSettingsDialog(props: { status: AiStatus; onSaved: (s:
     const saved = await api.aiSetConfig(config, apiKey);
     props.onSaved(saved);
     setHasKey(saved.hasKey);
+    setSavedProvider(saved.config.provider);
     setApiKey(undefined);
     return saved;
   };
 
-  const test = async () => {
+  const run = async (test: boolean) => {
     setBusy(true);
     setMessage(null);
     try {
       // The test runs against the saved settings.
       await save();
-      const reply = await api.aiTest();
-      setMessage({ ok: true, text: `连接成功：${reply}` });
+      const text = test ? t("ai.testOk", { reply: await api.aiTest() }) : t("ai.saved");
+      setMessage({ ok: true, text });
     } catch (e) {
       setMessage({ ok: false, text: errorText(e) });
     } finally {
@@ -75,51 +79,27 @@ export default function AiSettingsDialog(props: { status: AiStatus; onSaved: (s:
   const canSave = !!config.provider && !!config.model.trim() && (!needsUrl || !!config.baseUrl?.trim());
 
   return (
-    <Modal
-      title="AI 设置"
-      width={500}
-      onClose={props.onClose}
-      footer={
-        <>
-          <button onClick={test} disabled={!canSave || busy}>
-            {busy ? "测试中…" : "测试连接"}
-          </button>
-          <span className="spacer" />
-          <button onClick={props.onClose}>取消</button>
-          <button
-            className="primary"
-            disabled={!canSave || busy}
-            onClick={() =>
-              save()
-                .then(props.onClose)
-                .catch((e) => setMessage({ ok: false, text: errorText(e) }))
-            }
-          >
-            保存
-          </button>
-        </>
-      }
-    >
+    <div className="settings-form">
       <label className="field">
-        <span>服务</span>
+        <span>{t("ai.provider")}</span>
         <select value={config.provider} onChange={(e) => pickProvider(e.target.value)}>
           {PROVIDERS.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.name}
+              {providerLabel(p)}
             </option>
           ))}
         </select>
       </label>
       <label className="field">
-        <span>模型</span>
+        <span>{t("ai.model")}</span>
         <div className="inline-add">
           <input
             list="ai-models"
             value={config.model}
-            placeholder="模型名称"
+            placeholder={t("ai.modelPlaceholder")}
             onChange={(e) => setConfig((c) => ({ ...c, model: e.target.value }))}
           />
-          {config.provider === "ollama" && <button onClick={loadLocal}>刷新</button>}
+          {config.provider === "ollama" && <button onClick={loadLocal}>{t("common.refresh")}</button>}
         </div>
         <datalist id="ai-models">
           {models.map((m) => (
@@ -130,20 +110,21 @@ export default function AiSettingsDialog(props: { status: AiStatus; onSaved: (s:
       {(needsKey || needsUrl) && (
         <label className="field">
           <span>
-            API Key{!needsKey && "（可选）"}
-            {hasKey && apiKey === undefined && !providerChanged && <span className="key-saved">已保存在系统钥匙串</span>}
+            {t("ai.apiKey")}
+            {!needsKey && t("common.optional")}
+            {hasKey && apiKey === undefined && !providerChanged && <span className="key-saved">{t("ai.keySaved")}</span>}
           </span>
           <div className="inline-add">
             <input
               type="password"
               autoComplete="off"
               value={apiKey ?? ""}
-              placeholder={hasKey && !providerChanged ? "留空则保持不变" : preset?.keyHint ?? ""}
+              placeholder={hasKey && !providerChanged ? t("ai.keyKeep") : (preset?.keyHint ?? "")}
               onChange={(e) => setApiKey(e.target.value)}
             />
             {hasKey && !providerChanged && (
-              <button onClick={() => (setApiKey(""), setHasKey(false))} title="从钥匙串删除">
-                清除
+              <button onClick={() => (setApiKey(""), setHasKey(false))} title={t("ai.keyClear")}>
+                {t("common.clear")}
               </button>
             )}
           </div>
@@ -151,28 +132,38 @@ export default function AiSettingsDialog(props: { status: AiStatus; onSaved: (s:
       )}
       {(needsUrl || preset?.local || config.baseUrl) && (
         <label className="field">
-          <span>接口地址{!needsUrl && "（可选）"}</span>
+          <span>
+            {t("ai.baseUrl")}
+            {!needsUrl && t("common.optional")}
+          </span>
           <input
             value={config.baseUrl ?? ""}
-            placeholder={preset?.baseUrlHint ?? "使用默认地址"}
+            placeholder={baseUrlPlaceholder(preset)}
             onChange={(e) => setConfig((c) => ({ ...c, baseUrl: e.target.value || null }))}
           />
         </label>
       )}
       <label className="field">
-        <span>回答语言</span>
+        <span>{t("ai.language")}</span>
         <select value={config.language} onChange={(e) => setConfig((c) => ({ ...c, language: e.target.value }))}>
-          {[...new Set([config.language, ...LANGUAGES])].map((l) => (
-            <option key={l}>{l}</option>
+          {[...new Set([...ANSWER_LANGUAGES, config.language])].map((l) => (
+            <option key={l} value={l}>
+              {l === "auto" ? t("ai.languageAuto") : l}
+            </option>
           ))}
         </select>
       </label>
-      <p className="muted small">
-        {preset?.local
-          ? "本地模型在你的电脑上运行，书籍内容不会离开本机。"
-          : "使用云端服务时，所需的书籍文字会发送给该服务处理，并按其价格计费。API Key 只保存在系统钥匙串中。"}
-      </p>
-      {message && <p className={message.ok ? "ok-text small" : "error small"}>{message.text}</p>}
-    </Modal>
+      <p className="muted small">{preset?.local ? t("ai.localNote") : t("ai.cloudNote")}</p>
+      <div className="form-actions">
+        {message && <span className={message.ok ? "ok-text small" : "error small"}>{message.text}</span>}
+        <span className="spacer" />
+        <button onClick={() => run(true)} disabled={!canSave || busy}>
+          {busy ? t("ai.testing") : t("ai.test")}
+        </button>
+        <button className="primary" disabled={!canSave || busy} onClick={() => run(false)}>
+          {t("common.save")}
+        </button>
+      </div>
+    </div>
   );
 }

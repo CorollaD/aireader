@@ -62,9 +62,9 @@ fn bind() -> Result<Pdfium, String> {
 pub fn pdfium() -> Result<&'static Pdfium> {
     PDFIUM.get_or_init(bind).as_ref().map_err(|e| {
         anyhow!(
-            "未找到 PDFium 动态库 {}，无法打开 PDF。\n\
-             开发环境请运行 src-tauri/scripts/fetch-pdfium.sh 后重新构建；\
-             也可以设置环境变量 AIREADER_PDFIUM_DIR 指向该库所在目录。\n({e})",
+            "The PDFium library {} was not found, so PDFs can't be opened.\n\
+             In development, run src-tauri/scripts/fetch-pdfium.sh and rebuild, \
+             or point AIREADER_PDFIUM_DIR at the directory that contains it.\n({e})",
             Pdfium::pdfium_platform_library_name().to_string_lossy(),
         )
     })
@@ -149,9 +149,9 @@ pub fn load(path: &Path) -> Result<Document> {
         .load_pdf_from_file(path, None)
         .map_err(|e| match e {
             PdfiumError::PdfiumLibraryInternalError(PdfiumInternalError::PasswordError) => {
-                anyhow!("PDF 已加密，暂不支持输入密码")
+                anyhow!(crate::t!("pdf_encrypted"))
             }
-            e => anyhow!("PDF 打开失败: {e}"),
+            e => anyhow!(crate::t!("pdf_open_failed", error = e)),
         })?;
     let aspects = doc
         .pages()

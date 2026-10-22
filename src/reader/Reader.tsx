@@ -4,7 +4,10 @@ import { api, errorText } from "../api";
 import type { UpdateSettings } from "../App";
 import type { Settings } from "../settings";
 import type { Hit, HighlightColor, Location, OpenedBook } from "../types";
-import { isTyping, Modal, Toast } from "../ui";
+import { isTyping, Toast } from "../ui";
+import { t } from "../i18n";
+import { Icon } from "../icons";
+import { useOpenSettings } from "../SettingsDialog";
 import AiPanel, { type ChatRequest } from "../ai/AiPanel";
 import { useAi } from "../ai/AiContext";
 import type { ChatAction } from "../types";
@@ -14,7 +17,7 @@ import { describe, isValid, progressOf, sameLocation, START } from "./locations"
 import PagedView, { pageText, type PageSelection } from "./PagedView";
 import ProgressBar from "./ProgressBar";
 import SettingsPanel from "./SettingsPanel";
-import { SHORTCUTS } from "./shortcuts";
+import { MOD } from "./shortcuts";
 import Sidebar, { type SidebarTab } from "./Sidebar";
 import { useAnnotations } from "./useAnnotations";
 import { useReadingStats } from "./useReadingStats";
@@ -51,7 +54,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
   const [rotation, setRotation] = useState(0);
   const [sideTab, setSideTab] = useState<SidebarTab>("toc");
   const [focus, setFocus] = useState(false);
-  const [help, setHelp] = useState(false);
+  const [moreMenu, setMoreMenu] = useState(false);
   const [selection, setSelection] = useState<FlowSelection | null>(null);
   const [activeMark, setActiveMark] = useState<{ id: string; rect: DOMRect } | null>(null);
   const [noteFor, setNoteFor] = useState<string | null>(null);
@@ -61,6 +64,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
   const [chatRequest, setChatRequest] = useState<ChatRequest | null>(null);
   const [pageSel, setPageSel] = useState<PageSelection | null>(null);
   const ai = useAi();
+  const openSettings = useOpenSettings();
   const searchInput = useRef<HTMLInputElement>(null);
   const flowRef = useRef<FlowHandle>(null);
   const pendingSave = useRef<{ loc: Location; progress: number } | null>(null);
@@ -150,13 +154,13 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
     if (!book || !location) return;
     if (currentBookmark) {
       ann.removeBookmark(currentBookmark.id);
-      setToast("已删除书签");
+      setToast(t("reader.bookmarkRemoved"));
       return;
     }
     const excerpt =
       location.kind === "flow" ? (flowRef.current?.blockText(location.chapter, location.block) ?? "").trim().slice(0, 100) : "";
     ann.addBookmark({ location, title: describe(book, location), excerpt });
-    setToast("已添加书签");
+    setToast(t("reader.bookmarkAdded"));
   }, [book, location, currentBookmark, ann]);
 
   // --- highlights ----------------------------------------------------------------------------
@@ -189,8 +193,8 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
 
   const copy = (text: string) => {
     navigator.clipboard.writeText(text).then(
-      () => setToast("已复制"),
-      () => setToast("复制失败"),
+      () => setToast(t("common.copied")),
+      () => setToast(t("common.copyFailed")),
     );
   };
 
@@ -207,8 +211,8 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
     // Context: the selected paragraphs plus one on each side, capped.
     const context: string[] = [];
     for (let b = Math.max(0, startBlock - 1); b <= endBlock + 1; b++) {
-      const t = flowRef.current?.blockText(chapter, b);
-      if (t) context.push(t);
+      const text = flowRef.current?.blockText(chapter, b);
+      if (text) context.push(text);
     }
     openChat({ anchor: { chapter, range: { startBlock, start, endBlock, end } }, selection: text, context: context.join("\n").slice(0, 2000), action });
     clearSelection();
@@ -242,7 +246,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
   const exportNotes = async () => {
     try {
       const path = await api.exportNotes(bookId);
-      if (path) setToast(`已导出到 ${path}`);
+      if (path) setToast(t("reader.exported", { path }));
     } catch (e) {
       setToast(errorText(e));
     }
@@ -311,7 +315,8 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
           clearSelection();
           setActiveMark(null);
           setPageSel(null);
-        } else if (panel) setPanel(false);
+        } else if (moreMenu) setMoreMenu(false);
+        else if (panel) setPanel(false);
         else if (search.open) setSearch((s) => ({ ...s, open: false }));
         else if (aiOpen) setAiOpen(false);
         else if (focus) setFocus(false);
@@ -323,126 +328,204 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
       } else if (key === "f") {
         setFocus((f) => !f);
       } else if (e.key === "?") {
-        setHelp(true);
+        openSettings("shortcuts");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isFlow, settings.fontSize, settings.showToc, panel, search.open, aiOpen, focus, selection, activeMark, pageSel, update, props.onClose, toggleBookmark, back, forward]);
+  }, [isFlow, settings.fontSize, settings.showToc, panel, moreMenu, search.open, aiOpen, focus, selection, activeMark, pageSel, update, props.onClose, toggleBookmark, back, forward, openSettings]);
+
+  // The reader keeps its text at the size chosen under Reading, whatever the interface zoom.
+  const flowSettings = useMemo(() => {
+    const k = settings.uiScale;
+    return k === 1 ? settings : { ...settings, fontSize: settings.fontSize / k, maxWidth: settings.maxWidth / k, margin: settings.margin / k };
+  }, [settings]);
 
   if (error && !book) {
     return (
       <div className="reader">
         <div className="center-msg">
           <p className="error">{error}</p>
-          <button onClick={props.onClose}>返回书架</button>
+          <button onClick={props.onClose}>{t("reader.backToShelf")}</button>
         </div>
       </div>
     );
   }
-  if (!book) return <div className="reader center-msg muted">正在打开…</div>;
+  if (!book) return <div className="reader center-msg muted">{t("reader.opening")}</div>;
 
   const chapterTitle = location?.kind === "flow" ? book.chapters[location.chapter]?.title : null;
   const mark = activeMark ? ann.data.highlights.find((h) => h.id === activeMark.id) : null;
   const noteHighlight = noteFor ? ann.data.highlights.find((h) => h.id === noteFor) : null;
 
   return (
-    <div className={`reader${focus ? " focus" : ""}`} onClick={() => setPanel(false)}>
+    <div className={`reader${focus ? " focus" : ""}`} onClick={() => (setPanel(false), setMoreMenu(false))}>
       {focus && <div className="focus-hotzone" />}
       <header className="reader-bar">
-        <button onClick={props.onClose} title="返回书架 (Esc)">
-          ← 书架
-        </button>
-        <button className={settings.showToc ? "on" : ""} onClick={() => update({ showToc: !settings.showToc })} title="侧栏 (T)">
-          ☰
-        </button>
-        <button onClick={back} disabled={history.back.length === 0} title="后退 (Alt+←)">
-          ‹
-        </button>
-        <button onClick={forward} disabled={history.forward.length === 0} title="前进 (Alt+→)">
-          ›
-        </button>
+        <div className="bar-group">
+          <button className="icon-button wide" onClick={props.onClose} title={`${t("reader.backToShelf")} (Esc)`}>
+            <Icon name="arrowLeft" />
+            <span className="label">{t("reader.shelf")}</span>
+          </button>
+          <button
+            className={`icon-button${settings.showToc ? " on" : ""}`}
+            onClick={() => update({ showToc: !settings.showToc })}
+            title={`${t("reader.sidebar")} (T)`}
+            aria-label={t("reader.sidebar")}
+          >
+            <Icon name="panelLeft" />
+          </button>
+          <button className="icon-button" onClick={back} disabled={history.back.length === 0} title={`${t("reader.back")} (Alt+←)`} aria-label={t("reader.back")}>
+            <Icon name="chevronLeft" />
+          </button>
+          <button
+            className="icon-button"
+            onClick={forward}
+            disabled={history.forward.length === 0}
+            title={`${t("reader.forward")} (Alt+→)`}
+            aria-label={t("reader.forward")}
+          >
+            <Icon name="chevronRight" />
+          </button>
+        </div>
         <div className="reader-title ellipsis">
           <strong>{book.title}</strong>
           {chapterTitle && <span className="muted"> · {chapterTitle}</span>}
         </div>
-        {book.kind === "paged" && (
-          <div className="page-controls">
-            <button onClick={() => setZoom((z) => Math.max(0.3, z / 1.2))} title="缩小">
-              －
-            </button>
-            <span className="zoom">{Math.round(zoom * 100)}%</span>
-            <button onClick={() => setZoom((z) => Math.min(5, z * 1.2))} title="放大">
-              ＋
-            </button>
-            <div className="segmented">
-              <button className={settings.pageFit === "width" ? "on" : ""} onClick={() => (update({ pageFit: "width" }), setZoom(1))}>
-                适宽
+        <div className="bar-group">
+          {book.kind === "paged" && (
+            <div className="tool-group">
+              <button className="icon-button" onClick={() => setZoom((z) => Math.max(0.3, z / 1.2))} title={t("reader.zoomOut")} aria-label={t("reader.zoomOut")}>
+                <Icon name="minus" />
               </button>
-              <button className={settings.pageFit === "page" ? "on" : ""} onClick={() => (update({ pageFit: "page" }), setZoom(1))}>
-                适页
+              <button className="zoom" onClick={() => setZoom(1)} title={t("reader.zoomReset")}>
+                {Math.round(zoom * 100)}%
+              </button>
+              <button className="icon-button" onClick={() => setZoom((z) => Math.min(5, z * 1.2))} title={t("reader.zoomIn")} aria-label={t("reader.zoomIn")}>
+                <Icon name="plus" />
+              </button>
+              <span className="tool-sep" />
+              <button
+                className={`icon-button${settings.pageFit === "width" ? " on" : ""}`}
+                onClick={() => (update({ pageFit: "width" }), setZoom(1))}
+                title={t("rs.fitWidth")}
+                aria-label={t("rs.fitWidth")}
+              >
+                <Icon name="fitWidth" />
+              </button>
+              <button
+                className={`icon-button${settings.pageFit === "page" ? " on" : ""}`}
+                onClick={() => (update({ pageFit: "page" }), setZoom(1))}
+                title={t("rs.fitPage")}
+                aria-label={t("rs.fitPage")}
+              >
+                <Icon name="fitPage" />
+              </button>
+              <button className="icon-button" onClick={rotate} title={t("reader.rotate")} aria-label={t("reader.rotate")}>
+                <Icon name="rotate" />
               </button>
             </div>
-            <button onClick={rotate} title="顺时针旋转 90°">
-              ⟳
-            </button>
-            <div className="segmented">
-              <button className={settings.pageLayout === "continuous" ? "on" : ""} onClick={() => update({ pageLayout: "continuous" })}>
-                连续
-              </button>
-              <button className={settings.pageLayout === "single" ? "on" : ""} onClick={() => update({ pageLayout: "single" })}>
-                单页
-              </button>
-            </div>
-          </div>
-        )}
-        <button className={currentBookmark ? "on bookmark-on" : ""} onClick={toggleBookmark} title="书签 (⌘/Ctrl+D)">
-          {currentBookmark ? "★" : "☆"} 书签
-        </button>
-        {isFlow && (
-          <button
-            className={search.open ? "on" : ""}
-            title="全文搜索 (Ctrl/⌘+F)"
-            onClick={() => {
-              setSearch((s) => ({ ...s, open: !s.open }));
-              setAiOpen(false);
-              setTimeout(() => searchInput.current?.focus(), 0);
-            }}
-          >
-            搜索
-          </button>
-        )}
-        <button
-          className={aiOpen ? "on" : ""}
-          title="AI 总结与划词解释"
-          onClick={() => {
-            setAiOpen((o) => !o);
-            setSearch((s) => ({ ...s, open: false }));
-          }}
-        >
-          AI
-        </button>
-        <div className="panel-anchor">
-          <button
-            className={panel ? "on" : ""}
-            onClick={(e) => {
-              e.stopPropagation();
-              setPanel((p) => !p);
-            }}
-            title="阅读设置"
-          >
-            Aa
-          </button>
-          {panel && (
-            <SettingsPanel
-              settings={settings}
-              update={update}
-              textOptions={isFlow}
-              onFocusMode={() => (setFocus(true), setPanel(false))}
-              onFullscreen={() => toggleFullscreen().catch(() => {})}
-              onShortcuts={() => (setHelp(true), setPanel(false))}
-            />
           )}
+          <button
+            className={`icon-button${currentBookmark ? " on bookmark-on" : ""}`}
+            onClick={toggleBookmark}
+            title={`${t("reader.bookmark")} (${MOD}+D)`}
+            aria-label={t("reader.bookmark")}
+          >
+            <Icon name="bookmark" filled={!!currentBookmark} />
+          </button>
+          {isFlow && (
+            <button
+              className={`icon-button${search.open ? " on" : ""}`}
+              title={`${t("reader.search")} (${MOD}+F)`}
+              aria-label={t("reader.search")}
+              onClick={() => {
+                setSearch((s) => ({ ...s, open: !s.open }));
+                setAiOpen(false);
+                setTimeout(() => searchInput.current?.focus(), 0);
+              }}
+            >
+              <Icon name="search" />
+            </button>
+          )}
+          <button
+            className={`icon-button${aiOpen ? " on" : ""}`}
+            title={t("reader.ai")}
+            aria-label={t("reader.ai")}
+            onClick={() => {
+              setAiOpen((o) => !o);
+              setSearch((s) => ({ ...s, open: false }));
+            }}
+          >
+            <Icon name="sparkles" />
+          </button>
+          <div className="menu-anchor">
+            <button
+              className={`icon-button${panel ? " on" : ""}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMoreMenu(false);
+                setPanel((p) => !p);
+              }}
+              title={t("reader.appearance")}
+              aria-label={t("reader.appearance")}
+            >
+              <Icon name="type" />
+            </button>
+            {panel && (
+              <SettingsPanel
+                settings={settings}
+                update={update}
+                textOptions={isFlow}
+                onMore={() => (setPanel(false), openSettings("reading"))}
+              />
+            )}
+          </div>
+          <div className="menu-anchor">
+            <button
+              className={`icon-button${moreMenu ? " on" : ""}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setPanel(false);
+                setMoreMenu((m) => !m);
+              }}
+              title={t("common.more")}
+              aria-label={t("common.more")}
+            >
+              <Icon name="more" />
+            </button>
+            {moreMenu && (
+              <div className="menu dropdown" onClick={(e) => (e.stopPropagation(), setMoreMenu(false))}>
+                {book.kind === "paged" && (
+                  <>
+                    <button className={settings.pageLayout === "continuous" ? "checked" : ""} onClick={() => update({ pageLayout: "continuous" })}>
+                      <Icon name="list" /> {t("rs.continuous")}
+                    </button>
+                    <button className={settings.pageLayout === "single" ? "checked" : ""} onClick={() => update({ pageLayout: "single" })}>
+                      <Icon name="fitPage" /> {t("rs.single")}
+                    </button>
+                    <hr />
+                  </>
+                )}
+                <button onClick={() => setFocus(true)}>
+                  <Icon name="focus" /> {t("reader.focus")}
+                  <kbd>F</kbd>
+                </button>
+                <button onClick={() => toggleFullscreen().catch(() => {})}>
+                  <Icon name="maximize" /> {t("reader.fullscreen")}
+                  <kbd>F11</kbd>
+                </button>
+                <hr />
+                <button onClick={() => openSettings("shortcuts")}>
+                  <Icon name="keyboard" /> {t("reader.shortcuts")}
+                  <kbd>?</kbd>
+                </button>
+                <button onClick={() => openSettings()}>
+                  <Icon name="settings" /> {t("reader.settings")}
+                  <kbd>{MOD},</kbd>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -470,7 +553,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
               book={book}
               jump={jump}
               flash={flash}
-              settings={settings}
+              settings={flowSettings}
               highlights={ann.data.highlights}
               onLocation={onLocation}
               onSelect={onSelect}
@@ -499,18 +582,22 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
             <input
               ref={searchInput}
               className="full"
-              placeholder="搜索全文，回车确认"
+              placeholder={t("reader.searchPlaceholder")}
               value={search.query}
               onChange={(e) => setSearch((s) => ({ ...s, query: e.target.value }))}
               onKeyDown={(e) => e.key === "Enter" && runSearch()}
             />
             <div className="muted small search-status">
-              {search.busy ? "搜索中…" : search.hits ? `找到 ${search.hits.length}${search.hits.length >= 1000 ? "+" : ""} 处` : ""}
+              {search.busy
+                ? t("reader.searching")
+                : search.hits
+                  ? t("reader.found", { n: `${search.hits.length}${search.hits.length >= 1000 ? "+" : ""}` })
+                  : ""}
             </div>
             <div className="search-hits">
               {search.hits?.map((h, i) => (
                 <button key={i} className="hit" onClick={() => navigate({ kind: "flow", chapter: h.chapter, block: h.block }, true)}>
-                  <span className="hit-chapter">{book.chapters[h.chapter]?.title || `第 ${h.chapter + 1} 章`}</span>
+                  <span className="hit-chapter">{book.chapters[h.chapter]?.title || t("loc.chapter", { n: h.chapter + 1 })}</span>
                   <span>{h.snippet}</span>
                 </button>
               ))}
@@ -534,8 +621,8 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
           extra={
             ai.ready
               ? [
-                  { label: "解释", title: "让 AI 解释选中的文字", run: () => askAi("explain") },
-                  { label: "翻译", title: "让 AI 翻译选中的文字", run: () => askAi("translate") },
+                  { label: t("reader.explain"), title: t("reader.explainTitle"), run: () => askAi("explain") },
+                  { label: t("reader.translate"), title: t("reader.translateTitle"), run: () => askAi("translate") },
                 ]
               : undefined
           }
@@ -552,8 +639,8 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
           extra={
             ai.ready
               ? [
-                  { label: "解释", title: "让 AI 解释选中的文字", run: () => askAiPage("explain") },
-                  { label: "翻译", title: "让 AI 翻译选中的文字", run: () => askAiPage("translate") },
+                  { label: t("reader.explain"), title: t("reader.explainTitle"), run: () => askAiPage("explain") },
+                  { label: t("reader.translate"), title: t("reader.translateTitle"), run: () => askAiPage("translate") },
                 ]
               : undefined
           }
@@ -588,23 +675,6 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
           onSave={(note) => ann.updateHighlight(noteHighlight.id, { note: note.trim() || null })}
           onClose={() => setNoteFor(null)}
         />
-      )}
-      {help && (
-        <Modal title="快捷键" width={520} onClose={() => setHelp(false)}>
-          <div className="shortcuts">
-            {SHORTCUTS.map((g) => (
-              <div key={g.group}>
-                <div className="panel-label">{g.group}</div>
-                {g.items.map(([k, d]) => (
-                  <div key={k} className="shortcut-row">
-                    <kbd>{k}</kbd>
-                    <span>{d}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </Modal>
       )}
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
     </div>

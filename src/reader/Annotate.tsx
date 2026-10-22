@@ -3,14 +3,10 @@
 import { useState, type ReactNode } from "react";
 import { Modal } from "../ui";
 import type { HighlightColor } from "../types";
+import { t } from "../i18n";
+import { MOD } from "./shortcuts";
 
-export const COLORS: { key: HighlightColor; name: string }[] = [
-  { key: "yellow", name: "黄色" },
-  { key: "green", name: "绿色" },
-  { key: "blue", name: "蓝色" },
-  { key: "pink", name: "粉色" },
-  { key: "purple", name: "紫色" },
-];
+export const COLORS: HighlightColor[] = ["yellow", "green", "blue", "pink", "purple"];
 
 /** Positions a toolbar above `rect` (or below it near the top of the window). */
 function placement(rect: DOMRect): React.CSSProperties {
@@ -44,19 +40,19 @@ export function SelectionToolbar(props: {
       {props.onColor &&
         COLORS.map((c) => (
           <button
-            key={c.key}
-            className={`color-dot hl-${c.key}${props.current === c.key ? " on" : ""}`}
-            title={`${c.name}高亮`}
-            aria-label={`${c.name}高亮`}
-            onClick={() => props.onColor?.(c.key)}
+            key={c}
+            className={`color-dot hl-${c}${props.current === c ? " on" : ""}`}
+            title={t("annotate.highlight", { color: t(`color.${c}`) })}
+            aria-label={t("annotate.highlight", { color: t(`color.${c}`) })}
+            onClick={() => props.onColor?.(c)}
           />
         ))}
       {props.onColor && <span className="sep" />}
-      {props.onNote && <button onClick={props.onNote}>笔记</button>}
-      <button onClick={props.onCopy}>复制</button>
+      {props.onNote && <button onClick={props.onNote}>{t("annotate.note")}</button>}
+      <button onClick={props.onCopy}>{t("common.copy")}</button>
       {props.onRemove && (
         <button className="danger" onClick={props.onRemove}>
-          删除
+          {t("common.delete")}
         </button>
       )}
       {props.extra?.map((a) => (
@@ -72,12 +68,12 @@ export function NoteEditor(props: { quote: string; note: string; onSave: (note: 
   const [text, setText] = useState(props.note);
   return (
     <Modal
-      title="笔记"
+      title={t("annotate.note")}
       width={460}
       onClose={props.onClose}
       footer={
         <>
-          <button onClick={props.onClose}>取消</button>
+          <button onClick={props.onClose}>{t("common.cancel")}</button>
           <button
             className="primary"
             onClick={() => {
@@ -85,7 +81,7 @@ export function NoteEditor(props: { quote: string; note: string; onSave: (note: 
               props.onClose();
             }}
           >
-            保存
+            {t("common.save")}
           </button>
         </>
       }
@@ -95,7 +91,7 @@ export function NoteEditor(props: { quote: string; note: string; onSave: (note: 
         className="note-text"
         autoFocus
         value={text}
-        placeholder="写下你的想法…"
+        placeholder={t("annotate.notePlaceholder")}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -104,7 +100,7 @@ export function NoteEditor(props: { quote: string; note: string; onSave: (note: 
           }
         }}
       />
-      <div className="muted small">⌘/Ctrl + Enter 保存</div>
+      <div className="muted small">{t("annotate.saveHint", { key: MOD })}</div>
     </Modal>
   );
 }

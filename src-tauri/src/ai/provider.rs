@@ -18,10 +18,10 @@ pub type ChatModel = DynModel<Completion>;
 /// Builds the configured chat model. Nothing is sent until a request is made.
 pub fn connect(cfg: &AiConfig, key: Option<String>) -> Result<ChatModel> {
     if !cfg.is_configured() {
-        bail!("还没有配置 AI 服务，请先在「AI 设置」中选择服务和模型");
+        bail!(crate::t!("ai_not_configured"));
     }
     if cfg.provider == CUSTOM && cfg.base_url.is_none() {
-        bail!("自定义服务需要填写接口地址");
+        bail!(crate::t!("ai_custom_needs_url"));
     }
     let key = key.map(|k| k.trim().to_owned()).filter(|k| !k.is_empty());
     if cfg.provider == CUSTOM {
@@ -53,9 +53,13 @@ pub fn connect(cfg: &AiConfig, key: Option<String>) -> Result<ChatModel> {
         .map_err(|e| {
             let text = e.to_string();
             if text.to_lowercase().contains("key") {
-                anyhow::anyhow!("缺少 API Key：请在「AI 设置」中填写")
+                anyhow::anyhow!(crate::t!("ai_missing_key"))
             } else {
-                anyhow::anyhow!("无法连接模型 {reference}：{text}")
+                anyhow::anyhow!(crate::t!(
+                    "ai_connect_failed",
+                    model = reference,
+                    error = text
+                ))
             }
         })
 }
@@ -144,34 +148,34 @@ pub fn friendly_error(cfg: &AiConfig, error: &ProviderError) -> String {
         _ if matches!(error, ProviderError::InvalidAuthentication(_))
             || matches!(status, Some(401 | 403)) =>
         {
-            "API Key 无效或没有权限，请在「AI 设置」中检查".into()
+            crate::t!("ai_bad_key")
         }
         _ if cfg.is_local()
             && (matches!(error, ProviderError::Http(_)) || matches!(status, Some(502..=504))) =>
         {
-            "连接不到本地模型服务，请确认 Ollama / llama.cpp 已经启动，并检查接口地址".into()
+            crate::t!("ai_local_unreachable")
         }
-        ProviderError::Http(_) => "网络错误，连接不到 AI 服务，请检查网络或接口地址".into(),
+        ProviderError::Http(_) => crate::t!("ai_network"),
         _ if status == Some(429) || body.contains("quota") || body.contains("rate limit") => {
-            "请求过于频繁或额度不足，请稍后再试或检查账户余额".into()
+            crate::t!("ai_rate_limited")
         }
         _ if status == Some(404)
             || body.contains("model_not_found")
             || body.contains("not found") =>
         {
-            format!("找不到模型「{}」，请检查模型名称", cfg.model)
+            crate::t!("ai_model_not_found", model = cfg.model)
         }
         _ if body.contains("context")
             && (body.contains("length")
                 || body.contains("too long")
                 || body.contains("maximum")) =>
         {
-            "内容超出模型能处理的长度".into()
+            crate::t!("ai_too_long")
         }
         _ => {
             let detail = error.to_string();
             let detail: String = detail.chars().take(300).collect();
-            format!("AI 服务返回错误：{detail}")
+            crate::t!("ai_service_error", detail = detail)
         }
     }
 }
@@ -218,7 +222,7 @@ mod tests {
             connect(&custom, None)
                 .unwrap_err()
                 .to_string()
-                .contains("接口地址")
+                .contains("endpoint URL")
         );
         let local = AiConfig {
             base_url: Some("http://localhost:1234/v1".into()),

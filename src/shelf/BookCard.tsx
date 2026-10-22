@@ -1,7 +1,8 @@
 import { useState, type MouseEvent } from "react";
 import { coverUrl } from "../api";
 import type { Book } from "../types";
-import { formatDuration } from "../reader/locations";
+import { formatDate, formatDuration, t } from "../i18n";
+import { Icon } from "../icons";
 
 /** Deterministic hue for books without a cover. */
 function hue(text: string): number {
@@ -29,12 +30,6 @@ export function Cover({ book, small }: { book: Book; small?: boolean }) {
 
 export const percent = (p: number) => `${Math.round(p * 100)}%`;
 
-export function formatDate(secs: number | null): string {
-  if (!secs) return "—";
-  const d = new Date(secs * 1000);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 interface CardProps {
   book: Book;
   selected: boolean;
@@ -50,14 +45,18 @@ export function BookCard({ book, selected, selecting, onOpen, onToggle, onMenu }
       className={`book-card${selected ? " selected" : ""}${book.missing ? " missing" : ""}`}
       onClick={selecting ? onToggle : onOpen}
       onContextMenu={onMenu}
-      title={book.missing ? "文件已丢失" : `${book.title}${book.readSeconds > 0 ? `\n已读 ${formatDuration(book.readSeconds)}` : ""}`}
+      title={
+        book.missing
+          ? t("book.missingTitle")
+          : `${book.title}${book.readSeconds > 0 ? `\n${t("book.readTime", { time: formatDuration(book.readSeconds) })}` : ""}`
+      }
     >
       <div className="cover">
         <Cover book={book} />
         <span className="badge">{book.format}</span>
         <button
           className={`check${selected ? " on" : ""}`}
-          aria-label="选择"
+          aria-label={t("common.select")}
           onClick={(e) => {
             e.stopPropagation();
             onToggle();
@@ -74,19 +73,19 @@ export function BookCard({ book, selected, selecting, onOpen, onToggle, onMenu }
       <div className="book-meta">
         <div className="book-title">{book.title}</div>
         <div className="book-sub">
-          <span className="ellipsis">{book.author ?? "佚名"}</span>
-          <span>{book.missing ? "丢失" : book.progress > 0 ? percent(book.progress) : "未读"}</span>
+          <span className="ellipsis">{book.author ?? t("common.unknownAuthor")}</span>
+          <span>{book.missing ? t("book.missing") : book.progress > 0 ? percent(book.progress) : t("book.unread")}</span>
         </div>
       </div>
       <button
         className="more"
-        aria-label="更多"
+        aria-label={t("common.more")}
         onClick={(e) => {
           e.stopPropagation();
           onMenu(e);
         }}
       >
-        ⋯
+        <Icon name="more" />
       </button>
     </div>
   );
@@ -101,7 +100,7 @@ export function BookRow({ book, selected, selecting, onOpen, onToggle, onMenu }:
     >
       <button
         className={`check inline${selected ? " on" : ""}`}
-        aria-label="选择"
+        aria-label={t("common.select")}
         onClick={(e) => {
           e.stopPropagation();
           onToggle();
@@ -115,24 +114,24 @@ export function BookRow({ book, selected, selecting, onOpen, onToggle, onMenu }:
       <div className="row-main">
         <div className="book-title">{book.title}</div>
         <div className="book-sub">
-          {book.author ?? "佚名"}
-          {book.groups.length > 0 && <span className="row-groups"> · {book.groups.join("、")}</span>}
+          {book.author ?? t("common.unknownAuthor")}
+          {book.groups.length > 0 && <span className="row-groups"> · {book.groups.join(t("common.listSeparator"))}</span>}
         </div>
       </div>
       <span className="row-cell">{book.format}</span>
-      <span className="row-cell">{book.missing ? "丢失" : percent(book.progress)}</span>
+      <span className="row-cell">{book.missing ? t("book.missing") : percent(book.progress)}</span>
       <span className="row-cell">{book.readSeconds > 0 ? formatDuration(book.readSeconds) : "—"}</span>
       <span className="row-cell">{formatDate(book.lastRead)}</span>
       <span className="row-cell">{formatDate(book.added)}</span>
       <button
         className="more inline"
-        aria-label="更多"
+        aria-label={t("common.more")}
         onClick={(e) => {
           e.stopPropagation();
           onMenu(e);
         }}
       >
-        ⋯
+        <Icon name="more" />
       </button>
     </div>
   );

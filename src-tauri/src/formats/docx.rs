@@ -17,7 +17,7 @@ pub fn load(path: &Path) -> Result<Document> {
     let title = doc.title.unwrap_or_else(|| Document::file_stem(path));
     let chapters = split_by_headings(doc.blocks);
     if chapters.iter().all(|c| c.blocks.is_empty()) {
-        bail!("文档为空");
+        bail!(crate::t!("document_empty"));
     }
     Ok(Document {
         path: path.to_owned(),
@@ -64,8 +64,9 @@ fn toggle(props: Option<Node>, name: &str) -> bool {
 }
 
 pub fn parse<R: Read + Seek>(zip: &mut zip::ZipArchive<R>) -> Result<Parsed> {
-    let document = read_xml(zip, "word/document.xml").context("缺少 word/document.xml")?;
-    let doc = roxmltree::Document::parse(&document).context("document.xml 解析失败")?;
+    let document = read_xml(zip, "word/document.xml").context("missing word/document.xml")?;
+    let doc = roxmltree::Document::parse(&document)
+        .map_err(|e| anyhow::anyhow!(crate::t!("parse_failed", format = "DOCX", error = e)))?;
 
     // Relationship id → archive path of the target.
     let mut rels = HashMap::new();

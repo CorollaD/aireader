@@ -1,5 +1,6 @@
 // Arithmetic on reading positions: ordering, progress fractions, and reading-time estimates.
 
+import { t } from "../i18n";
 import type { Location, OpenedBook } from "../types";
 
 export const START: Record<OpenedBook["kind"], Location> = {
@@ -53,8 +54,8 @@ export function locationAt(book: OpenedBook, fraction: number): Location {
 
 /** A short description of a location, e.g. for the progress slider's tooltip. */
 export function describe(book: OpenedBook, loc: Location): string {
-  if (loc.kind === "page") return `第 ${loc.page + 1} 页`;
-  return book.chapters[loc.chapter]?.title || `第 ${loc.chapter + 1} 章`;
+  if (loc.kind === "page") return t("loc.page", { n: loc.page + 1 });
+  return book.chapters[loc.chapter]?.title || t("loc.chapter", { n: loc.chapter + 1 });
 }
 
 /** Reading position in characters (reflowable) or pages, for speed measurement. */
@@ -77,17 +78,4 @@ export function remainingMinutes(book: OpenedBook, loc: Location, speed: number 
   const ch = book.chapters[loc.chapter];
   const chapterEnd = unitsAt(book, { kind: "flow", chapter: loc.chapter, block: ch?.blocks ?? 0 });
   return { chapter: (chapterEnd - here) / perMinute, book: (total - here) / perMinute };
-}
-
-export function formatMinutes(minutes: number): string {
-  if (minutes < 1) return "不到 1 分钟";
-  if (minutes < 60) return `${Math.round(minutes)} 分钟`;
-  const h = Math.floor(minutes / 60);
-  const m = Math.round(minutes % 60);
-  return m ? `${h} 小时 ${m} 分` : `${h} 小时`;
-}
-
-export function formatDuration(seconds: number): string {
-  if (seconds < 60) return seconds > 0 ? "不到 1 分钟" : "0 分钟";
-  return formatMinutes(seconds / 60);
 }

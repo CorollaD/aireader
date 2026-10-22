@@ -5,6 +5,9 @@ import { api, pageUrl } from "../api";
 import { isTyping } from "../ui";
 import type { Location, OpenedBook, TextRun } from "../types";
 import type { Jump } from "./Reader";
+import { pixelRatio } from "../zoom";
+import { t } from "../i18n";
+import { Icon } from "../icons";
 
 const GAP = 14;
 /** Pages within this many screens of the viewport get their images loaded. */
@@ -12,7 +15,7 @@ const PRELOAD_SCREENS = 1.5;
 
 /** Render width in device pixels, rounded up so small resizes reuse cached images. */
 function renderWidth(cssWidth: number): number {
-  const px = cssWidth * window.devicePixelRatio;
+  const px = cssWidth * pixelRatio();
   return Math.min(4096, Math.ceil(px / 256) * 256);
 }
 
@@ -270,7 +273,7 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, onL
   }, [onSelect]);
   const checkSelection = () => setTimeout(() => onSelect(pageSelection()), 0);
 
-  if (count === 0) return <div className="center-msg muted">没有页面</div>;
+  if (count === 0) return <div className="center-msg muted">{t("reader.noPages")}</div>;
 
   if (layout === "single") {
     const aspect = aspects[page] ?? 1.414;
@@ -283,11 +286,11 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, onL
             <Page key={page} bookId={book.id} index={page} width={w} height={w * aspect} rotation={rotation} load />
           )}
         </div>
-        <button className="page-turn left" onClick={() => goto(page - 1)} disabled={page === 0} aria-label="上一页">
-          ‹
+        <button className="page-turn left" onClick={() => goto(page - 1)} disabled={page === 0} aria-label={t("reader.prevPage")}>
+          <Icon name="chevronLeft" size={30} />
         </button>
-        <button className="page-turn right" onClick={() => goto(page + 1)} disabled={page >= count - 1} aria-label="下一页">
-          ›
+        <button className="page-turn right" onClick={() => goto(page + 1)} disabled={page >= count - 1} aria-label={t("reader.nextPage")}>
+          <Icon name="chevronRight" size={30} />
         </button>
         {page + 1 < count && <img className="prefetch" src={pageUrl(book.id, page + 1, renderWidth(w), rotation)} alt="" />}
       </div>

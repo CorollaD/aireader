@@ -63,19 +63,19 @@ fn serve<R: Runtime>(app: &AppHandle<R>, path: &str) -> anyhow::Result<Served> {
             let bytes = book
                 .images
                 .get(&image.parse()?)
-                .ok_or_else(|| anyhow::anyhow!("图片不存在"))?;
+                .ok_or_else(|| anyhow::anyhow!("no such image"))?;
             Ok((mime_of(bytes), bytes.to_vec(), "max-age=3600"))
         }
         ["page", id, page, width, rest @ ..] => {
             let book = state.open_book(id)?;
             let Content::Paged(src) = &book.doc.content else {
-                anyhow::bail!("不是分页文档")
+                anyhow::bail!("not a paged document")
             };
             let width = width.parse::<u32>()?.clamp(64, MAX_PAGE_WIDTH);
             let rotation = match rest {
                 [] => 0,
                 [r] => r.parse::<u16>()? % 360,
-                _ => anyhow::bail!("未知路径: {path}"),
+                _ => anyhow::bail!("unknown path: {path}"),
             };
             let img = render_rotated(src.as_ref(), page.parse()?, width, rotation)?;
             let mut png = Vec::new();
@@ -88,7 +88,7 @@ fn serve<R: Runtime>(app: &AppHandle<R>, path: &str) -> anyhow::Result<Served> {
                 )?;
             Ok(("image/png", png, "max-age=3600"))
         }
-        _ => anyhow::bail!("未知路径: {path}"),
+        _ => anyhow::bail!("unknown path: {path}"),
     }
 }
 
@@ -115,12 +115,12 @@ fn render_rotated(
         return Ok(img);
     }
     let buf = image::RgbaImage::from_raw(img.width, img.height, img.rgba)
-        .ok_or_else(|| anyhow::anyhow!("页面图像尺寸不符"))?;
+        .ok_or_else(|| anyhow::anyhow!("page image has the wrong size"))?;
     let rotated = match rotation {
         90 => imageops::rotate90(&buf),
         180 => imageops::rotate180(&buf),
         270 => imageops::rotate270(&buf),
-        _ => anyhow::bail!("不支持的旋转角度: {rotation}"),
+        _ => anyhow::bail!("unsupported rotation: {rotation}"),
     };
     Ok(crate::model::PageImage {
         width: rotated.width(),

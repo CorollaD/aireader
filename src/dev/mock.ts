@@ -54,7 +54,7 @@ export function installMock() {
     groups: ["小说", "技术"],
     settings: {} as unknown,
     annotations: new Map<string, Annotations>(),
-    ai: { provider: "", model: "", baseUrl: null, language: "中文", consented: false } as AiConfig,
+    ai: { provider: "", model: "", baseUrl: null, language: "auto", consented: false } as AiConfig,
     aiKey: false,
   };
   const aiStatus = () => ({
@@ -220,6 +220,10 @@ export function installMock() {
           return db.settings;
         case "set_settings":
           db.settings = a.settings;
+          return null;
+        case "plugin:webview|set_webview_zoom":
+          // The browser has no webview zoom; CSS zoom lays out the same way.
+          document.documentElement.style.setProperty("zoom", String(a.value));
           return null;
         case "plugin:dialog|open":
           return ["/Users/demo/Books/新导入的书.epub"];

@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { api, errorText, runAiTask } from "../api";
 import type { AiEvent, BookEstimate, ChatAction, ChatTurn, Location, OpenedBook } from "../types";
 import { Modal } from "../ui";
+import { formatNumber, t, type MessageKey } from "../i18n";
+import { Icon } from "../icons";
 import type { TextRange } from "../reader/anchors";
 import { useAi } from "./AiContext";
 import Markdown from "./Markdown";
@@ -39,11 +41,11 @@ interface Chat {
   taskId: string | null;
 }
 
-const ACTION_LABEL: Record<ChatAction, string> = { explain: "解释", translate: "翻译", summarize: "概括" };
-
-function formatTokens(n: number) {
-  return n >= 10_000 ? `${(n / 10_000).toFixed(1)} 万` : String(n);
-}
+const ACTION_LABEL: Record<ChatAction, MessageKey> = {
+  explain: "ai.actionExplain",
+  translate: "ai.actionTranslate",
+  summarize: "ai.actionSummarize",
+};
 
 export default function AiPanel(props: {
   book: OpenedBook;
@@ -88,10 +90,10 @@ export default function AiPanel(props: {
   const summarizeHere = () => {
     if (!location) return;
     if (location.kind === "flow") {
-      const title = book.chapters[location.chapter]?.title || `第 ${location.chapter + 1} 章`;
-      startSummary(`本章：${title}`, { kind: "summarizeChapter", bookId: book.id, chapter: location.chapter });
+      const title = book.chapters[location.chapter]?.title || t("loc.chapter", { n: location.chapter + 1 });
+      startSummary(t("ai.thisChapter", { title }), { kind: "summarizeChapter", bookId: book.id, chapter: location.chapter });
     } else {
-      startSummary(`第 ${location.page + 1} 页`, { kind: "summarizePages", bookId: book.id, from: location.page, to: location.page });
+      startSummary(t("loc.page", { n: location.page + 1 }), { kind: "summarizePages", bookId: book.id, from: location.page, to: location.page });
     }
   };
 
@@ -167,17 +169,17 @@ export default function AiPanel(props: {
     setChat((c) => (c && c.taskId === taskId ? { ...c, status: "stopped" } : c));
   };
 
-  const copy = (text: string) => navigator.clipboard.writeText(text).then(() => setNotice("已复制"), () => {});
+  const copy = (text: string) => navigator.clipboard.writeText(text).then(() => setNotice(t("common.copied")), () => {});
 
   if (!ai.ready) {
     return (
       <aside className="ai-panel">
         <PanelHead tab={tab} setTab={setTab} onSettings={ai.openSettings} onClose={props.onClose} showChat={false} />
         <div className="ai-empty">
-          <p>还没有配置 AI 服务。</p>
-          <p className="muted small">可以使用 Claude、OpenAI、DeepSeek、Kimi、智谱、Gemini 等云端服务，或本机的 Ollama / llama.cpp。</p>
+          <p>{t("ai.notSetUp")}</p>
+          <p className="muted small">{t("ai.notSetUpHint")}</p>
           <button className="primary" onClick={ai.openSettings}>
-            打开 AI 设置
+            {t("ai.openSettings")}
           </button>
         </div>
       </aside>
@@ -185,7 +187,7 @@ export default function AiPanel(props: {
   }
 
   const flow = book.kind === "flow";
-  const lastAnswer = chat?.turns.filter((t) => t.role === "assistant" && t.text).at(-1)?.text;
+  const lastAnswer = chat?.turns.filter((turn) => turn.role === "assistant" && turn.text).at(-1)?.text;
 
   return (
     <aside className="ai-panel">
@@ -194,18 +196,18 @@ export default function AiPanel(props: {
         <div className="ai-body">
           <div className="ai-actions">
             <button onClick={summarizeHere} disabled={summary?.status === "running"}>
-              {flow ? "总结本章" : "总结本页"}
+              {flow ? t("ai.summarizeChapter") : t("ai.summarizePage")}
             </button>
             <button onClick={askBookSummary} disabled={summary?.status === "running"}>
-              总结全书
+              {t("ai.summarizeBook")}
             </button>
           </div>
-          {!summary && <p className="muted small ai-hint">选择要总结的范围。在正文中选中文字，可以让 AI 解释或翻译。</p>}
+          {!summary && <p className="muted small ai-hint">{t("ai.summaryHint")}</p>}
           {summary && (
             <div className="ai-result">
               <div className="ai-result-title">
                 <span>{summary.title}</span>
-                {summary.cached && <span className="badge-soft">已缓存</span>}
+                {summary.cached && <span className="badge-soft">{t("ai.cached")}</span>}
               </div>
               {summary.progress && (
                 <div className="ai-progress">
@@ -215,14 +217,14 @@ export default function AiPanel(props: {
                   <span className="muted small">{summary.progress.label}</span>
                 </div>
               )}
-              {summary.text ? <Markdown text={summary.text} /> : summary.status === "running" && !summary.progress && <p className="muted small">思考中…</p>}
+              {summary.text ? <Markdown text={summary.text} /> : summary.status === "running" && !summary.progress && <p className="muted small">{t("ai.thinking")}</p>}
               {summary.error && <p className="error small">{summary.error}</p>}
-              {summary.status === "stopped" && <p className="muted small">已停止</p>}
+              {summary.status === "stopped" && <p className="muted small">{t("ai.stopped")}</p>}
               <div className="ai-result-actions">
                 {summary.status === "running" ? (
-                  <button onClick={() => stop(summary.taskId)}>停止</button>
+                  <button onClick={() => stop(summary.taskId)}>{t("common.stop")}</button>
                 ) : (
-                  summary.text && <button onClick={() => copy(summary.text)}>复制</button>
+                  summary.text && <button onClick={() => copy(summary.text)}>{t("common.copy")}</button>
                 )}
               </div>
             </div>
@@ -233,39 +235,39 @@ export default function AiPanel(props: {
       {tab === "chat" && (
         <div className="ai-body">
           {!chat ? (
-            <p className="muted small ai-hint">在正文中选中文字，点击工具条上的「解释」或「翻译」。扫描版 PDF 没有文字，无法选中。</p>
+            <p className="muted small ai-hint">{t("ai.chatHint")}</p>
           ) : (
             <>
               <blockquote className="ai-quote">
-                <span className="badge-soft">{ACTION_LABEL[chat.request.action]}</span> {chat.request.selection}
+                <span className="badge-soft">{t(ACTION_LABEL[chat.request.action])}</span> {chat.request.selection}
               </blockquote>
-              {chat.turns.map((t, i) =>
-                t.role === "user" ? (
+              {chat.turns.map((turn, i) =>
+                turn.role === "user" ? (
                   <div key={i} className="ai-user">
-                    {t.text}
+                    {turn.text}
                   </div>
                 ) : (
                   <div key={i} className="ai-answer">
-                    {t.text ? <Markdown text={t.text} /> : chat.status === "running" && <p className="muted small">思考中…</p>}
+                    {turn.text ? <Markdown text={turn.text} /> : chat.status === "running" && <p className="muted small">{t("ai.thinking")}</p>}
                   </div>
                 ),
               )}
               {chat.error && <p className="error small">{chat.error}</p>}
               <div className="ai-result-actions">
                 {chat.status === "running" ? (
-                  <button onClick={() => stop(chat.taskId)}>停止</button>
+                  <button onClick={() => stop(chat.taskId)}>{t("common.stop")}</button>
                 ) : (
                   lastAnswer && (
                     <>
-                      <button onClick={() => copy(lastAnswer)}>复制</button>
+                      <button onClick={() => copy(lastAnswer)}>{t("common.copy")}</button>
                       {chat.request.anchor && (
                         <button
                           onClick={() => {
                             props.onSaveNote(chat.request, lastAnswer);
-                            setNotice("已存为笔记");
+                            setNotice(t("ai.savedNote"));
                           }}
                         >
-                          存为笔记
+                          {t("ai.saveNote")}
                         </button>
                       )}
                     </>
@@ -279,7 +281,7 @@ export default function AiPanel(props: {
             <div className="ai-ask">
               <textarea
                 value={question}
-                placeholder="继续追问…（Enter 发送，Shift+Enter 换行）"
+                placeholder={t("ai.askPlaceholder")}
                 onChange={(e) => setQuestion(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -289,7 +291,7 @@ export default function AiPanel(props: {
                 }}
               />
               <button className="primary" onClick={ask} disabled={chat.status === "running" || !question.trim()}>
-                发送
+                {t("ai.send")}
               </button>
             </div>
           )}
@@ -302,37 +304,40 @@ export default function AiPanel(props: {
       )}
       {estimate && (
         <Modal
-          title="总结全书"
+          title={t("ai.summarizeBook")}
           width={420}
           onClose={() => setEstimate(null)}
           footer={
             <>
-              <button onClick={() => setEstimate(null)}>取消</button>
+              <button onClick={() => setEstimate(null)}>{t("common.cancel")}</button>
               <button
                 className="primary"
                 autoFocus
                 onClick={() => {
                   setEstimate(null);
-                  startSummary("全书总结", { kind: "summarizeBook", bookId: book.id });
+                  startSummary(t("ai.bookSummary"), { kind: "summarizeBook", bookId: book.id });
                 }}
               >
-                开始
+                {t("common.start")}
               </button>
             </>
           }
         >
           {estimate.bookCached ? (
-            <p>这本书已经有当前模型生成的全书总结，将直接显示，不再请求 AI 服务。</p>
+            <p>{t("ai.bookCached")}</p>
           ) : (
             <>
               <p>
-                全书共 {estimate.units} 个部分
-                {estimate.cachedUnits > 0 && `，其中 ${estimate.cachedUnits} 个已有总结`}。将先逐个总结，再汇总成全书总结。
+                {estimate.cachedUnits > 0
+                  ? t("ai.bookUnitsCached", { n: estimate.units, cached: estimate.cachedUnits })
+                  : t("ai.bookUnits", { n: estimate.units })}{" "}
+                {t("ai.bookPlan")}
               </p>
               <p className="muted small" style={{ marginTop: 8 }}>
-                预计输入约 {formatTokens(estimate.inputTokens)} tokens，输出约 {formatTokens(estimate.outputTokens)} tokens
-                {estimate.cost !== null && `，费用约 $${estimate.cost < 0.01 ? "0.01 以内" : estimate.cost.toFixed(2)}`}
-                。实际用量以服务商账单为准。
+                {t("ai.estimateTokens", { input: formatNumber(estimate.inputTokens), output: formatNumber(estimate.outputTokens) })}{" "}
+                {estimate.cost !== null &&
+                  (estimate.cost < 0.01 ? t("ai.estimateCostSmall") : t("ai.estimateCost", { cost: estimate.cost.toFixed(2) })) + " "}
+                {t("ai.estimateNote")}
               </p>
             </>
           )}
@@ -346,18 +351,18 @@ function PanelHead(props: { tab: string; setTab: (t: "summary" | "chat") => void
   return (
     <div className="side-tabs ai-tabs">
       <button className={props.tab === "summary" ? "on" : ""} onClick={() => props.setTab("summary")}>
-        AI 总结
+        {t("ai.summaryTab")}
       </button>
       {props.showChat && (
         <button className={props.tab === "chat" ? "on" : ""} onClick={() => props.setTab("chat")}>
-          划词对话
+          {t("ai.chatTab")}
         </button>
       )}
-      <button className="icon tab-icon" title="AI 设置" onClick={props.onSettings}>
-        ⚙
+      <button className="icon tab-icon" title={t("ai.settings")} aria-label={t("ai.settings")} onClick={props.onSettings}>
+        <Icon name="settings" />
       </button>
-      <button className="icon tab-icon" title="关闭" onClick={props.onClose}>
-        ×
+      <button className="icon tab-icon" title={t("common.close")} aria-label={t("common.close")} onClick={props.onClose}>
+        <Icon name="close" />
       </button>
     </div>
   );

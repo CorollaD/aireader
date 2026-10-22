@@ -20,7 +20,7 @@ pub struct AiConfig {
     pub model: String,
     /// Overrides the provider's endpoint; required for [`CUSTOM`].
     pub base_url: Option<String>,
-    /// Language for answers, e.g. "中文".
+    /// Language for answers: "auto" (the interface language) or a language name, e.g. "中文".
     pub language: String,
     /// The user accepted that book text is sent to a cloud service.
     pub consented: bool,
@@ -32,11 +32,14 @@ impl Default for AiConfig {
             provider: String::new(),
             model: String::new(),
             base_url: None,
-            language: "中文".into(),
+            language: AUTO_LANGUAGE.into(),
             consented: false,
         }
     }
 }
+
+/// `AiConfig::language` value meaning "answer in the interface language".
+pub const AUTO_LANGUAGE: &str = "auto";
 
 impl AiConfig {
     pub fn is_configured(&self) -> bool {
@@ -60,6 +63,15 @@ impl AiConfig {
         self.base_url.as_deref().is_some_and(is_local_url)
     }
 
+    /// The language answers are written in, as a name the model understands.
+    pub fn answer_language(&self) -> String {
+        if self.language == AUTO_LANGUAGE {
+            crate::i18n::language_name().to_owned()
+        } else {
+            self.language.clone()
+        }
+    }
+
     /// Keychain account name for this provider's key.
     pub fn key_name(&self) -> String {
         format!("ai:{}", self.provider)
@@ -79,7 +91,7 @@ impl AiConfig {
             .map(|u| u.trim().trim_end_matches('/').to_owned())
             .filter(|u| !u.is_empty());
         if self.language.trim().is_empty() {
-            self.language = "中文".into();
+            self.language = AUTO_LANGUAGE.into();
         }
         self
     }
@@ -172,7 +184,12 @@ mod tests {
             ("custom", "openai", Some("http://localhost:1234/v1"))
         );
         assert!(c.is_local());
-        assert_eq!(c.language, "中文");
+        assert_eq!(c.language, AUTO_LANGUAGE);
+        assert_eq!(
+            c.answer_language(),
+            "English",
+            "auto follows the interface language"
+        );
         assert!(
             !AiConfig {
                 provider: "anthropic".into(),

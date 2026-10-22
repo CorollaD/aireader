@@ -15,7 +15,8 @@ fn path_str(p: &Path) -> String {
 }
 
 pub fn load(path: &Path) -> Result<Document> {
-    let mut doc = EpubDoc::new(path).map_err(|e| anyhow!("EPUB 解析失败: {e}"))?;
+    let mut doc = EpubDoc::new(path)
+        .map_err(|e| anyhow!(crate::t!("parse_failed", format = "EPUB", error = e)))?;
     let title = doc
         .get_title()
         .filter(|t| !t.trim().is_empty())
@@ -86,7 +87,7 @@ pub fn load(path: &Path) -> Result<Document> {
         toc
     };
     if chapters.is_empty() {
-        return Err(anyhow!("EPUB 中没有可显示的内容"));
+        return Err(anyhow!(crate::t!("no_content", format = "EPUB")));
     }
     Ok(Document {
         path: path.to_owned(),

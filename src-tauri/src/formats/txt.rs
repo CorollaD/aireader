@@ -80,7 +80,7 @@ pub fn split_chapters(text: &str) -> Vec<Chapter> {
             if is_heading(line) {
                 if !cur.blocks.is_empty() {
                     if cur.title.is_empty() {
-                        cur.title = "开始".to_owned();
+                        cur.title = crate::t!("title_start");
                     }
                     chapters.push(std::mem::take(&mut cur));
                 }
@@ -112,7 +112,7 @@ pub fn split_chapters(text: &str) -> Vec<Chapter> {
         }
         if chapters.len() > 1 {
             for (i, c) in chapters.iter_mut().enumerate() {
-                c.title = format!("第 {} 部分", i + 1);
+                c.title = crate::t!("title_part", n = i + 1);
             }
         }
     }
@@ -146,7 +146,7 @@ mod tests {
         let titles: Vec<_> = ch.iter().map(|c| c.title.as_str()).collect();
         assert_eq!(
             titles,
-            ["开始", "第一章 开端", "第二章 发展", "Chapter 3 End"]
+            ["Start", "第一章 开端", "第二章 发展", "Chapter 3 End"]
         );
         assert_eq!(ch[1].blocks[1].text(), "\u{3000}\u{3000}正文一");
     }
@@ -157,6 +157,6 @@ mod tests {
         let text = vec![line.as_str(); 45].join("\n");
         let ch = split_chapters(&text);
         assert_eq!(ch.len(), 3);
-        assert_eq!(ch[0].title, "第 1 部分");
+        assert_eq!(ch[0].title, "Part 1");
     }
 }

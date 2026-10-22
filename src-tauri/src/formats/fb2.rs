@@ -22,7 +22,7 @@ pub fn load_zip(path: &Path) -> Result<Document> {
         .filter_map(Result::ok)
         .find(|n| n.to_lowercase().ends_with(".fb2"))
         .map(|n| n.into_owned())
-        .context("压缩包中没有 .fb2 文件")?;
+        .with_context(|| crate::t!("archive_no_fb2"))?;
     let mut bytes = Vec::new();
     zip.by_name(&name)?.read_to_end(&mut bytes)?;
     parse(path, &bytes)
@@ -52,7 +52,8 @@ pub fn parse(path: &Path, bytes: &[u8]) -> Result<Document> {
         allow_dtd: true,
         ..Default::default()
     };
-    let doc = roxmltree::Document::parse_with_options(xml, opts).context("FB2 XML 解析失败")?;
+    let doc = roxmltree::Document::parse_with_options(xml, opts)
+        .map_err(|e| anyhow::anyhow!(crate::t!("parse_failed", format = "FB2", error = e)))?;
     let root = doc.root_element();
 
     let binaries: HashMap<&str, ImageRef> = children(root, "binary")
@@ -120,7 +121,7 @@ pub fn parse(path: &Path, bytes: &[u8]) -> Result<Document> {
         }
     }
     if chapters.is_empty() {
-        bail!("FB2 中没有可显示的内容");
+        bail!(crate::t!("no_content", format = "FB2"));
     }
     if toc.is_empty() {
         toc = Document::chapter_toc(&chapters);

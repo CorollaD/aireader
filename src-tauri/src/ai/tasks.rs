@@ -94,8 +94,10 @@ pub struct Runner<'a> {
 impl Runner<'_> {
     fn system(&self) -> String {
         format!(
-            "你是一位细致的读书助手。只根据提供的书籍内容回答，不要编造书中没有的情节、人物或观点。请使用{}回答。",
-            self.cfg.language
+            "You are a careful reading assistant. Answer only from the book content provided; \
+             do not invent plot points, characters or arguments that are not in it. \
+             Write your answer in {}.",
+            self.cfg.answer_language()
         )
     }
 
@@ -136,9 +138,11 @@ pub struct Unit {
 
 pub fn chapter_unit(doc: &Document, chapter: usize) -> Result<Unit> {
     let Content::Flow(chapters) = &doc.content else {
-        bail!("这本书不是文字类书籍")
+        bail!(crate::t!("not_text_book"))
     };
-    let ch = chapters.get(chapter).ok_or_else(|| anyhow!("章节不存在"))?;
+    let ch = chapters
+        .get(chapter)
+        .ok_or_else(|| anyhow!(crate::t!("chapter_not_found")))?;
     let text = ch
         .blocks
         .iter()
@@ -147,10 +151,10 @@ pub fn chapter_unit(doc: &Document, chapter: usize) -> Result<Unit> {
         .collect::<Vec<_>>()
         .join("\n");
     if text.trim().is_empty() {
-        bail!("这一章没有文字内容");
+        bail!(crate::t!("ai_chapter_empty"));
     }
     let title = if ch.title.is_empty() {
-        format!("第 {} 章", chapter + 1)
+        crate::t!("title_chapter", n = chapter + 1)
     } else {
         ch.title.clone()
     };
@@ -163,7 +167,7 @@ pub fn chapter_unit(doc: &Document, chapter: usize) -> Result<Unit> {
 
 pub fn pages_unit(doc: &Document, from: usize, to: usize) -> Result<Unit> {
     let Content::Paged(src) = &doc.content else {
-        bail!("这本书不是按页显示的文档")
+        bail!(crate::t!("not_paged_book"))
     };
     let to = to.min(src.page_count().saturating_sub(1));
     let text = (from..=to)
@@ -171,12 +175,12 @@ pub fn pages_unit(doc: &Document, from: usize, to: usize) -> Result<Unit> {
         .collect::<Vec<_>>()
         .join("\n");
     if text.trim().is_empty() {
-        bail!("这些页面没有可提取的文字（可能是扫描版或图片）");
+        bail!(crate::t!("ai_pages_no_text"));
     }
     let title = if from == to {
-        format!("第 {} 页", from + 1)
+        crate::t!("title_page", n = from + 1)
     } else {
-        format!("第 {}–{} 页", from + 1, to + 1)
+        crate::t!("title_pages", from = from + 1, to = to + 1)
     };
     Ok(Unit {
         key: format!("pages:{from}-{to}"),
@@ -202,7 +206,7 @@ pub fn book_units(doc: &Document, budget: usize) -> Result<Vec<Unit>> {
                 if !text.is_empty() && estimate_tokens(&text) + estimate_tokens(&page) > budget {
                     units.push(Unit {
                         key: format!("pages:{start}-{}", p - 1),
-                        title: format!("第 {}–{} 页", start + 1, p),
+                        title: crate::t!("title_pages", from = start + 1, to = p),
                         text: std::mem::take(&mut text),
                     });
                     start = p;
@@ -213,7 +217,7 @@ pub fn book_units(doc: &Document, budget: usize) -> Result<Vec<Unit>> {
             if !text.trim().is_empty() {
                 units.push(Unit {
                     key: format!("pages:{start}-{}", src.page_count().saturating_sub(1)),
-                    title: format!("第 {}–{} 页", start + 1, src.page_count()),
+                    title: crate::t!("title_pages", from = start + 1, to = src.page_count()),
                     text,
                 });
             }
@@ -222,7 +226,7 @@ pub fn book_units(doc: &Document, budget: usize) -> Result<Vec<Unit>> {
         }
     };
     if units.is_empty() {
-        bail!("这本书没有可以总结的文字（可能是扫描版或图片）");
+        bail!(crate::t!("ai_book_no_text"));
     }
     Ok(units)
 }
@@ -315,7 +319,7 @@ pub async fn summarize_unit(
 ) -> Result<String> {
     if estimate_tokens(&unit.text) <= r.budget {
         let prompt = format!(
-            "下面是《{book}》的「{}」。请总结这部分内容：先用一两段话概括主要内容，再用列表列出关键要点（人物、事件、观点或论证）。\n\n<content>\n{}\n</content>",
+            "Below is \"{}\" from the book \"{book}\". Summarize it: first give the main content in one or two paragraphs, then list the key points (people, events, ideas or arguments).\n\n<content>\n{}\n</content>",
             unit.title, unit.text
         );
         return if stream {
@@ -330,10 +334,15 @@ pub async fn summarize_unit(
         (r.emit)(AiEvent::Progress {
             done: i,
             total: parts.len(),
-            label: format!("「{}」第 {}/{} 部分", unit.title, i + 1, parts.len()),
+            label: crate::t!(
+                "ai_summarizing_part",
+                title = unit.title,
+                i = i + 1,
+                n = parts.len()
+            ),
         });
         let prompt = format!(
-            "下面是《{book}》「{}」的第 {}/{} 部分。请简要总结这一部分的要点，之后会与其他部分合并。\n\n<content>\n{part}\n</content>",
+            "Below is part {1} of {2} of \"{0}\" from the book \"{book}\". Briefly summarize the key points of this part; it will be merged with the other parts later.\n\n<content>\n{part}\n</content>",
             unit.title,
             i + 1,
             parts.len()
@@ -343,11 +352,11 @@ pub async fn summarize_unit(
     let joined = partials
         .iter()
         .enumerate()
-        .map(|(i, s)| format!("## 第 {} 部分\n{s}", i + 1))
+        .map(|(i, s)| format!("## Part {}\n{s}", i + 1))
         .collect::<Vec<_>>()
         .join("\n\n");
     let prompt = format!(
-        "下面是《{book}》「{}」各部分的摘要。请合并成一份完整的总结：先概述，再列出关键要点，去掉重复内容。\n\n{joined}",
+        "Below are summaries of the parts of \"{}\" from the book \"{book}\". Merge them into one complete summary: an overview first, then the key points, without repetition.\n\n{joined}",
         unit.title
     );
     if stream {
@@ -390,7 +399,7 @@ pub async fn summarize_book(
         (r.emit)(AiEvent::Progress {
             done: i,
             total: units.len(),
-            label: format!("正在总结「{}」", unit.title),
+            label: crate::t!("ai_summarizing", title = unit.title),
         });
         let s = match cache.get(&model, &unit.key) {
             Some(s) => s.clone(),
@@ -405,14 +414,14 @@ pub async fn summarize_book(
     (r.emit)(AiEvent::Progress {
         done: units.len(),
         total: units.len(),
-        label: "正在汇总全书".into(),
+        label: crate::t!("ai_combining"),
     });
     // Merge in groups until everything fits in one request.
     while estimate_tokens(&summaries.join("\n\n")) > r.budget && summaries.len() > 1 {
         let mut merged = Vec::new();
         for group in split_by_budget(&summaries.join("\n\n"), r.budget) {
             let prompt = format!(
-                "下面是《{book}》若干章节的摘要。请把它们合并成一份更简洁的摘要，保留各章的标题和关键内容。\n\n{group}"
+                "Below are summaries of several chapters of the book \"{book}\". Merge them into one shorter summary that keeps each chapter's title and key content.\n\n{group}"
             );
             merged.push(r.complete(prompt, MERGE_TOKENS).await?);
         }
@@ -422,7 +431,7 @@ pub async fn summarize_book(
         summaries = merged;
     }
     let prompt = format!(
-        "下面是《{book}》各部分的摘要。请写一份全书总结，包括：1. 全书主旨（一段话）；2. 结构与各部分脉络；3. 核心观点或主要情节；4. 值得注意的细节。\n\n{}",
+        "Below are summaries of the parts of the book \"{book}\". Write a summary of the whole book with: 1. its central theme (one paragraph); 2. its structure and how the parts connect; 3. the core ideas or main plot; 4. details worth noticing.\n\n{}",
         summaries.join("\n\n")
     );
     let s = r.stream(prompt, MERGE_TOKENS).await?;
@@ -470,15 +479,6 @@ pub fn estimate_book(
 
 // --- chat about a selection ------------------------------------------------------------------
 
-fn mostly_cjk(text: &str) -> bool {
-    let total = text.chars().filter(|c| !c.is_whitespace()).count().max(1);
-    let cjk = text
-        .chars()
-        .filter(|c| matches!(*c as u32, 0x3400..=0x9FFF | 0xF900..=0xFAFF))
-        .count();
-    cjk * 2 > total
-}
-
 pub async fn chat(
     r: &Runner<'_>,
     book_title: &str,
@@ -488,30 +488,28 @@ pub async fn chat(
     history: &[ChatTurn],
 ) -> Result<String> {
     let mut system = format!(
-        "{}\n\n书名：《{book_title}》\n用户在书中选中了这段文字：\n<selection>\n{selection}\n</selection>",
+        "{}\n\nBook: \"{book_title}\"\nThe reader selected this passage in the book:\n<selection>\n{selection}\n</selection>",
         r.system()
     );
     if !context.trim().is_empty() && context.trim() != selection.trim() {
         system.push_str(&format!(
-            "\n它所在的上下文：\n<context>\n{context}\n</context>"
+            "\nThe surrounding text:\n<context>\n{context}\n</context>"
         ));
     }
     let first = action.map(|a| match a {
-        ChatAction::Explain => {
-            "请解释选中的文字：它的含义，以及涉及的背景、典故或术语。如有上下文，请结合上下文说明。"
-                .to_owned()
-        }
+        ChatAction::Explain => "Explain the selected passage: what it means, and any background, \
+             allusions or terms it involves. Use the surrounding text where it helps."
+            .to_owned(),
         ChatAction::Translate => {
-            let target = if mostly_cjk(selection) && r.cfg.language.contains('中') {
-                "英文".to_owned()
-            } else {
-                r.cfg.language.clone()
-            };
+            let target = r.cfg.answer_language();
             format!(
-                "请把选中的文字翻译成{target}，保持原文的语气；难以直译的地方，在译文后简要注释。"
+                "Translate the selected passage into {target}, keeping the tone of the original. \
+                 If it is already written in {target}, translate it into English instead \
+                 (or into Simplified Chinese if {target} is English). Where a literal \
+                 translation doesn't work, add a short note after the translation."
             )
         }
-        ChatAction::Summarize => "请概括选中文字的要点。".to_owned(),
+        ChatAction::Summarize => "Summarize the key points of the selected passage.".to_owned(),
     });
     let mut turns: Vec<Message> = Vec::new();
     if let Some(q) = first {
@@ -525,7 +523,7 @@ pub async fn chat(
         });
     }
     let Some(last) = turns.pop() else {
-        bail!("没有要发送的问题")
+        bail!(crate::t!("ai_no_question"))
     };
     let request = CompletionRequest::new(last)
         .messages(turns)
@@ -588,10 +586,14 @@ fn suggestion_schema() -> serde_json::Value {
 
 /// Parses the model's reply (tolerating text around the JSON) and keeps only valid suggestions.
 pub fn parse_suggestions(reply: &str, books: &[BookBrief]) -> Result<Vec<Suggestion>> {
-    let start = reply.find('{').ok_or_else(|| anyhow!("回复中没有 JSON"))?;
-    let end = reply.rfind('}').ok_or_else(|| anyhow!("回复中没有 JSON"))?;
+    let start = reply
+        .find('{')
+        .ok_or_else(|| anyhow!("no JSON in the reply"))?;
+    let end = reply
+        .rfind('}')
+        .ok_or_else(|| anyhow!("no JSON in the reply"))?;
     let list: SuggestionList =
-        serde_json::from_str(&reply[start..=end]).map_err(|e| anyhow!("JSON 格式不对：{e}"))?;
+        serde_json::from_str(&reply[start..=end]).map_err(|e| anyhow!("invalid JSON: {e}"))?;
     let by_id: HashMap<&str, &BookBrief> = books.iter().map(|b| (b.id.as_str(), b)).collect();
     let mut seen = std::collections::HashSet::new();
     let mut out = Vec::new();
@@ -638,8 +640,12 @@ pub async fn organize(
 ) -> Result<Vec<Suggestion>> {
     let schema = suggestion_schema();
     let mut system = format!(
-        "你是图书管理助手，负责给书架上的书分组。每本书建议 1–2 个分组，优先使用已有分组；需要新分组时用简短的{}名称（例如：小说、历史、计算机、经济、哲学）。作者为空的书，如果你能确定作者，可以给出作者，否则作者填 null。只为列出的书给建议，bookId 必须原样使用。",
-        r.cfg.language
+        "You are a library assistant who sorts the books on a shelf into groups. Suggest 1–2 \
+         groups per book, preferring existing groups; when a new group is needed, give it a \
+         short name in {} (such as Fiction, History, Computing, Economics, Philosophy). For a \
+         book with no author, give the author if you are sure of it, otherwise null. Only make \
+         suggestions for the listed books, and copy each bookId exactly.",
+        r.cfg.answer_language()
     );
     if !native_schema {
         system.push_str("\n\n");
@@ -650,7 +656,7 @@ pub async fn organize(
     let listing = serde_json::to_string_pretty(
         &serde_json::json!({ "existingGroups": existing_groups, "books": books }),
     )?;
-    let prompt = format!("请为下面这些书给出分组建议：\n{listing}");
+    let prompt = format!("Suggest groups for these books:\n{listing}");
     let make = |messages: Vec<Message>| -> Result<CompletionRequest> {
         let mut req = CompletionRequest::new(Message::user(prompt.clone()))
             .messages(messages)
@@ -674,7 +680,7 @@ pub async fn organize(
             req = req
                 .message(Message::assistant(reply))
                 .message(Message::user(format!(
-                    "上面的回答无法解析（{first_error}）。请只返回符合要求的 JSON。"
+                    "Your answer could not be parsed ({first_error}). Reply with only the required JSON."
                 )));
             let reply = complete_text(&r.model, req)
                 .await

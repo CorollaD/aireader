@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api, errorText } from "../api";
 import type { Book, BookPatch, Suggestion } from "../types";
 import { Modal } from "../ui";
+import { t } from "../i18n";
 import { useAi } from "./AiContext";
 
 interface Row {
@@ -51,7 +52,7 @@ export default function OrganizeDialog(props: {
               suggestion: s,
               book: byId.get(s.bookId)!,
               // Groups the book already has are not new.
-              groups: s.groups.filter((g) => !byId.get(s.bookId)!.groups.includes(g)).join("、"),
+              groups: s.groups.filter((g) => !byId.get(s.bookId)!.groups.includes(g)).join(t("common.listSeparator")),
               accept: true,
               acceptAuthor: !!s.author,
             }))
@@ -98,29 +99,29 @@ export default function OrganizeDialog(props: {
 
   return (
     <Modal
-      title={`AI 整理（${props.books.length} 本书）`}
+      title={t("org.title", { n: props.books.length })}
       width={640}
       onClose={props.onClose}
       footer={
         phase === "review" ? (
           <>
-            <span className="muted small">只会添加分组，不会移除书原有的分组</span>
+            <span className="muted small">{t("org.onlyAdd")}</span>
             <span className="spacer" />
-            <button onClick={props.onClose}>取消</button>
+            <button onClick={props.onClose}>{t("common.cancel")}</button>
             <button className="primary" disabled={accepted === 0 || applying} onClick={apply}>
-              应用 {accepted} 项
+              {t("org.apply", { n: accepted })}
             </button>
           </>
         ) : (
-          <button onClick={props.onClose}>关闭</button>
+          <button onClick={props.onClose}>{t("common.close")}</button>
         )
       }
     >
-      {phase === "running" && <p className="muted">正在请 AI 分析书目，书多时需要一些时间…</p>}
+      {phase === "running" && <p className="muted">{t("org.running")}</p>}
       {phase === "error" && <p className="error">{error}</p>}
       {phase === "review" &&
         (rows.length === 0 ? (
-          <p className="muted">AI 没有给出新的分组建议，书架看起来已经整理好了。</p>
+          <p className="muted">{t("org.nothing")}</p>
         ) : (
           <div className="organize-list">
             {rows.map((r, i) => (
@@ -129,10 +130,10 @@ export default function OrganizeDialog(props: {
                 <div className="organize-main">
                   <div className="ellipsis">
                     <strong>{r.book.title}</strong>
-                    {r.book.groups.length > 0 && <span className="muted small">　现有：{r.book.groups.join("、")}</span>}
+                    {r.book.groups.length > 0 && <span className="muted small">　{t("org.current", { groups: r.book.groups.join(t("common.listSeparator")) })}</span>}
                   </div>
                   <label className="organize-field">
-                    <span className="muted small">添加分组</span>
+                    <span className="muted small">{t("org.addGroups")}</span>
                     <input value={r.groups} disabled={!r.accept} onChange={(e) => update(i, { groups: e.target.value })} />
                   </label>
                   {r.suggestion.author && (
@@ -143,7 +144,7 @@ export default function OrganizeDialog(props: {
                         disabled={!r.accept}
                         onChange={(e) => update(i, { acceptAuthor: e.target.checked })}
                       />
-                      <span className="small">作者设为「{r.suggestion.author}」</span>
+                      <span className="small">{t("org.setAuthor", { author: r.suggestion.author })}</span>
                     </label>
                   )}
                 </div>

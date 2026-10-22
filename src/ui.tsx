@@ -1,6 +1,8 @@
 // Small shared UI pieces: modal dialog, confirmation, toast.
 
 import { useEffect, type ReactNode } from "react";
+import { t } from "./i18n";
+import { Icon } from "./icons";
 
 export function Modal(props: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; width?: number }) {
   useEffect(() => {
@@ -11,7 +13,12 @@ export function Modal(props: { title: string; onClose: () => void; children: Rea
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && props.onClose()}>
       <div className="modal" style={{ width: props.width ?? 420 }} role="dialog" aria-label={props.title}>
-        <div className="modal-title">{props.title}</div>
+        <div className="modal-title">
+          <span className="ellipsis">{props.title}</span>
+          <button className="icon" aria-label={t("common.close")} title={t("common.close")} onClick={props.onClose}>
+            <Icon name="close" />
+          </button>
+        </div>
         <div className="modal-body">{props.children}</div>
         {props.footer && <div className="modal-footer">{props.footer}</div>}
       </div>
@@ -33,7 +40,7 @@ export function Confirm(props: {
       onClose={props.onClose}
       footer={
         <>
-          <button onClick={props.onClose}>取消</button>
+          <button onClick={props.onClose}>{t("common.cancel")}</button>
           <button
             className={props.danger ? "danger" : "primary"}
             autoFocus

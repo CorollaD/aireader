@@ -158,7 +158,9 @@ impl Library {
         std::fs::create_dir_all(root.join("covers"))?;
         let file = root.join("library.json");
         let data = match std::fs::read(&file) {
-            Ok(bytes) => serde_json::from_slice(&bytes).context("library.json 已损坏")?,
+            Ok(bytes) => {
+                serde_json::from_slice(&bytes).with_context(|| crate::t!("library_corrupt"))?
+            }
             Err(_) => LibraryData::default(),
         };
         Ok(Self {
@@ -200,7 +202,7 @@ impl Library {
             .books
             .iter_mut()
             .find(|b| b.id == id)
-            .context("书籍不存在")
+            .with_context(|| crate::t!("book_not_found"))
     }
 
     pub fn book_path(&self, book: &Book) -> PathBuf {
@@ -225,7 +227,7 @@ impl Library {
     pub fn prepare(root: &Path, src: &Path, sha256: &str) -> Result<Prepared> {
         let file_name = src
             .file_name()
-            .context("无效的文件名")?
+            .with_context(|| crate::t!("invalid_file_name"))?
             .to_string_lossy()
             .into_owned();
         let id = sha256[..16].to_owned();
@@ -233,7 +235,7 @@ impl Library {
         std::fs::create_dir_all(&dir)?;
         let dest = dir.join(&file_name);
         let result = (|| {
-            std::fs::copy(src, &dest).context("复制文件失败")?;
+            std::fs::copy(src, &dest).with_context(|| crate::t!("copy_failed"))?;
             let format = formats::detect(&dest)?.label().to_owned();
             let doc = formats::open(&dest)?;
             let has_cover = formats::cover_image(&dest, &doc)
@@ -294,7 +296,7 @@ impl Library {
         let book = self.get_mut(id)?;
         if let Some(title) = patch.title.map(|t| t.trim().to_owned()) {
             if title.is_empty() {
-                bail!("书名不能为空");
+                bail!(crate::t!("title_empty"));
             }
             book.title = title;
         }
@@ -362,10 +364,10 @@ impl Library {
     pub fn create_group(&mut self, name: &str) -> Result<()> {
         let name = name.trim();
         if name.is_empty() {
-            bail!("分组名不能为空");
+            bail!(crate::t!("group_empty"));
         }
         if self.data.groups.iter().any(|g| g == name) {
-            bail!("分组「{name}」已存在");
+            bail!(crate::t!("group_exists", name = name));
         }
         self.data.groups.push(name.to_owned());
         Ok(())
@@ -374,20 +376,20 @@ impl Library {
     pub fn rename_group(&mut self, old: &str, new: &str) -> Result<()> {
         let new = new.trim();
         if new.is_empty() {
-            bail!("分组名不能为空");
+            bail!(crate::t!("group_empty"));
         }
         if old == new {
             return Ok(());
         }
         if self.data.groups.iter().any(|g| g == new) {
-            bail!("分组「{new}」已存在");
+            bail!(crate::t!("group_exists", name = new));
         }
         let g = self
             .data
             .groups
             .iter_mut()
             .find(|g| *g == old)
-            .context("分组不存在")?;
+            .with_context(|| crate::t!("group_not_found"))?;
         *g = new.to_owned();
         for b in &mut self.data.books {
             for bg in &mut b.groups {

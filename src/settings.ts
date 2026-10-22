@@ -1,5 +1,7 @@
 // Reader preferences and the colour theme derived from the chosen background.
 
+import type { MessageKey } from "./i18n";
+
 export type FontFamily = "sans" | "serif" | "kai";
 export type ShelfSort = "recent" | "added" | "title" | "author" | "progress";
 
@@ -26,6 +28,11 @@ export interface Settings {
   showToc: boolean;
   shelfView: "grid" | "list";
   shelfSort: ShelfSort;
+  /** "auto" follows the system language. */
+  uiLanguage: string;
+  /** Interface zoom (one of UI_SCALES). */
+  uiScale: number;
+  shelfSidebar: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -46,33 +53,43 @@ export const DEFAULT_SETTINGS: Settings = {
   showToc: true,
   shelfView: "grid",
   shelfSort: "recent",
+  uiLanguage: "auto",
+  uiScale: 1,
+  shelfSidebar: true,
 };
 
-export const BACKGROUNDS: { name: string; color: string }[] = [
-  { name: "纯白", color: "#ffffff" },
-  { name: "米白", color: "#faf7ef" },
-  { name: "羊皮纸", color: "#f4ecd8" },
-  { name: "护眼绿", color: "#cce8cf" },
-  { name: "薄荷", color: "#e2f1e8" },
-  { name: "天青", color: "#dfeaf5" },
-  { name: "樱粉", color: "#f8e5e8" },
-  { name: "浅灰", color: "#e6e6e6" },
-  { name: "深灰", color: "#3a3b3e" },
-  { name: "夜间", color: "#1f2023" },
-  { name: "深蓝", color: "#17212f" },
-  { name: "墨黑", color: "#000000" },
+export const UI_SCALES: { value: number; label: MessageKey }[] = [
+  { value: 0.9, label: "settings.scaleSmall" },
+  { value: 1, label: "settings.scaleNormal" },
+  { value: 1.15, label: "settings.scaleLarge" },
+  { value: 1.3, label: "settings.scaleLarger" },
 ];
 
-export const FONT_STACKS: Record<FontFamily, { name: string; css: string }> = {
+export const BACKGROUNDS: { name: MessageKey; color: string }[] = [
+  { name: "bg.white", color: "#ffffff" },
+  { name: "bg.cream", color: "#faf7ef" },
+  { name: "bg.parchment", color: "#f4ecd8" },
+  { name: "bg.green", color: "#cce8cf" },
+  { name: "bg.mint", color: "#e2f1e8" },
+  { name: "bg.sky", color: "#dfeaf5" },
+  { name: "bg.blossom", color: "#f8e5e8" },
+  { name: "bg.lightGray", color: "#e6e6e6" },
+  { name: "bg.darkGray", color: "#3a3b3e" },
+  { name: "bg.night", color: "#1f2023" },
+  { name: "bg.navy", color: "#17212f" },
+  { name: "bg.black", color: "#000000" },
+];
+
+export const FONT_STACKS: Record<FontFamily, { name: MessageKey; css: string }> = {
   sans: {
-    name: "黑体",
+    name: "font.sans",
     css: '-apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
   },
   serif: {
-    name: "宋体",
+    name: "font.serif",
     css: '"Songti SC", STSong, "Noto Serif CJK SC", "Source Han Serif SC", SimSun, Georgia, serif',
   },
-  kai: { name: "楷体", css: '"Kaiti SC", STKaiti, KaiTi, "AR PL UKai CN", serif' },
+  kai: { name: "font.kai", css: '"Kaiti SC", STKaiti, KaiTi, "AR PL UKai CN", serif' },
 };
 
 export function normalizeSettings(raw: unknown): Settings {
@@ -80,6 +97,7 @@ export function normalizeSettings(raw: unknown): Settings {
   if (!/^#[0-9a-f]{6}$/i.test(s.background)) s.background = DEFAULT_SETTINGS.background;
   if (s.textColor !== null && !/^#[0-9a-f]{6}$/i.test(s.textColor)) s.textColor = null;
   if (!(s.fontFamily in FONT_STACKS)) s.fontFamily = DEFAULT_SETTINGS.fontFamily;
+  if (!UI_SCALES.some((u) => u.value === s.uiScale)) s.uiScale = DEFAULT_SETTINGS.uiScale;
   return s;
 }
 
@@ -126,6 +144,7 @@ export function themeVars(s: Settings): Record<string, string> {
     "--accent": dark ? "#6ea8fe" : "#2f6fde",
     "--accent-soft": dark ? "rgba(110,168,254,0.22)" : "rgba(47,111,222,0.14)",
     "--danger": dark ? "#ff8a80" : "#c62828",
+    "--ok": dark ? "#81c784" : "#2e7d32",
     "--shadow": dark ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.12)",
     "--reader-font": FONT_STACKS[s.fontFamily].css,
     "color-scheme": dark ? "dark" : "light",

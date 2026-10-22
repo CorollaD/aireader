@@ -110,7 +110,7 @@ pub fn to_markdown(
                 .get(h.chapter)
                 .filter(|t| !t.trim().is_empty())
                 .cloned()
-                .unwrap_or_else(|| format!("第 {} 章", h.chapter + 1));
+                .unwrap_or_else(|| crate::t!("title_chapter", n = h.chapter + 1));
             out.push_str(&format!("## {name}\n\n"));
         }
         for line in h.text.trim().lines() {
@@ -122,9 +122,13 @@ pub fn to_markdown(
         }
     }
     if !annotations.bookmarks.is_empty() {
-        out.push_str("## 书签\n\n");
+        out.push_str(&format!("## {}\n\n", crate::t!("notes_bookmarks")));
         for b in &annotations.bookmarks {
-            out.push_str(&format!("- {}：{}\n", b.title, b.excerpt));
+            if b.excerpt.is_empty() {
+                out.push_str(&format!("- {}\n", b.title));
+            } else {
+                out.push_str(&format!("- {}: {}\n", b.title, b.excerpt));
+            }
         }
         out.push('\n');
     }

@@ -4,6 +4,9 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { api, errorText } from "../api";
 import type { UpdateSettings } from "../App";
+import { formatList, t, type MessageKey } from "../i18n";
+import { Icon, type IconName } from "../icons";
+import { useOpenSettings } from "../SettingsDialog";
 import type { ShelfSort, Settings } from "../settings";
 import type { Book, BookPatch, ImportProgress, Shelf } from "../types";
 import { Confirm, Modal, Toast } from "../ui";
@@ -19,16 +22,18 @@ const ALL = "\u0000all";
 const RECENT = "\u0000recent";
 const UNGROUPED = "\u0000none";
 
-const SORTS: { key: ShelfSort; label: string }[] = [
-  { key: "recent", label: "最近阅读" },
-  { key: "added", label: "添加时间" },
-  { key: "title", label: "书名" },
-  { key: "author", label: "作者" },
-  { key: "progress", label: "阅读进度" },
+const SORTS: { key: ShelfSort; label: MessageKey }[] = [
+  { key: "recent", label: "sort.recent" },
+  { key: "added", label: "sort.added" },
+  { key: "title", label: "sort.title" },
+  { key: "author", label: "sort.author" },
+  { key: "progress", label: "sort.progress" },
 ];
 
+const FORMATS = "EPUB · PDF · TXT · Markdown · MOBI/AZW3 · FB2 · DOCX · CBZ";
+
 function sortBooks(books: Book[], sort: ShelfSort): Book[] {
-  const byText = (a: string, b: string) => a.localeCompare(b, "zh-Hans-CN");
+  const byText = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
   const sorted = [...books];
   switch (sort) {
     case "recent":
@@ -65,7 +70,9 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
   const [dragging, setDragging] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [organizing, setOrganizing] = useState<Book[] | null>(null);
+  const [importMenu, setImportMenu] = useState(false);
   const ai = useAi();
+  const openSettings = useOpenSettings();
 
   const refresh = useCallback(() => {
     api.listBooks().then(setShelf).catch((e) => setToast(errorText(e)));
@@ -82,10 +89,12 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
       setProgress({ done: 0, total: 0, name: "" });
       try {
         const r = await api.importBooks(paths, currentGroup);
-        const parts = [`已导入 ${r.added.length} 本`];
-        if (r.duplicates.length) parts.push(`${r.duplicates.length} 本已在书架中`);
-        if (r.failed.length) parts.push(`${r.failed.length} 本失败（${r.failed.map(([n]) => n).slice(0, 3).join("、")}）`);
-        setToast(parts.join("，"));
+        const parts = [t("shelf.imported", { n: r.added.length })];
+        if (r.duplicates.length) parts.push(t("shelf.duplicates", { n: r.duplicates.length }));
+        if (r.failed.length) {
+          parts.push(t("shelf.failed", { n: r.failed.length, names: formatList(r.failed.map(([n]) => n).slice(0, 3)) }));
+        }
+        setToast(formatList(parts));
       } catch (e) {
         fail(e);
       } finally {
@@ -114,7 +123,7 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
   }, [importPaths]);
 
   const pickFiles = async () => {
-    const r = await openDialog({ multiple: true, filters: [{ name: "电子书与文档", extensions: EXTENSIONS }] });
+    const r = await openDialog({ multiple: true, filters: [{ name: t("shelf.fileFilter"), extensions: EXTENSIONS }] });
     if (r) importPaths(Array.isArray(r) ? r : [r]);
   };
   const pickFolder = async () => {
@@ -166,121 +175,191 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
       await api.removeBooks(books.map((b) => b.id));
       setSelected(new Set());
       refresh();
-      setToast(`已删除 ${books.length} 本书`);
+      setToast(t("shelf.removed", { n: books.length }));
     } catch (e) {
       fail(e);
     }
   };
 
   const count = (pred: (b: Book) => boolean) => shelf.books.filter(pred).length;
-  const sideItem = (key: string, label: string, n: number) => (
+  const sideItem = (key: string, icon: IconName, label: string, n: number) => (
     <button key={key} className={`side-item${filter === key ? " active" : ""}`} onClick={() => setFilter(key)}>
-      <span className="ellipsis">{label}</span>
+      <Icon name={icon} />
+      <span className="ellipsis grow">{label}</span>
       <span className="count">{n}</span>
     </button>
   );
+  const openBook = (b: Book) => (b.missing ? setToast(t("shelf.fileMissing")) : props.onOpen(b.id));
 
   return (
-    <div className="shelf" onClick={() => setMenu(null)}>
-      <aside className="sidebar">
-        <div className="brand">AiReader</div>
-        {sideItem(ALL, "全部书籍", shelf.books.length)}
-        {sideItem(RECENT, "最近阅读", count((b) => !!b.lastRead))}
-        {sideItem(UNGROUPED, "未分组", count((b) => b.groups.length === 0))}
-        <div className="side-heading">
-          <span>分组</span>
-          <button className="icon" title="新建分组" onClick={() => setGroupDialog({ old: null })}>
-            ＋
-          </button>
-        </div>
-        {shelf.groups.map((g) => (
-          <div key={g} className="side-group">
-            {sideItem(g, g, count((b) => b.groups.includes(g)))}
-            <span className="side-actions">
-              <button className="icon" title="重命名" onClick={() => setGroupDialog({ old: g })}>
-                ✎
-              </button>
-              <button className="icon" title="删除分组" onClick={() => setGroupDeleting(g)}>
-                ×
-              </button>
-            </span>
+    <div className="shelf" onClick={() => (setMenu(null), setImportMenu(false))}>
+      {settings.shelfSidebar && (
+        <aside className="sidebar">
+          <div className="brand">AiReader</div>
+          {sideItem(ALL, "library", t("shelf.all"), shelf.books.length)}
+          {sideItem(RECENT, "clock", t("shelf.recent"), count((b) => !!b.lastRead))}
+          {sideItem(UNGROUPED, "inbox", t("shelf.ungrouped"), count((b) => b.groups.length === 0))}
+          <div className="side-heading">
+            <span>{t("shelf.groups")}</span>
+            <button className="icon" title={t("shelf.newGroup")} aria-label={t("shelf.newGroup")} onClick={() => setGroupDialog({ old: null })}>
+              <Icon name="plus" size={14} />
+            </button>
           </div>
-        ))}
-        {shelf.groups.length === 0 && <div className="muted small side-empty">用分组整理你的书</div>}
-        <div className="side-footer">
-          <button className="side-item" onClick={ai.openSettings}>
-            <span>AI 设置</span>
-            <span className="count">{ai.ready ? "已配置" : "未配置"}</span>
-          </button>
-        </div>
-      </aside>
+          {shelf.groups.map((g) => (
+            <div key={g} className="side-group">
+              {sideItem(g, "folder", g, count((b) => b.groups.includes(g)))}
+              <span className="side-actions">
+                <button className="icon" title={t("shelf.renameGroup")} onClick={() => setGroupDialog({ old: g })}>
+                  <Icon name="edit" size={14} />
+                </button>
+                <button className="icon" title={t("shelf.deleteGroup")} onClick={() => setGroupDeleting(g)}>
+                  <Icon name="close" size={14} />
+                </button>
+              </span>
+            </div>
+          ))}
+          {shelf.groups.length === 0 && <div className="muted small side-empty">{t("shelf.groupsHint")}</div>}
+          <div className="side-footer">
+            <button
+              className="side-item"
+              onClick={ai.openSettings}
+              title={`${t("ai.settings")}: ${ai.ready ? t("ai.configured") : t("ai.notConfigured")}`}
+            >
+              <Icon name="sparkles" />
+              <span className="ellipsis grow">{t("ai.settings")}</span>
+              <span
+                className={`status-dot${ai.ready ? " on" : ""}`}
+                title={ai.ready ? t("ai.configured") : t("ai.notConfigured")}
+                aria-label={ai.ready ? t("ai.configured") : t("ai.notConfigured")}
+              />
+            </button>
+            <button className="side-item" onClick={() => openSettings()}>
+              <Icon name="settings" />
+              <span className="ellipsis grow">{t("settings.title")}</span>
+            </button>
+          </div>
+        </aside>
+      )}
 
       <main className="shelf-main">
         <header className="shelf-bar">
-          <input className="search" placeholder="搜索书名或作者" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <button
+            className={`icon-button${settings.shelfSidebar ? " on" : ""}`}
+            title={t("shelf.toggleSidebar")}
+            aria-label={t("shelf.toggleSidebar")}
+            onClick={() => update({ shelfSidebar: !settings.shelfSidebar })}
+          >
+            <Icon name="panelLeft" />
+          </button>
+          <label className="search">
+            <Icon name="search" />
+            <input placeholder={t("shelf.searchPlaceholder")} value={query} onChange={(e) => setQuery(e.target.value)} />
+          </label>
           <select
             value={settings.shelfSort}
             onChange={(e) => update({ shelfSort: e.target.value as ShelfSort })}
             disabled={filter === RECENT}
-            title="排序"
+            title={t("shelf.sort")}
           >
             {SORTS.map((s) => (
               <option key={s.key} value={s.key}>
-                按{s.label}
+                {t(s.label)}
               </option>
             ))}
           </select>
           <div className="segmented">
-            <button className={settings.shelfView === "grid" ? "on" : ""} onClick={() => update({ shelfView: "grid" })}>
-              网格
+            <button
+              className={`icon-button${settings.shelfView === "grid" ? " on" : ""}`}
+              title={t("shelf.gridView")}
+              aria-label={t("shelf.gridView")}
+              onClick={() => update({ shelfView: "grid" })}
+            >
+              <Icon name="grid" />
             </button>
-            <button className={settings.shelfView === "list" ? "on" : ""} onClick={() => update({ shelfView: "list" })}>
-              列表
+            <button
+              className={`icon-button${settings.shelfView === "list" ? " on" : ""}`}
+              title={t("shelf.listView")}
+              aria-label={t("shelf.listView")}
+              onClick={() => update({ shelfView: "list" })}
+            >
+              <Icon name="list" />
             </button>
           </div>
           <span className="spacer" />
           {shelf.books.length > 0 && (
             <button
               onClick={() => (ai.ready ? setOrganizing(selecting ? selectedBooks : visible) : ai.openSettings())}
-              title={selecting ? "为选中的书建议分组" : "为当前列表中的书建议分组"}
+              title={selecting ? t("shelf.organizeSelected") : t("shelf.organizeVisible")}
             >
-              AI 整理
+              <Icon name="sparkles" />
+              <span className="label">{t("shelf.organize")}</span>
             </button>
           )}
-          <button onClick={pickFolder}>导入文件夹</button>
-          <button className="primary" onClick={pickFiles}>
-            导入书籍
-          </button>
+          <div className="menu-anchor">
+            <div className="split-button">
+              <button className="primary" onClick={pickFiles}>
+                <Icon name="filePlus" />
+                <span className="label">{t("shelf.importBooks")}</span>
+              </button>
+              <button
+                className="primary"
+                aria-label={t("common.more")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setImportMenu((m) => !m);
+                }}
+              >
+                <Icon name="chevronDown" size={14} />
+              </button>
+            </div>
+            {importMenu && (
+              <div className="menu dropdown" onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => (setImportMenu(false), pickFiles())}>
+                  <Icon name="filePlus" /> {t("shelf.importBooks")}
+                </button>
+                <button onClick={() => (setImportMenu(false), pickFolder())}>
+                  <Icon name="folderPlus" /> {t("shelf.importFolder")}
+                </button>
+              </div>
+            )}
+          </div>
+          {!settings.shelfSidebar && (
+            <button className="icon-button" title={t("settings.title")} aria-label={t("settings.title")} onClick={() => openSettings()}>
+              <Icon name="settings" />
+            </button>
+          )}
         </header>
 
         {selecting && (
           <div className="select-bar">
-            <span>已选择 {selected.size} 本</span>
-            <button onClick={() => setSelected(new Set(visible.map((b) => b.id)))}>全选</button>
-            <button onClick={() => setEditing(selectedBooks)}>设置分组</button>
+            <span>{t("shelf.selectedCount", { n: selected.size })}</span>
+            <button onClick={() => setSelected(new Set(visible.map((b) => b.id)))}>{t("shelf.selectAll")}</button>
+            <button onClick={() => setEditing(selectedBooks)}>{t("shelf.setGroups")}</button>
             <button className="danger" onClick={() => setDeleting(selectedBooks)}>
-              删除
+              {t("common.delete")}
             </button>
             <span className="spacer" />
-            <button onClick={() => setSelected(new Set())}>取消选择</button>
+            <button onClick={() => setSelected(new Set())}>{t("shelf.clearSelection")}</button>
           </div>
         )}
 
         <div className="shelf-content">
           {shelf.books.length === 0 ? (
             <div className="empty">
-              <div className="empty-title">书架还是空的</div>
-              <div className="muted">支持 EPUB · PDF · TXT · Markdown · MOBI/AZW3 · FB2 · DOCX · CBZ</div>
+              <div className="empty-title">{t("shelf.emptyTitle")}</div>
+              <div className="muted">{t("shelf.emptyFormats", { formats: FORMATS })}</div>
               <div className="empty-actions">
                 <button className="primary" onClick={pickFiles}>
-                  导入书籍
+                  <Icon name="filePlus" /> {t("shelf.importBooks")}
                 </button>
-                <button onClick={pickFolder}>导入文件夹</button>
+                <button onClick={pickFolder}>
+                  <Icon name="folderPlus" /> {t("shelf.importFolder")}
+                </button>
               </div>
-              <div className="muted small">也可以把文件或文件夹拖到窗口中</div>
+              <div className="muted small">{t("shelf.dropHint")}</div>
             </div>
           ) : visible.length === 0 ? (
-            <div className="empty muted">没有符合条件的书</div>
+            <div className="empty muted">{t("shelf.noMatch")}</div>
           ) : settings.shelfView === "grid" ? (
             <div className="book-grid">
               {visible.map((b) => (
@@ -289,7 +368,7 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
                   book={b}
                   selected={selected.has(b.id)}
                   selecting={selecting}
-                  onOpen={() => (b.missing ? setToast("书籍文件已丢失，请删除后重新导入") : props.onOpen(b.id))}
+                  onOpen={() => openBook(b)}
                   onToggle={() => toggle(b.id)}
                   onMenu={openMenu(b)}
                 />
@@ -300,12 +379,12 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
               <div className="book-row header">
                 <span className="check-space" />
                 <span className="row-cover" />
-                <span className="row-main">书名</span>
-                <span className="row-cell">格式</span>
-                <span className="row-cell">进度</span>
-                <span className="row-cell">阅读时长</span>
-                <span className="row-cell">最近阅读</span>
-                <span className="row-cell">添加时间</span>
+                <span className="row-main">{t("shelf.colTitle")}</span>
+                <span className="row-cell">{t("shelf.colFormat")}</span>
+                <span className="row-cell">{t("shelf.colProgress")}</span>
+                <span className="row-cell">{t("shelf.colReadTime")}</span>
+                <span className="row-cell">{t("shelf.colLastRead")}</span>
+                <span className="row-cell">{t("shelf.colAdded")}</span>
                 <span className="more-space" />
               </div>
               {visible.map((b) => (
@@ -314,7 +393,7 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
                   book={b}
                   selected={selected.has(b.id)}
                   selecting={selecting}
-                  onOpen={() => (b.missing ? setToast("书籍文件已丢失，请删除后重新导入") : props.onOpen(b.id))}
+                  onOpen={() => openBook(b)}
                   onToggle={() => toggle(b.id)}
                   onMenu={openMenu(b)}
                 />
@@ -327,13 +406,15 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
       {menu && (
         <div className="menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
           <button onClick={() => (setMenu(null), props.onOpen(menu.book.id))} disabled={menu.book.missing}>
-            打开
+            {t("shelf.open")}
           </button>
-          <button onClick={() => (setMenu(null), setEditing([menu.book]))}>编辑信息与分组</button>
-          <button onClick={() => (setMenu(null), toggle(menu.book.id))}>{selected.has(menu.book.id) ? "取消选择" : "选择"}</button>
+          <button onClick={() => (setMenu(null), setEditing([menu.book]))}>{t("shelf.editInfo")}</button>
+          <button onClick={() => (setMenu(null), toggle(menu.book.id))}>
+            {selected.has(menu.book.id) ? t("shelf.clearSelection") : t("common.select")}
+          </button>
           <hr />
           <button className="danger" onClick={() => (setMenu(null), setDeleting([menu.book]))}>
-            从书架删除
+            {t("shelf.remove")}
           </button>
         </div>
       )}
@@ -348,13 +429,14 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
       )}
       {deleting && (
         <Confirm
-          title="从书架删除"
+          title={t("shelf.remove")}
           danger
-          confirmText="删除"
+          confirmText={t("common.delete")}
           message={
             <p>
-              将删除{deleting.length === 1 ? `《${deleting[0].title}》` : ` ${deleting.length} 本书`}
-              及其阅读进度。书库中保存的副本会一并删除，你导入时选择的原文件不受影响。
+              {deleting.length === 1
+                ? t("shelf.removeOne", { title: deleting[0].title })
+                : t("shelf.removeMany", { n: deleting.length })}
             </p>
           }
           onConfirm={() => remove(deleting)}
@@ -382,10 +464,10 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
       )}
       {groupDeleting && (
         <Confirm
-          title="删除分组"
+          title={t("shelf.deleteGroup")}
           danger
-          confirmText="删除分组"
-          message={<p>删除分组「{groupDeleting}」？分组里的书会保留在书架上。</p>}
+          confirmText={t("shelf.deleteGroup")}
+          message={<p>{t("shelf.deleteGroupConfirm", { name: groupDeleting })}</p>}
           onConfirm={async () => {
             try {
               await api.deleteGroup(groupDeleting);
@@ -401,17 +483,21 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
       {progress && (
         <div className="modal-backdrop">
           <div className="modal import-progress">
-            <div className="modal-title">正在导入…</div>
+            <div className="modal-title">{t("shelf.importing")}</div>
             <div className="bar">
               <div style={{ width: progress.total ? `${(progress.done / progress.total) * 100}%` : "0%" }} />
             </div>
             <div className="muted small ellipsis">
-              {progress.total ? `${progress.done} / ${progress.total}　${progress.name}` : "正在扫描文件…"}
+              {progress.total ? `${progress.done} / ${progress.total}　${progress.name}` : t("shelf.scanning")}
             </div>
           </div>
         </div>
       )}
-      {dragging && <div className="drop-overlay">松开以导入到{currentGroup ? `「${currentGroup}」` : "书架"}</div>}
+      {dragging && (
+        <div className="drop-overlay">
+          {currentGroup ? t("shelf.dropToGroup", { group: currentGroup }) : t("shelf.dropToShelf")}
+        </div>
+      )}
       {organizing && (
         <OrganizeDialog
           books={organizing}
@@ -419,7 +505,7 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
           onApply={async (changes) => {
             for (const c of changes) await api.updateBook(c.id, c.patch);
             refresh();
-            setToast(`已更新 ${changes.length} 本书`);
+            setToast(t("shelf.updated", { n: changes.length }));
           }}
         />
       )}
@@ -432,14 +518,14 @@ function GroupDialog(props: { old: string | null; onSave: (name: string) => void
   const [name, setName] = useState(props.old ?? "");
   return (
     <Modal
-      title={props.old === null ? "新建分组" : "重命名分组"}
+      title={props.old === null ? t("shelf.newGroup") : t("shelf.renameGroup")}
       onClose={props.onClose}
       width={340}
       footer={
         <>
-          <button onClick={props.onClose}>取消</button>
+          <button onClick={props.onClose}>{t("common.cancel")}</button>
           <button className="primary" disabled={!name.trim()} onClick={() => props.onSave(name)}>
-            确定
+            {t("common.ok")}
           </button>
         </>
       }
@@ -448,7 +534,7 @@ function GroupDialog(props: { old: string | null; onSave: (name: string) => void
         className="full"
         value={name}
         autoFocus
-        placeholder="分组名称"
+        placeholder={t("shelf.groupName")}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && name.trim() && props.onSave(name)}
       />

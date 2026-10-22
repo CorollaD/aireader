@@ -79,7 +79,7 @@ pub fn open_source(path: &Path) -> Result<CbzSource> {
         .map(|n| n.into_owned())
         .collect();
     if names.is_empty() {
-        bail!("压缩包中没有图片");
+        bail!(crate::t!("archive_no_images"));
     }
     names.sort_by(|a, b| natord::compare_ignore_case(a, b));
     let aspects = Mutex::new(vec![None; names.len()]);

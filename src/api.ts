@@ -57,6 +57,8 @@ export const api = {
   aiEstimateBook: (bookId: string) => invoke<BookEstimate>("ai_estimate_book", { bookId }),
   aiCancel: (taskId: string) => invoke<void>("ai_cancel", { taskId }),
   aiOrganize: (bookIds: string[]) => invoke<Suggestion[]>("ai_organize", { bookIds }),
+  /** Language for backend messages (errors, generated titles, AI answers set to "auto"). */
+  setLocale: (locale: string) => invoke<void>("set_locale", { locale }),
   getSettings: () => invoke<unknown>("get_settings"),
   setSettings: (settings: unknown) => invoke<void>("set_settings", { settings }),
 };

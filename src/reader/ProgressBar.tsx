@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import type { Location, OpenedBook } from "../types";
-import { describe, formatDuration, formatMinutes, locationAt, progressOf, remainingMinutes } from "./locations";
+import { formatDuration, formatMinutes, t } from "../i18n";
+import { describe, locationAt, progressOf, remainingMinutes } from "./locations";
 import type { ReadingStats } from "./useReadingStats";
 
 interface Props {
@@ -70,17 +71,17 @@ export default function ProgressBar({ book, location, stats, onJump }: Props) {
         <span className="ellipsis">
           {remaining && (
             <>
-              {remaining.chapter !== null && <>本章剩余约 {formatMinutes(remaining.chapter)} · </>}
-              全书剩余约 {formatMinutes(remaining.book)}
+              {remaining.chapter !== null && <>{t("progress.chapterLeft", { time: formatMinutes(remaining.chapter) })} · </>}
+              {t("progress.bookLeft", { time: formatMinutes(remaining.book) })}
             </>
           )}
-          {stats.readSeconds > 0 && <> · 已读 {formatDuration(stats.readSeconds)}</>}
+          {stats.readSeconds > 0 && <> · {t("progress.readTime", { time: formatDuration(stats.readSeconds) })}</>}
         </span>
         {editing ? (
           <input
             className="jump-input"
             autoFocus
-            placeholder={book.kind === "paged" ? "页码或 50%" : "百分比"}
+            placeholder={book.kind === "paged" ? t("progress.jumpPaged") : t("progress.jumpPercent")}
             onBlur={() => setEditing(false)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -91,7 +92,7 @@ export default function ProgressBar({ book, location, stats, onJump }: Props) {
             }}
           />
         ) : (
-          <button className="link-button" title="跳转到百分比或页码" onClick={() => setEditing(true)}>
+          <button className="link-button" title={t("progress.jumpTitle")} onClick={() => setEditing(true)}>
             {location?.kind === "page" ? `${location.page + 1} / ${book.pages.length} · ` : ""}
             {Math.round(progress * 100)}%
           </button>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Modal } from "../ui";
 import type { Book, BookPatch } from "../types";
+import { t } from "../i18n";
 
 /**
  * Edits one book's title/author/groups, or only the groups of several books. `onSave` gets the
@@ -49,13 +50,13 @@ export function EditDialog(props: {
 
   return (
     <Modal
-      title={single ? "编辑书籍信息" : `设置 ${props.books.length} 本书的分组`}
+      title={single ? t("edit.titleOne") : t("edit.titleMany", { n: props.books.length })}
       onClose={props.onClose}
       footer={
         <>
-          <button onClick={props.onClose}>取消</button>
+          <button onClick={props.onClose}>{t("common.cancel")}</button>
           <button className="primary" onClick={save} disabled={!!single && !title.trim()}>
-            保存
+            {t("common.save")}
           </button>
         </>
       }
@@ -63,19 +64,19 @@ export function EditDialog(props: {
       {single && (
         <>
           <label className="field">
-            <span>书名</span>
+            <span>{t("edit.bookTitle")}</span>
             <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
           </label>
           <label className="field">
-            <span>作者</span>
-            <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="未知" />
+            <span>{t("edit.author")}</span>
+            <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder={t("edit.unknown")} />
           </label>
         </>
       )}
       <div className="field">
-        <span>分组</span>
+        <span>{t("edit.groups")}</span>
         <div className="group-checks">
-          {allGroups.length === 0 && <span className="muted">还没有分组</span>}
+          {allGroups.length === 0 && <span className="muted">{t("edit.noGroups")}</span>}
           {allGroups.map((g) => (
             <label key={g} className="chip-check">
               <input type="checkbox" checked={checked.has(g)} onChange={() => toggle(g)} />
@@ -86,12 +87,12 @@ export function EditDialog(props: {
         <div className="inline-add">
           <input
             value={newGroup}
-            placeholder="新分组名称"
+            placeholder={t("edit.newGroup")}
             onChange={(e) => setNewGroup(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addGroup()}
           />
           <button onClick={addGroup} disabled={!newGroup.trim()}>
-            添加
+            {t("common.add")}
           </button>
         </div>
       </div>

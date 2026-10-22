@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { TocEntry } from "../types";
 import type { Bookmark, Highlight, Location, OpenedBook } from "../types";
-import { formatDate } from "../shelf/BookCard";
+import { formatDate, t } from "../i18n";
+import { Icon } from "../icons";
+import { MOD } from "./shortcuts";
 import { atOrBefore } from "./locations";
 
 export type SidebarTab = "toc" | "bookmarks" | "notes";
@@ -42,9 +44,9 @@ export default function Sidebar(props: Props) {
   }, [currentToc, tab]);
 
   const tabs: [SidebarTab, string, number | null][] = [
-    ["toc", "目录", null],
-    ["bookmarks", "书签", props.bookmarks.length],
-    ...(flow ? ([["notes", "笔记", props.highlights.length]] as [SidebarTab, string, number][]) : []),
+    ["toc", t("side.toc"), null],
+    ["bookmarks", t("side.bookmarks"), props.bookmarks.length],
+    ...(flow ? ([["notes", t("side.notes"), props.highlights.length]] as [SidebarTab, string, number][]) : []),
   ];
 
   return (
@@ -60,7 +62,7 @@ export default function Sidebar(props: Props) {
       <div className="side-list" ref={list}>
         {tab === "toc" &&
           (book.toc.length === 0 ? (
-            <div className="side-empty muted small">这本书没有目录</div>
+            <div className="side-empty muted small">{t("side.noToc")}</div>
           ) : (
             <TocTree bookId={book.id} toc={book.toc} current={currentToc} onNavigate={props.onNavigate} />
           ))}
@@ -74,7 +76,7 @@ export default function Sidebar(props: Props) {
 function Bookmarks(props: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const sorted = [...props.bookmarks].sort((a, b) => (atOrBefore(a.location, b.location) ? -1 : 1));
-  if (sorted.length === 0) return <div className="side-empty muted small">按 ⌘/Ctrl+D 或点击工具栏的书签按钮，为当前位置添加书签</div>;
+  if (sorted.length === 0) return <div className="side-empty muted small">{t("side.noBookmarks", { key: `${MOD}+D` })}</div>;
   return (
     <>
       {sorted.map((b) => (
@@ -103,23 +105,23 @@ function Bookmarks(props: Props) {
             <span className="entry-actions">
               <button
                 className="icon"
-                title="重命名"
+                title={t("common.rename")}
                 onClick={(e) => {
                   e.stopPropagation();
                   setEditing(b.id);
                 }}
               >
-                ✎
+                <Icon name="edit" size={14} />
               </button>
               <button
                 className="icon"
-                title="删除书签"
+                title={t("side.deleteBookmark")}
                 onClick={(e) => {
                   e.stopPropagation();
                   props.onRemoveBookmark(b.id);
                 }}
               >
-                ×
+                <Icon name="close" size={14} />
               </button>
             </span>
           </div>
@@ -137,16 +139,16 @@ function Notes(props: Props) {
   return (
     <>
       <div className="notes-head">
-        <span className="muted small">{sorted.length} 条高亮</span>
-        <button disabled={sorted.length === 0} onClick={props.onExport} title="导出为 Markdown">
-          导出
+        <span className="muted small">{t("side.highlightCount", { n: sorted.length })}</span>
+        <button disabled={sorted.length === 0} onClick={props.onExport} title={t("side.exportTitle")}>
+          {t("side.export")}
         </button>
       </div>
-      {sorted.length === 0 && <div className="side-empty muted small">选中正文文字，即可添加高亮或笔记</div>}
+      {sorted.length === 0 && <div className="side-empty muted small">{t("side.noNotes")}</div>}
       {sorted.map((h, i) => (
         <div key={h.id}>
           {(i === 0 || sorted[i - 1].chapter !== h.chapter) && (
-            <div className="notes-chapter">{book.chapters[h.chapter]?.title || `第 ${h.chapter + 1} 章`}</div>
+            <div className="notes-chapter">{book.chapters[h.chapter]?.title || t("loc.chapter", { n: h.chapter + 1 })}</div>
           )}
           <div
             className={`side-entry note-entry hl-bar-${h.color}`}
@@ -159,23 +161,23 @@ function Notes(props: Props) {
               <span className="entry-actions">
                 <button
                   className="icon"
-                  title="编辑笔记"
+                  title={t("side.editNote")}
                   onClick={(e) => {
                     e.stopPropagation();
                     props.onEditNote(h.id);
                   }}
                 >
-                  ✎
+                  <Icon name="edit" size={14} />
                 </button>
                 <button
                   className="icon"
-                  title="删除高亮"
+                  title={t("side.deleteHighlight")}
                   onClick={(e) => {
                     e.stopPropagation();
                     props.onRemoveHighlight(h.id);
                   }}
                 >
-                  ×
+                  <Icon name="close" size={14} />
                 </button>
               </span>
             </div>
@@ -258,10 +260,10 @@ function TocTree(props: { bookId: string; toc: TocEntry[]; current: number; onNa
       {parents.length > 0 && (
         <div className="toc-tools">
           <button className="link-button" onClick={() => change(new Set())}>
-            全部展开
+            {t("side.expandAll")}
           </button>
           <button className="link-button" onClick={() => change(new Set(parents))}>
-            全部收起
+            {t("side.collapseAll")}
           </button>
         </div>
       )}
@@ -271,11 +273,11 @@ function TocTree(props: { bookId: string; toc: TocEntry[]; current: number; onNa
             {hasChildren[i] ? (
               <button
                 className="toc-toggle"
-                aria-label={collapsed.has(i) ? "展开" : "收起"}
+                aria-label={collapsed.has(i) ? t("side.expand") : t("side.collapse")}
                 aria-expanded={!collapsed.has(i)}
                 onClick={() => toggle(i)}
               >
-                {collapsed.has(i) ? "▸" : "▾"}
+                <Icon name={collapsed.has(i) ? "chevronRight" : "chevronDown"} size={13} />
               </button>
             ) : (
               <span className="toc-toggle-space" />

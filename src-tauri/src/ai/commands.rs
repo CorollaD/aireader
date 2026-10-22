@@ -54,7 +54,7 @@ fn config(app: &AppHandle) -> AiConfig {
 fn model(app: &AppHandle) -> Result<(ChatModel, AiConfig)> {
     let cfg = config(app);
     if cfg.is_configured() && !cfg.is_local() && !cfg.consented {
-        bail!("使用云端 AI 服务前，需要先同意发送书籍内容");
+        bail!(crate::t!("ai_consent_required"));
     }
     connect(app, cfg)
 }
@@ -106,7 +106,7 @@ pub async fn ai_set_config(
             } else {
                 secrets
                     .set(&config.key_name(), key.trim())
-                    .map_err(|e| format!("无法保存到系统钥匙串：{e:#}"))?;
+                    .map_err(|e| crate::t!("ai_keychain_failed", error = format!("{e:#}")))?;
             }
         }
         let mut lib = app_state(&app).library();
@@ -126,7 +126,7 @@ pub async fn ai_test(app: AppHandle) -> CmdResult<String> {
     // The test sends no book text, so it does not need the user's consent.
     let (model, cfg) = connect(&app, config(&app)).map_err(err)?;
     let request =
-        CompletionRequest::new(Message::user("请只回复四个字：连接成功")).max_tokens(64u64);
+        CompletionRequest::new(Message::user("Reply with just the word: OK")).max_tokens(64u64);
     let reply = provider::complete_text(&model, request)
         .await
         .map_err(|e| provider::friendly_error(&cfg, &e))?;
@@ -269,7 +269,7 @@ pub async fn ai_organize(app: AppHandle, book_ids: Vec<String>) -> CmdResult<Vec
         (entries, lib.groups().to_vec())
     };
     if entries.is_empty() {
-        return Err("没有要整理的书".into());
+        return Err(crate::t!("ai_nothing_to_organize"));
     }
     // Excerpts help with unfamiliar titles, but parsing many books is slow.
     let with_excerpts = entries.len() <= 30;

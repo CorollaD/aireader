@@ -14,6 +14,8 @@ import {
 } from "react";
 import { api, errorText, imageUrl } from "../api";
 import { isTyping } from "../ui";
+import { t } from "../i18n";
+import { Icon } from "../icons";
 import type { Settings } from "../settings";
 import type { Block, Highlight, Location, OpenedBook, Span } from "../types";
 import { blockText, resolveHighlights, selectionRange, splitSpans, type BlockMark, type SelectionInfo, type TextRange } from "./anchors";
@@ -411,7 +413,7 @@ const FlowView = forwardRef<FlowHandle, Props>(function FlowView(props, ref) {
       onKeyUp={(e) => e.shiftKey && checkSelection()}
     >
       {error && <div className="center-msg error">{error}</div>}
-      {!shown && !error && <div className="center-msg muted">加载中…</div>}
+      {!shown && !error && <div className="center-msg muted">{t("common.loading")}</div>}
       {shown && (
         <article className={classes} ref={article} style={style}>
           {shown.map((b, i) => (
@@ -420,11 +422,23 @@ const FlowView = forwardRef<FlowHandle, Props>(function FlowView(props, ref) {
             </div>
           ))}
           <nav className="chapter-nav">
-            {chapter > 0 ? <button onClick={prev}>← 上一章</button> : <span />}
+            {chapter > 0 ? (
+              <button onClick={prev}>
+                <Icon name="chevronLeft" /> {t("reader.prevChapter")}
+              </button>
+            ) : (
+              <span />
+            )}
             <span className="muted small">
               {chapter + 1} / {book.chapters.length}
             </span>
-            {chapter + 1 < book.chapters.length ? <button onClick={next}>下一章 →</button> : <span className="muted small">全书完</span>}
+            {chapter + 1 < book.chapters.length ? (
+              <button onClick={next}>
+                {t("reader.nextChapter")} <Icon name="chevronRight" />
+              </button>
+            ) : (
+              <span className="muted small">{t("reader.theEnd")}</span>
+            )}
           </nav>
         </article>
       )}

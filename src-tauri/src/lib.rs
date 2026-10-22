@@ -4,6 +4,7 @@ pub mod ai;
 pub mod annotations;
 pub mod commands;
 pub mod formats;
+pub mod i18n;
 pub mod library;
 pub mod model;
 pub mod protocol;
@@ -54,6 +55,7 @@ pub fn run() {
             commands::export_notes,
             commands::add_reading_time,
             commands::set_settings,
+            commands::set_locale,
             ai::commands::ai_get_config,
             ai::commands::ai_set_config,
             ai::commands::ai_test,

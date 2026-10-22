@@ -109,7 +109,7 @@ pub fn open(path: &Path) -> Result<Document> {
         Format::Docx => docx::load(path),
         Format::Cbz => cbz::load(path),
     };
-    doc.with_context(|| format!("无法打开 {}", path.display()))
+    doc.with_context(|| crate::t!("open_failed", path = path.display()))
 }
 
 pub fn detect(path: &Path) -> Result<Format> {
@@ -138,7 +138,7 @@ pub fn detect(path: &Path) -> Result<Format> {
 fn sniff(path: &Path) -> Result<Format> {
     let mut head = [0u8; 1024];
     let n = std::fs::File::open(path)
-        .context("无法读取文件")?
+        .with_context(|| crate::t!("read_failed"))?
         .read(&mut head)?;
     let head = &head[..n];
     if head.starts_with(b"%PDF") {
