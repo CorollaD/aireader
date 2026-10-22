@@ -1862,3 +1862,12 @@ kbd {
   max-width: 200px;
   flex-shrink: 1;
 }
+/* The AI button keeps its label at every width so it is easy to find. */
+.ai-button {
+  margin: 0 2px;
+  border-color: var(--border);
+  font-weight: 500;
+}
+.ai-button .icon-svg {
+  color: var(--accent);
+}

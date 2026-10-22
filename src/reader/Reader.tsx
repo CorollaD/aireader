@@ -448,7 +448,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
             </button>
           )}
           <button
-            className={`icon-button${aiOpen ? " on" : ""}`}
+            className={`icon-button wide ai-button${aiOpen ? " on" : ""}`}
             title={t("reader.ai")}
             aria-label={t("reader.ai")}
             onClick={() => {
@@ -457,6 +457,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
             }}
           >
             <Icon name="sparkles" />
+            AI
           </button>
           <div className="menu-anchor">
             <button
