@@ -2,6 +2,8 @@
 
 跨平台桌面阅读器。界面用 [Tauri 2](https://tauri.app) + React，文档解析与渲染用 Rust。
 
+**下载**：在 [Releases](https://github.com/CorollaD/aireader/releases) 页面下载 macOS（Apple 芯片 / Intel）、Windows 和 Linux 的安装包。安装包暂未签名，首次打开的方法见 Release 说明。
+
 | 格式 | 支持情况 |
 | --- | --- |
 | EPUB 2/3 | 按 spine 顺序读取章节；NCX/nav 目录（含锚点跳转）；内嵌图片与封面 |
@@ -66,7 +68,11 @@ npm run tauri build                   # 打包安装程序
 
 程序会依次在以下位置查找 PDFium：环境变量 `AIREADER_PDFIUM_DIR`、应用资源目录下的 `lib/`、可执行文件旁的 `lib/`、`../Frameworks` 和 `../Resources/lib`（macOS app 包）、`src-tauri/lib`（开发时），最后是系统库路径。找不到时只有 PDF 打不开，其他格式不受影响。
 
-打包时会自动带上 PDFium：macOS 放进 `Contents/Frameworks/`（见 `tauri.macos.conf.json`），Linux 和 Windows 作为资源文件随安装包分发（见 `tauri.linux.conf.json`、`tauri.windows.conf.json`）。在 macOS 和 Linux 上，`npm run tauri build` 会先运行 `fetch-pdfium.sh --if-missing`，`src-tauri/lib` 中没有这个库时自动下载。在 Windows 上，请先在 Git Bash 中运行该脚本。
+打包时会自动带上 PDFium：macOS 放进 `Contents/Frameworks/`（见 `tauri.macos.conf.json`），Linux 和 Windows 作为资源文件随安装包分发（见 `tauri.linux.conf.json`、`tauri.windows.conf.json`）。在 macOS 和 Linux 上，`npm run tauri build` 会先运行 `fetch-pdfium.sh --if-missing`，`src-tauri/lib` 中没有这个库时自动下载。在 Windows 上，请先在 Git Bash 中运行该脚本。脚本按要构建的 Rust 目标（`PDFIUM_TARGET` 或 Tauri 提供的 `TAURI_ENV_TARGET_TRIPLE`）选择对应的库，版本固定为 `PDFIUM_VERSION`（默认 8111）。
+
+### 发布
+
+推送 `v*` 标签（版本号与 `tauri.conf.json` 一致，例如 `v0.2.0`）会触发 `.github/workflows/release.yml`：在 GitHub Actions 上分别构建 macOS（Apple 芯片、Intel）、Linux 和 Windows 安装包，全部成功后发布为 GitHub Release；也可以在 Actions 页面手动运行。
 
 ### 数据位置
 
@@ -109,3 +115,7 @@ src-tauri/                Rust 后端
 ```
 
 键盘快捷键：← / → 上一章或上一页、下一章或下一页；空格 / PgDn 翻一屏（读到章节末尾时进入下一章）；Home / End 跳到开头或末尾；Ctrl/⌘ +/- 调整字号（PDF 为缩放）；Ctrl/⌘ F 搜索；T 显示或隐藏目录；F 专注模式；? 快捷键帮助；⌘/Ctrl+, 设置；Esc 关闭面板，或返回书架。
+
+## 许可证
+
+[GPL-3.0](LICENSE)

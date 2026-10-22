@@ -1,0 +1,110 @@
+# Builds installers for macOS (Apple silicon and Intel), Linux and Windows when a version tag
+# such as v0.2.0 is pushed (or when run by hand), and publishes them as a GitHub release.
+# The release is created as a draft and only made public once every platform has built.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PDFIUM_VERSION: "8111"
+
+jobs:
+  create-release:
+    name: Create the draft release
+    runs-on: ubuntu-latest
+    outputs:
+      id: ${{ steps.draft.outputs.id }}
+      tag: ${{ steps.draft.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          tag="v$version"
+          # Reuse the draft when the workflow is run again for the same version.
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$tag\") | .id" | head -n 1)
+          if [ -z "$id" ]; then
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --draft --target "$GITHUB_SHA" \
+              --title "AiReader $tag" --notes-file .github/release-notes.md
+            id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$tag\") | .id" | head -n 1)
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS (Apple silicon)
+            runner: macos-latest
+            target: aarch64-apple-darwin
+          - name: macOS (Intel)
+            runner: macos-latest
+            target: x86_64-apple-darwin
+          - name: Linux
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - name: Windows
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdbus-1-dev pkg-config
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.target }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Download PDFium
+        shell: bash
+        env:
+          PDFIUM_TARGET: ${{ matrix.target }}
+        run: bash src-tauri/scripts/fetch-pdfium.sh
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          releaseId: ${{ needs.create-release.outputs.id }}
+          args: --target ${{ matrix.target }}
+
+  publish:
+    name: Publish the release
+    needs: [create-release, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Make the draft public
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ needs.create-release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --draft=false --latest
