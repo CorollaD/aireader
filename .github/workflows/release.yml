@@ -1,6 +1,10 @@
 # Builds installers for macOS (Apple silicon and Intel), Linux and Windows when a version tag
 # such as v0.2.0 is pushed (or when run by hand), and publishes them as a GitHub release.
 # The release is created as a draft and only made public once every platform has built.
+#
+# Windows installers are code-signed through SignPath when the repository has the variable
+# SIGNPATH_ORGANIZATION_ID and the secret SIGNPATH_API_TOKEN (see README, "Code signing");
+# without them they are published unsigned. SHA256SUMS.txt lists checksums of every file.
 
 name: Release
 
@@ -104,6 +108,49 @@ jobs:
           releaseId: ${{ needs.create-release.outputs.id }}
           args: --target ${{ matrix.target }}
 
+      # Windows signing: SignPath signs the installers, which then replace the unsigned ones
+      # in the (still draft) release.
+      - name: Collect Windows installers for signing
+        id: unsigned
+        if: runner.os == 'Windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-unsigned
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+            src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
+          if-no-files-found: error
+
+      - name: Sign with SignPath
+        if: steps.unsigned.outcome == 'success'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'aireader' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - name: Replace the unsigned installers
+        if: steps.unsigned.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ID: ${{ needs.create-release.outputs.id }}
+        run: |
+          shopt -s globstar nullglob
+          files=(signed/**/*.exe signed/**/*.msi)
+          [ ${#files[@]} -gt 0 ] || { echo "SignPath returned no installers" >&2; exit 1; }
+          for f in "${files[@]}"; do
+            name=$(basename "$f")
+            old=$(gh api "repos/$GITHUB_REPOSITORY/releases/$ID/assets" --jq ".[] | select(.name == \"$name\") | .id")
+            [ -n "$old" ] && gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$old"
+            gh api -X POST "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$ID/assets?name=$name" \
+              -H "Content-Type: application/octet-stream" --input "$f" --jq .name
+          done
+
   publish:
     name: Publish the release
     needs: [create-release, build]
@@ -123,4 +170,17 @@ jobs:
               exit 1
             fi
           done
+          # Checksums of every file, so downloads can be verified.
+          mkdir files && cd files
+          gh api "repos/$GITHUB_REPOSITORY/releases/$ID" --jq '.assets[] | select(.name != "SHA256SUMS.txt") | "\(.id) \(.name)"' |
+            while read -r asset name; do
+              gh api -H "Accept: application/octet-stream" "repos/$GITHUB_REPOSITORY/releases/assets/$asset" > "$name"
+            done
+          sha256sum -- * > ../SHA256SUMS.txt
+          cd ..
+          cat SHA256SUMS.txt
+          old=$(gh api "repos/$GITHUB_REPOSITORY/releases/$ID/assets" --jq '.[] | select(.name == "SHA256SUMS.txt") | .id')
+          [ -z "$old" ] || gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$old"
+          gh api -X POST "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$ID/assets?name=SHA256SUMS.txt" \
+            -H "Content-Type: text/plain" --input SHA256SUMS.txt --jq .name
           gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$ID" -F draft=false -f make_latest=true --jq .html_url

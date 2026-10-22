@@ -2,7 +2,7 @@
 
 跨平台桌面阅读器。界面用 [Tauri 2](https://tauri.app) + React，文档解析与渲染用 Rust。
 
-**下载**：在 [Releases](https://github.com/CorollaD/aireader/releases) 页面下载 macOS（Apple 芯片 / Intel）、Windows 和 Linux 的安装包。安装包暂未签名，首次打开的方法见 Release 说明。
+**下载**：在 [Releases](https://github.com/CorollaD/aireader/releases) 页面下载 macOS（Apple 芯片 / Intel）、Windows 和 Linux 的安装包，`SHA256SUMS.txt` 可用来校验文件。首次打开的方法见 Release 说明，签名情况见下文「代码签名」。
 
 | 格式 | 支持情况 |
 | --- | --- |
@@ -115,6 +115,21 @@ src-tauri/                Rust 后端
 ```
 
 键盘快捷键：← / → 上一章或上一页、下一章或下一页；空格 / PgDn 翻一屏（读到章节末尾时进入下一章）；Home / End 跳到开头或末尾；Ctrl/⌘ +/- 调整字号（PDF 为缩放）；Ctrl/⌘ F 搜索；T 显示或隐藏目录；F 专注模式；? 快捷键帮助；⌘/Ctrl+, 设置；Esc 关闭面板，或返回书架。
+
+## 代码签名 / Code signing policy
+
+- **Windows**：计划申请 [SignPath Foundation](https://signpath.org) 为开源项目提供的免费代码签名，获批前安装包不签名。获批后：Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+- **macOS**：暂不签名。
+- **Linux**：不签名，用 Release 中的 `SHA256SUMS.txt` 校验。
+
+所有安装包都由 GitHub Actions 从本仓库的源码构建（`.github/workflows/release.yml`），不在个人电脑上构建。All release builds come from this repository's source via GitHub Actions.
+
+| 角色 / Role | 成员 / Members |
+| --- | --- |
+| Committers and reviewers | [CorollaD](https://github.com/CorollaD) |
+| Approvers | [CorollaD](https://github.com/CorollaD) |
+
+**隐私 / Privacy**：程序不会主动向任何网络服务发送信息，除非用户自己配置并使用了 AI 功能，此时所需的书籍文字会发送给用户选择的 AI 服务（使用云端服务前会先征得同意；本地模型不离开本机）。This program will not transfer any information to other networked systems unless specifically requested by the user: the AI features send the needed book text to the AI service the user configures, after asking for consent (local models stay on the computer).
 
 ## 许可证
 
