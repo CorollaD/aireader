@@ -342,19 +342,11 @@ const de: Messages = {
   "reader.ask": "Fragen",
   "reader.askTitle": "Die KI zum markierten Text fragen",
 
-  "mm.title": "Mindmap",
-  "mm.create": "Mindmap erstellen",
   "mm.scopeChapter": "Dieses Kapitel",
   "mm.scopePages": "Diese Seiten",
   "mm.scopeBook": "Ganzes Buch",
   "mm.scopeConversation": "Dieses Gespräch",
-  "mm.requestChapter": "Mindmap zu „{title}“",
-  "mm.requestPages": "Mindmap der Seiten um {title}",
-  "mm.requestBook": "Mindmap des ganzen Buchs",
-  "mm.requestConversation": "Dieses Gespräch als Mindmap",
   "mm.conversationTitle": "Gespräch",
-  "mm.suggestChapter": "Mindmap dieses Kapitels erstellen",
-  "mm.suggestPages": "Mindmap dieser Seiten erstellen",
   "mm.bookTitle": "Mindmap des Buchs",
   "mm.bookPlan": "Zuerst wird jeder Teil zusammengefasst (vorhandene Zusammenfassungen werden genutzt), dann entsteht daraus die Mindmap.",
   "mm.open": "Öffnen",
@@ -369,6 +361,10 @@ const de: Messages = {
   "edit.keepGroup": "Gruppen beibehalten",
   "edit.newGroupOption": "Neue Gruppe …",
   "org.moveTo": "In Gruppe verschieben",
+  "ai.mapTab": "Mindmap",
+  "mm.emptyHint": "Wähle, was dargestellt werden soll. Kapitel- und Buch-Mindmaps werden je Modell zwischengespeichert und beim nächsten Mal sofort angezeigt.",
+  "mm.history": "In dieser Sitzung erstellt",
+  "mm.messages": "{n} Nachrichten",
 };
 
 export default de;

@@ -342,19 +342,11 @@ const ko: Messages = {
   "reader.ask": "질문",
   "reader.askTitle": "선택한 글에 대해 AI에게 질문",
 
-  "mm.title": "마인드맵",
-  "mm.create": "마인드맵 만들기",
   "mm.scopeChapter": "이 장",
   "mm.scopePages": "이 쪽 주변",
   "mm.scopeBook": "책 전체",
   "mm.scopeConversation": "현재 대화",
-  "mm.requestChapter": "'{title}' 마인드맵",
-  "mm.requestPages": "{title} 주변의 마인드맵",
-  "mm.requestBook": "책 전체 마인드맵",
-  "mm.requestConversation": "현재 대화를 마인드맵으로 정리",
   "mm.conversationTitle": "대화 요점",
-  "mm.suggestChapter": "이 장의 마인드맵 만들기",
-  "mm.suggestPages": "이 쪽 주변의 마인드맵 만들기",
   "mm.bookTitle": "책 전체 마인드맵",
   "mm.bookPlan": "각 부분을 먼저 요약한 뒤(기존 요약은 그대로 사용) 이를 바탕으로 마인드맵을 만듭니다.",
   "mm.open": "크게 보기",
@@ -369,6 +361,10 @@ const ko: Messages = {
   "edit.keepGroup": "각자의 그룹 유지",
   "edit.newGroupOption": "새 그룹…",
   "org.moveTo": "이동할 그룹",
+  "ai.mapTab": "마인드맵",
+  "mm.emptyHint": "마인드맵으로 만들 범위를 고르세요. 장과 책 전체 마인드맵은 모델별로 캐시되어 다음에는 바로 표시됩니다.",
+  "mm.history": "이번에 만든 마인드맵",
+  "mm.messages": "메시지 {n}개",
 };
 
 export default ko;

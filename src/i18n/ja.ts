@@ -342,19 +342,11 @@ const ja: Messages = {
   "reader.ask": "質問",
   "reader.askTitle": "選択した文章について AI に質問",
 
-  "mm.title": "マインドマップ",
-  "mm.create": "マインドマップを作成",
   "mm.scopeChapter": "この章",
   "mm.scopePages": "このページ付近",
   "mm.scopeBook": "本全体",
   "mm.scopeConversation": "この会話",
-  "mm.requestChapter": "「{title}」のマインドマップ",
-  "mm.requestPages": "{title}付近のマインドマップ",
-  "mm.requestBook": "本全体のマインドマップ",
-  "mm.requestConversation": "この会話をマインドマップにまとめる",
   "mm.conversationTitle": "会話の要点",
-  "mm.suggestChapter": "この章のマインドマップを作成",
-  "mm.suggestPages": "このページ付近のマインドマップを作成",
   "mm.bookTitle": "本全体のマインドマップ",
   "mm.bookPlan": "各部分を要約してから（既存の要約はそのまま使います）、それをもとにマインドマップを作ります。",
   "mm.open": "全画面で表示",
@@ -369,6 +361,10 @@ const ja: Messages = {
   "edit.keepGroup": "それぞれのグループのまま",
   "edit.newGroupOption": "新規グループ…",
   "org.moveTo": "移動先のグループ",
+  "ai.mapTab": "マップ",
+  "mm.emptyHint": "マップにする範囲を選んでください。章と本全体のマップはモデルごとにキャッシュされ、次回はすぐに表示されます。",
+  "mm.history": "今回作成したマップ",
+  "mm.messages": "{n} 件のメッセージ",
 };
 
 export default ja;

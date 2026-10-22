@@ -2362,37 +2362,6 @@ button.cite:hover {
   white-space: nowrap;
 }
 
-/* Composer tools (mind map) */
-.ai-input .menu-anchor {
-  align-self: flex-end;
-}
-.ai-tool {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  margin-left: -6px;
-  justify-content: center;
-  border: none;
-  border-radius: 50%;
-  background: none;
-  color: var(--muted);
-}
-.ai-tool:hover:not(:disabled),
-.ai-tool.on {
-  color: var(--accent);
-  background: var(--accent-soft) !important;
-}
-.menu.dropup {
-  position: absolute;
-  left: -6px;
-  bottom: calc(100% + 8px);
-  min-width: 200px;
-}
-.menu-label {
-  padding: 4px 10px 6px;
-  font-size: 11px;
-  color: var(--muted);
-}
 .menu button:disabled {
   opacity: 0.4;
 }
@@ -2411,4 +2380,50 @@ button.cite:hover {
 }
 .group-chip.none {
   color: var(--muted);
+}
+
+/* Mind map tab */
+.ai-cards.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+.ai-cards.three .ai-card {
+  padding: 10px 8px;
+}
+.ai-result .mm-preview {
+  max-height: 440px;
+}
+.msg-actions.wrap {
+  flex-wrap: wrap;
+}
+.mm-history {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mm-history .panel-label {
+  margin: 4px 2px 4px;
+}
+.mm-history-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.mm-history-item .icon-svg {
+  color: var(--muted);
+}
+.mm-history-item .ellipsis {
+  flex: 1;
+}
+.mm-history-item.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.mm-history-item.on .icon-svg {
+  color: var(--accent);
 }

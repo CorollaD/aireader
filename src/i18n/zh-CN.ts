@@ -342,19 +342,11 @@ const zhCN = {
   "reader.ask": "提问",
   "reader.askTitle": "就选中的文字向 AI 提问",
 
-  "mm.title": "思维导图",
-  "mm.create": "生成思维导图",
   "mm.scopeChapter": "本章",
   "mm.scopePages": "本页附近",
   "mm.scopeBook": "全书",
   "mm.scopeConversation": "当前对话",
-  "mm.requestChapter": "生成「{title}」的思维导图",
-  "mm.requestPages": "生成{title}附近的思维导图",
-  "mm.requestBook": "生成全书思维导图",
-  "mm.requestConversation": "把当前对话整理成思维导图",
   "mm.conversationTitle": "对话要点",
-  "mm.suggestChapter": "生成本章思维导图",
-  "mm.suggestPages": "生成本页附近的思维导图",
   "mm.bookTitle": "全书思维导图",
   "mm.bookPlan": "将先逐个总结（已有的总结直接使用），再据此生成全书思维导图。",
   "mm.open": "全屏查看",
@@ -369,6 +361,10 @@ const zhCN = {
   "edit.keepGroup": "保持各自的分组",
   "edit.newGroupOption": "新建分组…",
   "org.moveTo": "移到分组",
+  "ai.mapTab": "导图",
+  "mm.emptyHint": "选择要生成思维导图的范围。生成过的本章和全书导图会按模型缓存，下次直接显示。",
+  "mm.history": "本次生成",
+  "mm.messages": "{n} 条消息",
 };
 
 export default zhCN;

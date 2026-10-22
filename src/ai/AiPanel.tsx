@@ -1,7 +1,7 @@
-// Reader side panel for AI. "Chat" answers questions about the whole book from retrieved
-// passages (with [n] citations that jump to the text), or about a selected passage (explain,
-// translate, ask), and draws mind maps of the chapter, the book or the conversation. "Summary"
-// summarises the chapter, page or whole book.
+// Reader side panel for AI, with three tabs. "Chat" answers questions about the whole book from
+// retrieved passages (with [n] citations that jump to the text), or about a selected passage
+// (explain, translate, ask). "Summary" summarises the chapter, page or whole book. "Mind map"
+// draws mind maps of the chapter, the book or the conversation.
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, errorText, runAiTask } from "../api";
@@ -9,11 +9,11 @@ import type { AiEvent, AiTask, BookEstimate, ChatAction, Location, MindMapScope,
 import { Modal } from "../ui";
 import type { TextRange } from "../reader/anchors";
 import { formatNumber, t, type MessageKey } from "../i18n";
-import { Icon } from "../icons";
+import { Icon, type IconName } from "../icons";
 import { describe } from "../reader/locations";
 import { useAi } from "./AiContext";
-import Markdown, { type FenceRenderer } from "./Markdown";
-import { MindMapCard, MindMapViewer } from "./MindMap";
+import Markdown from "./Markdown";
+import { MindMapPreview, MindMapViewer, outlineMarkdown, saveMindMap } from "./MindMap";
 
 /** A passage the conversation is about (from the selection toolbar). */
 export interface Quote {
@@ -30,6 +30,7 @@ export interface ChatRequest extends Quote {
   n: number;
 }
 
+type Tab = "chat" | "summary" | "map";
 type Status = "idle" | "running" | "done" | "error" | "stopped";
 type Progress = { done: number; total: number; label: string };
 
@@ -37,9 +38,6 @@ interface Turn {
   role: "user" | "assistant";
   text: string;
   sources?: Source[];
-  /** Set for answers drawn by the mind-map task. */
-  mindmap?: { title: string; scope: MindMapScope; cached?: boolean };
-  progress?: Progress | null;
 }
 
 interface Chat {
@@ -61,11 +59,19 @@ interface Summary {
   task: AiTask;
 }
 
-/** A mind map opened in the full-window viewer. */
-interface MapView {
-  outline: string;
+/** A mind map drawn in this session. */
+interface MapItem {
+  id: number;
   title: string;
-  sources?: Source[];
+  /** What it covers, e.g. "This chapter". */
+  scopeLabel: string;
+  scope: MindMapScope;
+  outline: string;
+  status: Status;
+  progress: Progress | null;
+  cached: boolean;
+  error: string | null;
+  taskId: string | null;
 }
 
 const ACTION_LABEL: Record<ChatAction, MessageKey> = {
@@ -75,6 +81,12 @@ const ACTION_LABEL: Record<ChatAction, MessageKey> = {
 };
 
 const EMPTY_CHAT: Chat = { turns: [], quote: null, status: "idle", error: null, taskId: null };
+
+const TABS: { key: Tab; icon: IconName; label: MessageKey }[] = [
+  { key: "chat", icon: "message", label: "ai.chatTab" },
+  { key: "summary", icon: "bookOpen", label: "ai.summaryTab" },
+  { key: "map", icon: "mindmap", label: "ai.mapTab" },
+];
 
 export default function AiPanel(props: {
   book: OpenedBook;
@@ -86,24 +98,38 @@ export default function AiPanel(props: {
 }) {
   const { book, location } = props;
   const ai = useAi();
-  const [tab, setTab] = useState<"chat" | "summary">("chat");
+  const [tab, setTab] = useState<Tab>("chat");
   const [chat, setChat] = useState<Chat>(EMPTY_CHAT);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [maps, setMaps] = useState<MapItem[]>([]);
+  const [mapId, setMapId] = useState<number | null>(null);
+  const [viewing, setViewing] = useState<MapItem | null>(null);
   const [question, setQuestion] = useState("");
   const [estimate, setEstimate] = useState<{ data: BookEstimate; purpose: "summary" | "mindmap" } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [mapMenu, setMapMenu] = useState(false);
-  const [mapView, setMapView] = useState<MapView | null>(null);
   const body = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const mapSvg = useRef<SVGSVGElement>(null);
+  const nextMapId = useRef(1);
 
   const flow = book.kind === "flow";
   const here = location ? describe(book, location) : null;
 
   // --- chat ------------------------------------------------------------------------------------
 
-  /** Runs `task`; its output fills the last turn of `c`. */
-  const start = (c: Chat, task: AiTask) => {
+  /** Answers the conversation whose last turn is the (empty) answer being generated. */
+  const run = (c: Chat) => {
+    const history = c.turns.slice(0, -1).map(({ role, text }) => ({ role, text }));
+    const task: AiTask = c.quote
+      ? {
+          kind: "chat",
+          bookTitle: book.title,
+          selection: c.quote.selection,
+          context: c.quote.context,
+          action: c.quote.action,
+          history,
+        }
+      : { kind: "ask", bookId: book.id, location, history };
     const taskId = runAiTask(task, (e: AiEvent) =>
       setChat((cur) => {
         if (cur.taskId !== taskId) return cur;
@@ -113,41 +139,20 @@ export default function AiPanel(props: {
           case "sources":
             turns[turns.length - 1] = { ...last, sources: e.sources };
             return { ...cur, turns };
-          case "progress":
-            turns[turns.length - 1] = { ...last, progress: e };
-            return { ...cur, turns };
           case "delta":
-            turns[turns.length - 1] = { ...last, text: last.text + e.text, progress: null };
+            turns[turns.length - 1] = { ...last, text: last.text + e.text };
             return { ...cur, turns };
-          case "done": {
-            const mindmap = last.mindmap && { ...last.mindmap, cached: e.cached };
-            turns[turns.length - 1] = { ...last, text: e.text, progress: null, mindmap };
+          case "done":
+            turns[turns.length - 1] = { ...last, text: e.text };
             return { ...cur, turns, status: "done" };
-          }
           case "error":
             return { ...cur, turns: turns.slice(0, -1), status: "error", error: e.message };
+          default:
+            return cur;
         }
       }),
     );
     setChat({ ...c, status: "running", error: null, taskId });
-  };
-
-  /** Answers the conversation whose last turn is the (empty) answer being generated. */
-  const run = (c: Chat) => {
-    const history = c.turns.slice(0, -1).map(({ role, text }) => ({ role, text }));
-    start(
-      c,
-      c.quote
-        ? {
-            kind: "chat",
-            bookTitle: book.title,
-            selection: c.quote.selection,
-            context: c.quote.context,
-            action: c.quote.action,
-            history,
-          }
-        : { kind: "ask", bookId: book.id, location, history },
-    );
   };
 
   const send = async (text: string) => {
@@ -159,55 +164,9 @@ export default function AiPanel(props: {
     run({ ...chat, turns: [...chat.turns, { role: "user", text: q }, { role: "assistant", text: "" }] });
   };
 
-  /** Draws a mind map as a new exchange, or in place of the last answer (`replace`). */
-  const drawMap = async (scope: MindMapScope, title: string, request: string, opts: { refresh?: boolean; replace?: boolean } = {}) => {
-    if (chat.status === "running") return;
-    if (!(await ai.ensureConsent())) return;
-    setTab("chat");
-    const answer: Turn = { role: "assistant", text: "", mindmap: { title, scope } };
-    const turns = opts.replace ? [...chat.turns.slice(0, -1), answer] : [...chat.turns, { role: "user" as const, text: request }, answer];
-    start({ ...chat, turns }, { kind: "mindMap", bookId: book.id, scope, refresh: opts.refresh });
-  };
-
-  const mapChapter = () => {
-    if (!location) return;
-    if (location.kind === "flow") {
-      const title = book.chapters[location.chapter]?.title || t("loc.chapter", { n: location.chapter + 1 });
-      drawMap({ kind: "chapter", chapter: location.chapter }, title, t("mm.requestChapter", { title }));
-    } else {
-      const from = Math.max(0, location.page - 1);
-      const to = Math.min(book.pages.length - 1, location.page + 1);
-      const title = t("loc.page", { n: location.page + 1 });
-      drawMap({ kind: "pages", from, to }, title, t("mm.requestPages", { title }));
-    }
-  };
-
-  const mapBook = async () => {
-    if (!(await ai.ensureConsent())) return;
-    try {
-      setEstimate({ data: await api.aiEstimateBook(book.id), purpose: "mindmap" });
-    } catch (e) {
-      setNotice(errorText(e));
-    }
-  };
-
-  const mapConversation = () => {
-    const text = chat.turns
-      .filter((turn) => turn.text && !turn.mindmap)
-      .map((turn) => `${turn.role === "user" ? "Q" : "A"}: ${turn.text}`)
-      .join("\n\n");
-    const material = chat.quote ? `> ${chat.quote.selection}\n\n${text}` : text;
-    const title = t("mm.conversationTitle");
-    drawMap({ kind: "text", title, text: material }, title, t("mm.requestConversation"));
-  };
-
   const regenerate = () => {
     if (chat.status === "running") return;
     const last = chat.turns[chat.turns.length - 1];
-    if (last?.role === "assistant" && last.mindmap) {
-      drawMap(last.mindmap.scope, last.mindmap.title, "", { refresh: true, replace: true });
-      return;
-    }
     const turns = last?.role === "assistant" ? chat.turns.slice(0, -1) : chat.turns;
     run({ ...chat, turns: [...turns, { role: "assistant", text: "" }] });
   };
@@ -238,11 +197,11 @@ export default function AiPanel(props: {
     // Only a new request (its nonce) should start a conversation.
   }, [props.chatRequest?.n]);
 
-  // Keep the newest message in view while it streams.
+  // Keep the newest output in view while it streams.
   const lastText = chat.turns[chat.turns.length - 1]?.text;
   useEffect(() => {
     const el = body.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el && tab !== "map") el.scrollTop = el.scrollHeight;
   }, [chat.turns.length, lastText, summary?.text, tab]);
 
   // The question box grows with its text.
@@ -289,10 +248,82 @@ export default function AiPanel(props: {
     }
   };
 
-  const askBookSummary = async () => {
+  const askEstimate = async (purpose: "summary" | "mindmap") => {
     if (!(await ai.ensureConsent())) return;
     try {
-      setEstimate({ data: await api.aiEstimateBook(book.id), purpose: "summary" });
+      setEstimate({ data: await api.aiEstimateBook(book.id), purpose });
+    } catch (e) {
+      setNotice(errorText(e));
+    }
+  };
+
+  // --- mind maps -------------------------------------------------------------------------------
+
+  /** Draws a map as a new item, or in place of `replace` (regenerating it). */
+  const drawMap = async (scope: MindMapScope, title: string, scopeLabel: string, replace?: MapItem) => {
+    if (!(await ai.ensureConsent())) return;
+    setTab("map");
+    const id = replace?.id ?? nextMapId.current++;
+    const item: MapItem = {
+      id,
+      title,
+      scopeLabel,
+      scope,
+      outline: "",
+      status: "running",
+      progress: null,
+      cached: false,
+      error: null,
+      taskId: null,
+    };
+    const taskId = runAiTask({ kind: "mindMap", bookId: book.id, scope, refresh: !!replace }, (e: AiEvent) =>
+      setMaps((ms) =>
+        ms.map((m) => {
+          if (m.id !== id || m.taskId !== taskId) return m;
+          switch (e.type) {
+            case "delta":
+              return { ...m, outline: m.outline + e.text, progress: null };
+            case "progress":
+              return { ...m, progress: e };
+            case "done":
+              return { ...m, outline: e.text, cached: e.cached, status: "done", progress: null };
+            case "error":
+              return { ...m, status: "error", error: e.message, progress: null };
+            default:
+              return m;
+          }
+        }),
+      ),
+    );
+    setMaps((ms) => (replace ? ms.map((m) => (m.id === id ? { ...item, taskId } : m)) : [...ms, { ...item, taskId }]));
+    setMapId(id);
+  };
+
+  const mapHere = () => {
+    if (!location) return;
+    if (location.kind === "flow") {
+      const title = book.chapters[location.chapter]?.title || t("loc.chapter", { n: location.chapter + 1 });
+      drawMap({ kind: "chapter", chapter: location.chapter }, title, t("mm.scopeChapter"));
+    } else {
+      const from = Math.max(0, location.page - 1);
+      const to = Math.min(book.pages.length - 1, location.page + 1);
+      drawMap({ kind: "pages", from, to }, t("loc.page", { n: location.page + 1 }), t("mm.scopePages"));
+    }
+  };
+
+  const conversationTurns = chat.turns.filter((turn) => turn.text);
+  const mapConversation = () => {
+    const text = conversationTurns.map((turn) => `${turn.role === "user" ? "Q" : "A"}: ${turn.text}`).join("\n\n");
+    const material = chat.quote ? `> ${chat.quote.selection}\n\n${text}` : text;
+    const title = t("mm.conversationTitle");
+    drawMap({ kind: "text", title, text: material }, title, t("mm.scopeConversation"));
+  };
+
+  const exportMap = async (m: MapItem, kind: "png" | "svg") => {
+    if (!mapSvg.current) return;
+    try {
+      const path = await saveMindMap(mapSvg.current, m.title, kind);
+      if (path) setNotice(t("reader.exported", { path }));
     } catch (e) {
       setNotice(errorText(e));
     }
@@ -302,6 +333,7 @@ export default function AiPanel(props: {
     if (!taskId) return;
     api.aiCancel(taskId).catch(() => {});
     setSummary((s) => (s && s.taskId === taskId && s.status === "running" ? { ...s, status: "stopped", progress: null } : s));
+    setMaps((ms) => ms.map((m) => (m.taskId === taskId && m.status === "running" ? { ...m, status: "stopped", progress: null } : m)));
     setChat((c) => {
       if (c.taskId !== taskId || c.status !== "running") return c;
       // Drop an answer that never started.
@@ -324,14 +356,12 @@ export default function AiPanel(props: {
   const header = (
     <div className="ai-head">
       <div className="ai-switch" role="tablist">
-        <button role="tab" aria-selected={tab === "chat"} className={tab === "chat" ? "on" : ""} onClick={() => setTab("chat")}>
-          <Icon name="message" size={14} />
-          {t("ai.chatTab")}
-        </button>
-        <button role="tab" aria-selected={tab === "summary"} className={tab === "summary" ? "on" : ""} onClick={() => setTab("summary")}>
-          <Icon name="bookOpen" size={14} />
-          {t("ai.summaryTab")}
-        </button>
+        {TABS.map((tb) => (
+          <button key={tb.key} role="tab" aria-selected={tab === tb.key} className={tab === tb.key ? "on" : ""} onClick={() => setTab(tb.key)}>
+            <Icon name={tb.icon} size={14} />
+            {t(tb.label)}
+          </button>
+        ))}
       </div>
       <span className="spacer" />
       {tab === "chat" && ai.ready && (
@@ -368,17 +398,14 @@ export default function AiPanel(props: {
 
   const running = chat.status === "running";
   const lastAnswer = [...chat.turns].reverse().find((turn) => turn.role === "assistant" && turn.text);
-  const suggestions: { label: string; run: () => void }[] = [
-    ...(flow
-      ? (["ai.suggestChapter", "ai.suggestPeople"] as MessageKey[])
-      : (["ai.suggestPage", "ai.suggestTerms"] as MessageKey[])
-    ).map((k) => ({ label: t(k), run: () => send(t(k)) })),
-    { label: flow ? t("mm.suggestChapter") : t("mm.suggestPages"), run: mapChapter },
-  ];
-  const hasConversation = chat.turns.some((turn) => turn.text && !turn.mindmap);
+  const suggestions: MessageKey[] = flow
+    ? ["ai.suggestChapter", "ai.suggestPeople", "ai.suggestHard"]
+    : ["ai.suggestPage", "ai.suggestTerms", "ai.suggestHard"];
+  const map = maps.find((m) => m.id === mapId) ?? null;
+  const mapBusy = maps.some((m) => m.status === "running");
 
   return (
-    <aside className="ai-panel" onClick={() => setMapMenu(false)}>
+    <aside className="ai-panel">
       {header}
 
       {tab === "chat" && (
@@ -392,9 +419,9 @@ export default function AiPanel(props: {
                 <div className="ai-welcome-title">{t("ai.emptyTitle")}</div>
                 <p className="muted small">{t("ai.emptyHint")}</p>
                 <div className="ai-suggestions">
-                  {suggestions.map((s) => (
-                    <button key={s.label} onClick={s.run}>
-                      {s.label}
+                  {suggestions.map((k) => (
+                    <button key={k} onClick={() => send(t(k))}>
+                      {t(k)}
                     </button>
                   ))}
                 </div>
@@ -415,7 +442,7 @@ export default function AiPanel(props: {
                   last={i === chat.turns.length - 1}
                   onCopy={() => copy(turn.text)}
                   onNote={
-                    chat.quote?.anchor && turn.text && !turn.mindmap
+                    chat.quote?.anchor && turn.text
                       ? () => {
                           props.onSaveNote(chat.quote!, turn.text);
                           setNotice(t("ai.savedNote"));
@@ -424,7 +451,6 @@ export default function AiPanel(props: {
                   }
                   onRegenerate={!running && i === chat.turns.length - 1 ? regenerate : undefined}
                   onNavigate={props.onNavigate}
-                  onOpenMap={setMapView}
                 />
               ),
             )}
@@ -447,34 +473,6 @@ export default function AiPanel(props: {
               </div>
             )}
             <div className="ai-input">
-              <div className="menu-anchor">
-                <button
-                  className={`ai-tool${mapMenu ? " on" : ""}`}
-                  title={t("mm.create")}
-                  aria-label={t("mm.create")}
-                  disabled={running}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMapMenu((m) => !m);
-                  }}
-                >
-                  <Icon name="mindmap" size={17} />
-                </button>
-                {mapMenu && (
-                  <div className="menu dropup" onClick={(e) => e.stopPropagation()}>
-                    <div className="menu-label">{t("mm.create")}</div>
-                    <button onClick={() => (setMapMenu(false), mapChapter())} disabled={!location}>
-                      <Icon name={flow ? "bookOpen" : "fitPage"} /> {flow ? t("mm.scopeChapter") : t("mm.scopePages")}
-                    </button>
-                    <button onClick={() => (setMapMenu(false), mapBook())}>
-                      <Icon name="library" /> {t("mm.scopeBook")}
-                    </button>
-                    <button onClick={() => (setMapMenu(false), mapConversation())} disabled={!hasConversation}>
-                      <Icon name="message" /> {t("mm.scopeConversation")}
-                    </button>
-                  </div>
-                )}
-              </div>
               <textarea
                 ref={input}
                 rows={1}
@@ -511,7 +509,7 @@ export default function AiPanel(props: {
               <span className="ai-card-title">{flow ? t("ai.summarizeChapter") : t("ai.summarizePage")}</span>
               <span className="muted small ellipsis">{here ?? ""}</span>
             </button>
-            <button className="ai-card" onClick={askBookSummary} disabled={summary?.status === "running"}>
+            <button className="ai-card" onClick={() => askEstimate("summary")} disabled={summary?.status === "running"}>
               <Icon name="library" size={18} />
               <span className="ai-card-title">{t("ai.summarizeBook")}</span>
               <span className="muted small ellipsis">{book.title}</span>
@@ -559,6 +557,94 @@ export default function AiPanel(props: {
         </div>
       )}
 
+      {tab === "map" && (
+        <div className="ai-scroll" ref={body}>
+          <div className="ai-cards three">
+            <button className="ai-card" onClick={mapHere} disabled={mapBusy || !location}>
+              <Icon name={flow ? "bookOpen" : "fitPage"} size={18} />
+              <span className="ai-card-title">{flow ? t("mm.scopeChapter") : t("mm.scopePages")}</span>
+              <span className="muted small ellipsis">{here ?? ""}</span>
+            </button>
+            <button className="ai-card" onClick={() => askEstimate("mindmap")} disabled={mapBusy}>
+              <Icon name="library" size={18} />
+              <span className="ai-card-title">{t("mm.scopeBook")}</span>
+              <span className="muted small ellipsis">{book.title}</span>
+            </button>
+            <button className="ai-card" onClick={mapConversation} disabled={mapBusy || conversationTurns.length === 0}>
+              <Icon name="message" size={18} />
+              <span className="ai-card-title">{t("mm.scopeConversation")}</span>
+              <span className="muted small ellipsis">{t("mm.messages", { n: conversationTurns.length })}</span>
+            </button>
+          </div>
+          {!map && <p className="muted small ai-hint">{t("mm.emptyHint")}</p>}
+          {map && (
+            <div className="ai-result">
+              <div className="ai-result-title">
+                <Icon name="mindmap" size={15} />
+                <span className="ellipsis">{map.title}</span>
+                <span className="badge-soft">{map.scopeLabel}</span>
+                {map.cached && <span className="badge-soft">{t("ai.cached")}</span>}
+              </div>
+              {map.progress && <ProgressBar progress={map.progress} />}
+              {map.outline ? (
+                <MindMapPreview
+                  outline={map.outline}
+                  title={map.title}
+                  streaming={map.status === "running"}
+                  svgRef={mapSvg}
+                  onOpen={() => setViewing(map)}
+                />
+              ) : (
+                map.status === "running" && !map.progress && <Dots />
+              )}
+              {map.error && <div className="ai-error">{map.error}</div>}
+              {map.status === "stopped" && <div className="muted small">{t("ai.stopped")}</div>}
+              <div className="msg-actions visible wrap">
+                {map.status === "running" ? (
+                  <button onClick={() => stop(map.taskId)}>
+                    <Icon name="stop" size={12} filled /> {t("common.stop")}
+                  </button>
+                ) : (
+                  <>
+                    {map.outline && (
+                      <>
+                        <button onClick={() => setViewing(map)}>
+                          <Icon name="maximize" size={13} /> {t("mm.open")}
+                        </button>
+                        <button onClick={() => copy(outlineMarkdown(map.outline, map.title))}>
+                          <Icon name="copy" size={13} /> {t("mm.copyOutline")}
+                        </button>
+                        <button onClick={() => exportMap(map, "png")}>
+                          <Icon name="filePlus" size={13} /> PNG
+                        </button>
+                        <button onClick={() => exportMap(map, "svg")}>
+                          <Icon name="filePlus" size={13} /> SVG
+                        </button>
+                      </>
+                    )}
+                    <button onClick={() => drawMap(map.scope, map.title, map.scopeLabel, map)} disabled={mapBusy}>
+                      <Icon name="refresh" size={13} /> {t("ai.regenerate")}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+          {maps.length > 1 && (
+            <div className="mm-history">
+              <div className="panel-label">{t("mm.history")}</div>
+              {[...maps].reverse().map((m) => (
+                <button key={m.id} className={`mm-history-item${m.id === mapId ? " on" : ""}`} onClick={() => setMapId(m.id)}>
+                  <Icon name="mindmap" size={13} />
+                  <span className="ellipsis">{m.title}</span>
+                  <span className="muted small">{m.scopeLabel}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {notice && (
         <div className="ai-notice" onClick={() => setNotice(null)}>
           {notice}
@@ -578,7 +664,7 @@ export default function AiPanel(props: {
                 onClick={() => {
                   const purpose = estimate.purpose;
                   setEstimate(null);
-                  if (purpose === "mindmap") drawMap({ kind: "book" }, book.title, t("mm.requestBook"));
+                  if (purpose === "mindmap") drawMap({ kind: "book" }, book.title, t("mm.scopeBook"));
                   else startSummary(t("ai.bookSummary"), { kind: "summarizeBook", bookId: book.id });
                 }}
               >
@@ -607,14 +693,7 @@ export default function AiPanel(props: {
           )}
         </Modal>
       )}
-      {mapView && (
-        <MindMapViewer
-          outline={mapView.outline}
-          title={mapView.title}
-          onCite={mapView.sources?.length ? (n) => mapView.sources?.[n - 1] && props.onNavigate(mapView.sources[n - 1].location) : undefined}
-          onClose={() => setMapView(null)}
-        />
-      )}
+      {viewing && <MindMapViewer outline={viewing.outline} title={viewing.title} onClose={() => setViewing(null)} />}
     </aside>
   );
 }
@@ -677,50 +756,23 @@ function Answer(props: {
   onNote?: () => void;
   onRegenerate?: () => void;
   onNavigate: (loc: Location) => void;
-  onOpenMap: (view: MapView) => void;
 }) {
   const { turn } = props;
   const sources = turn.sources ?? [];
-  const onCite = sources.length ? (n: number) => sources[n - 1] && props.onNavigate(sources[n - 1].location) : undefined;
-  const cite = onCite
-    ? { count: sources.length, onCite, title: (n: number) => `${sources[n - 1].title} — ${sources[n - 1].excerpt}` }
+  const cite = sources.length
+    ? {
+        count: sources.length,
+        onCite: (n: number) => sources[n - 1] && props.onNavigate(sources[n - 1].location),
+        title: (n: number) => `${sources[n - 1].title} — ${sources[n - 1].excerpt}`,
+      }
     : undefined;
-  // A mind map the model wrote in a ```mindmap block of an ordinary answer.
-  const fence: FenceRenderer = (lang, code) =>
-    lang === "mindmap" ? (
-      <MindMapCard
-        outline={code}
-        title={t("mm.title")}
-        streaming={props.streaming}
-        onOpen={() => props.onOpenMap({ outline: code, title: t("mm.title"), sources })}
-      />
-    ) : null;
-  const map = turn.mindmap;
-  const kind = map ? "mindmap" : props.translation ? "translation" : "";
   return (
-    <div className={`msg ai ${kind}${props.streaming ? " streaming" : ""}`}>
+    <div className={`msg ai${props.translation ? " translation" : ""}${props.streaming ? " streaming" : ""}`}>
       <div className="msg-head">
-        <Icon name={map ? "mindmap" : props.translation ? "languages" : "sparkles"} size={13} />
-        <span className="ellipsis">{map ? map.title : props.translation ? t("ai.translation") : "AI"}</span>
-        {map?.cached && <span className="badge-soft">{t("ai.cached")}</span>}
+        <Icon name={props.translation ? "languages" : "sparkles"} size={13} />
+        <span>{props.translation ? t("ai.translation") : "AI"}</span>
       </div>
-      {turn.progress && <ProgressBar progress={turn.progress} />}
-      {map ? (
-        turn.text ? (
-          <MindMapCard
-            outline={turn.text}
-            title={map.title}
-            streaming={props.streaming}
-            onOpen={() => props.onOpenMap({ outline: turn.text, title: map.title })}
-          />
-        ) : (
-          props.streaming && !turn.progress && <Dots />
-        )
-      ) : turn.text ? (
-        <Markdown text={turn.text} cite={cite} fence={fence} />
-      ) : (
-        props.streaming && <Dots />
-      )}
+      {turn.text ? <Markdown text={turn.text} cite={cite} /> : props.streaming && <Dots />}
       {sources.length > 0 && !props.streaming && (
         <details className="msg-sources">
           <summary>{t("ai.sources", { n: sources.length })}</summary>
@@ -738,7 +790,7 @@ function Answer(props: {
       {turn.text && !props.streaming && (
         <div className={`msg-actions${props.last ? " visible" : ""}`}>
           <button onClick={props.onCopy}>
-            <Icon name="copy" size={13} /> {map ? t("mm.copyOutline") : t("common.copy")}
+            <Icon name="copy" size={13} /> {t("common.copy")}
           </button>
           {props.onNote && (
             <button onClick={props.onNote}>

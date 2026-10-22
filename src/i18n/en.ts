@@ -342,19 +342,11 @@ const en: Messages = {
   "reader.ask": "Ask",
   "reader.askTitle": "Ask AI about the selected text",
 
-  "mm.title": "Mind map",
-  "mm.create": "Create a mind map",
   "mm.scopeChapter": "This chapter",
   "mm.scopePages": "These pages",
   "mm.scopeBook": "Whole book",
   "mm.scopeConversation": "This conversation",
-  "mm.requestChapter": "Mind map of “{title}”",
-  "mm.requestPages": "Mind map of the pages around {title}",
-  "mm.requestBook": "Mind map of the whole book",
-  "mm.requestConversation": "Turn this conversation into a mind map",
   "mm.conversationTitle": "Conversation",
-  "mm.suggestChapter": "Make a mind map of this chapter",
-  "mm.suggestPages": "Make a mind map of these pages",
   "mm.bookTitle": "Mind map of the book",
   "mm.bookPlan": "Each part is summarized first (existing summaries are reused), then the mind map is drawn from them.",
   "mm.open": "Open",
@@ -369,6 +361,10 @@ const en: Messages = {
   "edit.keepGroup": "Keep their groups",
   "edit.newGroupOption": "New group…",
   "org.moveTo": "Move to group",
+  "ai.mapTab": "Mind map",
+  "mm.emptyHint": "Choose what to map. Chapter and book maps are cached per model and shown instantly next time.",
+  "mm.history": "Drawn this session",
+  "mm.messages": "{n} messages",
 };
 
 export default en;

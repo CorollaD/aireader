@@ -342,19 +342,11 @@ const fr: Messages = {
   "reader.ask": "Question",
   "reader.askTitle": "Interroger l'IA sur le texte sélectionné",
 
-  "mm.title": "Carte mentale",
-  "mm.create": "Créer une carte mentale",
   "mm.scopeChapter": "Ce chapitre",
   "mm.scopePages": "Ces pages",
   "mm.scopeBook": "Tout le livre",
   "mm.scopeConversation": "Cette discussion",
-  "mm.requestChapter": "Carte mentale de « {title} »",
-  "mm.requestPages": "Carte mentale des pages autour de la {title}",
-  "mm.requestBook": "Carte mentale de tout le livre",
-  "mm.requestConversation": "Transformer cette discussion en carte mentale",
   "mm.conversationTitle": "Discussion",
-  "mm.suggestChapter": "Créer une carte mentale de ce chapitre",
-  "mm.suggestPages": "Créer une carte mentale de ces pages",
   "mm.bookTitle": "Carte mentale du livre",
   "mm.bookPlan": "Chaque partie est d'abord résumée (les résumés existants sont réutilisés), puis la carte est tracée à partir d'eux.",
   "mm.open": "Ouvrir",
@@ -369,6 +361,10 @@ const fr: Messages = {
   "edit.keepGroup": "Garder leurs groupes",
   "edit.newGroupOption": "Nouveau groupe…",
   "org.moveTo": "Déplacer vers le groupe",
+  "ai.mapTab": "Carte",
+  "mm.emptyHint": "Choisissez ce qu'il faut représenter. Les cartes de chapitre et du livre sont mises en cache par modèle et s'affichent aussitôt la fois suivante.",
+  "mm.history": "Créées pendant cette session",
+  "mm.messages": "{n} messages",
 };
 
 export default fr;

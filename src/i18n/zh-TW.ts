@@ -342,19 +342,11 @@ const zhTW: Messages = {
   "reader.ask": "提問",
   "reader.askTitle": "就選取的文字向 AI 提問",
 
-  "mm.title": "心智圖",
-  "mm.create": "產生心智圖",
   "mm.scopeChapter": "本章",
   "mm.scopePages": "本頁附近",
   "mm.scopeBook": "全書",
   "mm.scopeConversation": "目前對話",
-  "mm.requestChapter": "產生「{title}」的心智圖",
-  "mm.requestPages": "產生{title}附近的心智圖",
-  "mm.requestBook": "產生全書心智圖",
-  "mm.requestConversation": "把目前對話整理成心智圖",
   "mm.conversationTitle": "對話要點",
-  "mm.suggestChapter": "產生本章心智圖",
-  "mm.suggestPages": "產生本頁附近的心智圖",
   "mm.bookTitle": "全書心智圖",
   "mm.bookPlan": "將先逐一摘要（已有的摘要直接使用），再據此產生全書心智圖。",
   "mm.open": "全螢幕檢視",
@@ -369,6 +361,10 @@ const zhTW: Messages = {
   "edit.keepGroup": "保持各自的分組",
   "edit.newGroupOption": "新增分組…",
   "org.moveTo": "移到分組",
+  "ai.mapTab": "心智圖",
+  "mm.emptyHint": "選擇要產生心智圖的範圍。產生過的本章和全書心智圖會依模型快取，下次直接顯示。",
+  "mm.history": "本次產生",
+  "mm.messages": "{n} 則訊息",
 };
 
 export default zhTW;

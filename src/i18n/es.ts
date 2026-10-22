@@ -342,19 +342,11 @@ const es: Messages = {
   "reader.ask": "Preguntar",
   "reader.askTitle": "Preguntar a la IA sobre el texto seleccionado",
 
-  "mm.title": "Mapa mental",
-  "mm.create": "Crear un mapa mental",
   "mm.scopeChapter": "Este capítulo",
   "mm.scopePages": "Estas páginas",
   "mm.scopeBook": "Todo el libro",
   "mm.scopeConversation": "Esta conversación",
-  "mm.requestChapter": "Mapa mental de «{title}»",
-  "mm.requestPages": "Mapa mental de las páginas en torno a la {title}",
-  "mm.requestBook": "Mapa mental de todo el libro",
-  "mm.requestConversation": "Convierte esta conversación en un mapa mental",
   "mm.conversationTitle": "Conversación",
-  "mm.suggestChapter": "Crear un mapa mental de este capítulo",
-  "mm.suggestPages": "Crear un mapa mental de estas páginas",
   "mm.bookTitle": "Mapa mental del libro",
   "mm.bookPlan": "Primero se resume cada parte (se reutilizan los resúmenes existentes) y después se dibuja el mapa a partir de ellos.",
   "mm.open": "Abrir",
@@ -369,6 +361,10 @@ const es: Messages = {
   "edit.keepGroup": "Mantener sus grupos",
   "edit.newGroupOption": "Nuevo grupo…",
   "org.moveTo": "Mover a grupo",
+  "ai.mapTab": "Mapa",
+  "mm.emptyHint": "Elige qué representar. Los mapas de capítulos y del libro se guardan en caché por modelo y se muestran al instante la próxima vez.",
+  "mm.history": "Creados en esta sesión",
+  "mm.messages": "{n} mensajes",
 };
 
 export default es;

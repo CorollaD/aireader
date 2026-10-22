@@ -209,16 +209,13 @@ export function installMock() {
             return null;
           }
           if (task.kind === "ask") {
-            const wantsMap = task.history[task.history.length - 1]?.text.includes("导图");
             const sources: Source[] = [0, 1, 2].map((c) => ({
               n: c + 1,
               title: `第${c + 1}回 示例章节`,
               location: { kind: "flow", chapter: c, block: 3 },
               excerpt: "话说天下大势，分久必合，合久必分。周末七国分争，并入于秦。",
             }));
-            const answer = wantsMap
-              ? "```mindmap\n- 曹操\n  - 身份\n    - 魏武帝 [1]\n  - 事迹\n    - 煮酒论英雄 [2]\n    - 赤壁之战 [3]\n  - 评价\n    - 治世之能臣，乱世之奸雄\n```\n以上是关于曹操的思维导图。"
-              : task.history.length > 1 ? "继续说明：后来**楚汉相争**，又并入于汉 [2]。" : "开篇点明了全书主旨：**天下大势，分久必合，合久必分** [1]。\n\n- 周末七国分争，并入于秦 [1]\n- 楚汉分争，又并入于汉 [2][3]";
+            const answer = task.history.length > 1 ? "继续说明：后来**楚汉相争**，又并入于汉 [2]。" : "开篇点明了全书主旨：**天下大势，分久必合，合久必分** [1]。\n\n- 周末七国分争，并入于秦 [1]\n- 楚汉分争，又并入于汉 [2][3]";
             stream(a.onEvent as { id: number }, answer, false, sources);
             return null;
           }

@@ -40,10 +40,7 @@ function inline(text: string, cite?: Cite): ReactNode[] {
   return out;
 }
 
-/** Renders a fenced block of the given language specially (e.g. ```mindmap); null = as code. */
-export type FenceRenderer = (lang: string, code: string) => ReactNode | null;
-
-export default function Markdown({ text, cite, fence }: { text: string; cite?: Cite; fence?: FenceRenderer }) {
+export default function Markdown({ text, cite }: { text: string; cite?: Cite }) {
   const span = (t: string) => inline(t, cite);
   const lines = text.replace(/\r/g, "").split("\n");
   const blocks: ReactNode[] = [];
@@ -56,13 +53,11 @@ export default function Markdown({ text, cite, fence }: { text: string; cite?: C
       continue;
     }
     if (line.startsWith("```")) {
-      const lang = line.slice(3).trim().toLowerCase();
       const code: string[] = [];
       i++;
       while (i < lines.length && !lines[i].startsWith("```")) code.push(lines[i++]);
       i++;
-      const special = fence?.(lang, code.join("\n"));
-      blocks.push(special ? <div key={key++}>{special}</div> : <pre key={key++}>{code.join("\n")}</pre>);
+      blocks.push(<pre key={key++}>{code.join("\n")}</pre>);
       continue;
     }
     const heading = /^(#{1,6})\s+(.*)$/.exec(line);

@@ -509,20 +509,11 @@ pub enum MindMapScope {
     },
 }
 
-/// How a mind map is written, shared by the mind-map task and chat answers.
+/// How the mind-map task asks for the outline.
 pub const MIND_MAP_FORMAT: &str = "Write the mind map as a nested Markdown bullet list: the \
      first line is a single root item naming the topic, and each level below is indented by \
      two spaces. Use at most 4 levels and about 60 items, each a short phrase (no sentences). \
      Group related ideas under clear branch names. Output only the list.";
-
-/// Added to chat prompts so a reader can ask for a mind map in conversation.
-fn chat_mind_map_note() -> String {
-    format!(
-        "\n\nIf the reader asks for a mind map, reply with one fenced code block whose info \
-         string is `mindmap`, containing the outline. {MIND_MAP_FORMAT} Citations like [n] may \
-         follow an item. You may add one short sentence after the block."
-    )
-}
 
 /// Keeps only the outline from a model's mind-map reply: the contents of a fenced block if
 /// there is one, list items, and headings (turned into list levels).
@@ -710,9 +701,8 @@ pub async fn chat(
     history: &[ChatTurn],
 ) -> Result<String> {
     let mut system = format!(
-        "{}{}\n\nBook: \"{book_title}\"\nThe reader selected this passage in the book:\n<selection>\n{selection}\n</selection>",
-        r.system(),
-        chat_mind_map_note()
+        "{}\n\nBook: \"{book_title}\"\nThe reader selected this passage in the book:\n<selection>\n{selection}\n</selection>",
+        r.system()
     );
     if !context.trim().is_empty() && context.trim() != selection.trim() {
         system.push_str(&format!(
@@ -854,7 +844,6 @@ pub async fn ask(
          don't contain the answer, say so briefly and answer only what they support.",
         r.system()
     );
-    system.push_str(&chat_mind_map_note());
     if let Some(here) = here {
         system.push_str(&format!(
             " The reader is currently in \"{here}\"; \"this chapter\" refers to it."

@@ -1,5 +1,5 @@
-// Mind map rendering: an SVG tree (root on the left), a preview card for the AI chat, and a
-// full-window viewer with panning, zooming, collapsing and export.
+// Mind map rendering: an SVG tree (root on the left), a preview for the AI panel's mind-map tab,
+// and a full-window viewer with panning, zooming, collapsing and export.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, errorText } from "../api";
@@ -37,7 +37,6 @@ function Svg(props: {
   collapsed: Set<string>;
   theme: Theme;
   onToggle?: (id: string) => void;
-  onCite?: (n: number) => void;
   svgRef?: React.Ref<SVGSVGElement>;
   className?: string;
   style?: React.CSSProperties;
@@ -75,14 +74,14 @@ function Svg(props: {
           );
         })}
         {nodes.map((p) => (
-          <NodeView key={p.node.id} p={p} theme={theme} onToggle={props.onToggle} onCite={props.onCite} />
+          <NodeView key={p.node.id} p={p} theme={theme} onToggle={props.onToggle} />
         ))}
       </g>
     </svg>
   );
 }
 
-function NodeView(props: { p: Placed; theme: Theme; onToggle?: (id: string) => void; onCite?: (n: number) => void }) {
+function NodeView(props: { p: Placed; theme: Theme; onToggle?: (id: string) => void }) {
   const { p, theme } = props;
   const color = colorOf(p, theme);
   const f = fontOf(p.depth);
@@ -108,14 +107,7 @@ function NodeView(props: { p: Placed; theme: Theme; onToggle?: (id: string) => v
         const cx = padX + p.lastW + i * CITE_W + CITE_W / 2 + 2;
         const cy = padY + lineH * (p.lines.length - 1) + lineH * 0.45;
         return (
-          <g
-            key={n}
-            className={props.onCite ? "mm-cite clickable" : "mm-cite"}
-            onClick={(e) => {
-              e.stopPropagation();
-              props.onCite?.(n);
-            }}
-          >
+          <g key={n} className="mm-cite">
             <circle cx={cx} cy={cy} r={7.5} fill={theme.accent} fillOpacity={0.18} />
             <text x={cx} y={cy + 3.5} fontSize={10} fontWeight={600} textAnchor="middle" fill={theme.accent}>
               {n}
@@ -182,13 +174,27 @@ async function pngBase64(svg: SVGSVGElement, theme: Theme): Promise<string> {
 
 const fileSafe = (s: string) => s.replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 80) || "mindmap";
 
-// --- chat card -----------------------------------------------------------------------------------
+/** Saves a drawn map through a save dialog; resolves to the path, or null if cancelled. */
+export async function saveMindMap(svg: SVGSVGElement, title: string, kind: "png" | "svg"): Promise<string | null> {
+  const theme = readTheme();
+  const data = kind === "svg" ? toBase64(new TextEncoder().encode(svgText(svg, theme))) : await pngBase64(svg, theme);
+  return api.saveExport(`${fileSafe(title)}.${kind}`, kind, data);
+}
 
-export function MindMapCard(props: {
+/** The outline as clean Markdown, for copying. */
+export function outlineMarkdown(outline: string, title: string): string {
+  const root = parseOutline(outline, title);
+  return root ? toMarkdown(root) : outline;
+}
+
+// --- preview -----------------------------------------------------------------------------------
+
+/** The whole map scaled to the panel width; clicking opens the viewer. */
+export function MindMapPreview(props: {
   outline: string;
   title: string;
   streaming: boolean;
-  onCite?: (n: number) => void;
+  svgRef?: React.Ref<SVGSVGElement>;
   onOpen: () => void;
 }) {
   const root = useMemo(() => parseOutline(props.outline, props.title), [props.outline, props.title]);
@@ -197,7 +203,7 @@ export function MindMapCard(props: {
   if (!root) return null;
   return (
     <button className="mm-card" onClick={props.onOpen} title={t("mm.open")}>
-      <Svg root={root} collapsed={none} theme={theme} className="mm-preview" />
+      <Svg root={root} collapsed={none} theme={theme} className="mm-preview" svgRef={props.svgRef} />
       {!props.streaming && (
         <span className="mm-open">
           <Icon name="maximize" size={13} /> {t("mm.open")}
@@ -209,7 +215,7 @@ export function MindMapCard(props: {
 
 // --- full-window viewer --------------------------------------------------------------------------
 
-export function MindMapViewer(props: { outline: string; title: string; onCite?: (n: number) => void; onClose: () => void }) {
+export function MindMapViewer(props: { outline: string; title: string; onClose: () => void }) {
   const root = useMemo(() => parseOutline(props.outline, props.title), [props.outline, props.title]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [view, setView] = useState({ x: 0, y: 0, k: 1 });
@@ -269,9 +275,7 @@ export function MindMapViewer(props: { outline: string; title: string; onCite?: 
     setMenu(false);
     if (!svg.current) return;
     try {
-      const data =
-        kind === "svg" ? toBase64(new TextEncoder().encode(svgText(svg.current, theme))) : await pngBase64(svg.current, theme);
-      const path = await api.saveExport(`${fileSafe(props.title)}.${kind}`, kind, data);
+      const path = await saveMindMap(svg.current, props.title, kind);
       if (path) setNotice(t("reader.exported", { path }));
     } catch (e) {
       setNotice(errorText(e));
@@ -359,14 +363,6 @@ export function MindMapViewer(props: { outline: string; title: string; onCite?: 
             theme={theme}
             svgRef={svg}
             onToggle={toggle}
-            onCite={
-              props.onCite
-                ? (n) => {
-                    props.onCite!(n);
-                    props.onClose();
-                  }
-                : undefined
-            }
           />
         </div>
         <div className="mm-hint muted small">{t("mm.hint")}</div>
