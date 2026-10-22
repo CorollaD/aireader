@@ -47,6 +47,9 @@ export const api = {
   saveAnnotations: (id: string, annotations: Annotations) => invoke<void>("save_annotations", { id, annotations }),
   /** Opens a save dialog; resolves to the written path, or null if cancelled. */
   exportNotes: (id: string) => invoke<string | null>("export_notes", { id }),
+  /** Saves base64 data through a save dialog; resolves to the path, or null if cancelled. */
+  saveExport: (fileName: string, extension: string, data: string) =>
+    invoke<string | null>("save_export", { fileName, extension, data }),
   addReadingTime: (id: string, seconds: number, speed: number | null) =>
     invoke<Book>("add_reading_time", { id, seconds, speed }),
   aiGetConfig: () => invoke<AiStatus>("ai_get_config"),

@@ -1,17 +1,19 @@
 // Reader side panel for AI. "Chat" answers questions about the whole book from retrieved
 // passages (with [n] citations that jump to the text), or about a selected passage (explain,
-// translate, ask). "Summary" summarises the chapter, page or whole book.
+// translate, ask), and draws mind maps of the chapter, the book or the conversation. "Summary"
+// summarises the chapter, page or whole book.
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, errorText, runAiTask } from "../api";
-import type { AiEvent, AiTask, BookEstimate, ChatAction, Location, OpenedBook, Source } from "../types";
+import type { AiEvent, AiTask, BookEstimate, ChatAction, Location, MindMapScope, OpenedBook, Source } from "../types";
 import { Modal } from "../ui";
 import type { TextRange } from "../reader/anchors";
 import { formatNumber, t, type MessageKey } from "../i18n";
 import { Icon } from "../icons";
 import { describe } from "../reader/locations";
 import { useAi } from "./AiContext";
-import Markdown from "./Markdown";
+import Markdown, { type FenceRenderer } from "./Markdown";
+import { MindMapCard, MindMapViewer } from "./MindMap";
 
 /** A passage the conversation is about (from the selection toolbar). */
 export interface Quote {
@@ -29,11 +31,15 @@ export interface ChatRequest extends Quote {
 }
 
 type Status = "idle" | "running" | "done" | "error" | "stopped";
+type Progress = { done: number; total: number; label: string };
 
 interface Turn {
   role: "user" | "assistant";
   text: string;
   sources?: Source[];
+  /** Set for answers drawn by the mind-map task. */
+  mindmap?: { title: string; scope: MindMapScope; cached?: boolean };
+  progress?: Progress | null;
 }
 
 interface Chat {
@@ -48,11 +54,18 @@ interface Summary {
   title: string;
   text: string;
   status: Status;
-  progress: { done: number; total: number; label: string } | null;
+  progress: Progress | null;
   cached: boolean;
   error: string | null;
   taskId: string | null;
   task: AiTask;
+}
+
+/** A mind map opened in the full-window viewer. */
+interface MapView {
+  outline: string;
+  title: string;
+  sources?: Source[];
 }
 
 const ACTION_LABEL: Record<ChatAction, MessageKey> = {
@@ -77,8 +90,10 @@ export default function AiPanel(props: {
   const [chat, setChat] = useState<Chat>(EMPTY_CHAT);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [question, setQuestion] = useState("");
-  const [estimate, setEstimate] = useState<BookEstimate | null>(null);
+  const [estimate, setEstimate] = useState<{ data: BookEstimate; purpose: "summary" | "mindmap" } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [mapMenu, setMapMenu] = useState(false);
+  const [mapView, setMapView] = useState<MapView | null>(null);
   const body = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
 
@@ -87,19 +102,8 @@ export default function AiPanel(props: {
 
   // --- chat ------------------------------------------------------------------------------------
 
-  /** Runs the conversation whose last turn is the (empty) answer being generated. */
-  const run = (c: Chat) => {
-    const history = c.turns.slice(0, -1).map(({ role, text }) => ({ role, text }));
-    const task: AiTask = c.quote
-      ? {
-          kind: "chat",
-          bookTitle: book.title,
-          selection: c.quote.selection,
-          context: c.quote.context,
-          action: c.quote.action,
-          history,
-        }
-      : { kind: "ask", bookId: book.id, location, history };
+  /** Runs `task`; its output fills the last turn of `c`. */
+  const start = (c: Chat, task: AiTask) => {
     const taskId = runAiTask(task, (e: AiEvent) =>
       setChat((cur) => {
         if (cur.taskId !== taskId) return cur;
@@ -109,20 +113,41 @@ export default function AiPanel(props: {
           case "sources":
             turns[turns.length - 1] = { ...last, sources: e.sources };
             return { ...cur, turns };
-          case "delta":
-            turns[turns.length - 1] = { ...last, text: last.text + e.text };
+          case "progress":
+            turns[turns.length - 1] = { ...last, progress: e };
             return { ...cur, turns };
-          case "done":
-            turns[turns.length - 1] = { ...last, text: e.text };
+          case "delta":
+            turns[turns.length - 1] = { ...last, text: last.text + e.text, progress: null };
+            return { ...cur, turns };
+          case "done": {
+            const mindmap = last.mindmap && { ...last.mindmap, cached: e.cached };
+            turns[turns.length - 1] = { ...last, text: e.text, progress: null, mindmap };
             return { ...cur, turns, status: "done" };
+          }
           case "error":
             return { ...cur, turns: turns.slice(0, -1), status: "error", error: e.message };
-          default:
-            return cur;
         }
       }),
     );
     setChat({ ...c, status: "running", error: null, taskId });
+  };
+
+  /** Answers the conversation whose last turn is the (empty) answer being generated. */
+  const run = (c: Chat) => {
+    const history = c.turns.slice(0, -1).map(({ role, text }) => ({ role, text }));
+    start(
+      c,
+      c.quote
+        ? {
+            kind: "chat",
+            bookTitle: book.title,
+            selection: c.quote.selection,
+            context: c.quote.context,
+            action: c.quote.action,
+            history,
+          }
+        : { kind: "ask", bookId: book.id, location, history },
+    );
   };
 
   const send = async (text: string) => {
@@ -134,9 +159,56 @@ export default function AiPanel(props: {
     run({ ...chat, turns: [...chat.turns, { role: "user", text: q }, { role: "assistant", text: "" }] });
   };
 
+  /** Draws a mind map as a new exchange, or in place of the last answer (`replace`). */
+  const drawMap = async (scope: MindMapScope, title: string, request: string, opts: { refresh?: boolean; replace?: boolean } = {}) => {
+    if (chat.status === "running") return;
+    if (!(await ai.ensureConsent())) return;
+    setTab("chat");
+    const answer: Turn = { role: "assistant", text: "", mindmap: { title, scope } };
+    const turns = opts.replace ? [...chat.turns.slice(0, -1), answer] : [...chat.turns, { role: "user" as const, text: request }, answer];
+    start({ ...chat, turns }, { kind: "mindMap", bookId: book.id, scope, refresh: opts.refresh });
+  };
+
+  const mapChapter = () => {
+    if (!location) return;
+    if (location.kind === "flow") {
+      const title = book.chapters[location.chapter]?.title || t("loc.chapter", { n: location.chapter + 1 });
+      drawMap({ kind: "chapter", chapter: location.chapter }, title, t("mm.requestChapter", { title }));
+    } else {
+      const from = Math.max(0, location.page - 1);
+      const to = Math.min(book.pages.length - 1, location.page + 1);
+      const title = t("loc.page", { n: location.page + 1 });
+      drawMap({ kind: "pages", from, to }, title, t("mm.requestPages", { title }));
+    }
+  };
+
+  const mapBook = async () => {
+    if (!(await ai.ensureConsent())) return;
+    try {
+      setEstimate({ data: await api.aiEstimateBook(book.id), purpose: "mindmap" });
+    } catch (e) {
+      setNotice(errorText(e));
+    }
+  };
+
+  const mapConversation = () => {
+    const text = chat.turns
+      .filter((turn) => turn.text && !turn.mindmap)
+      .map((turn) => `${turn.role === "user" ? "Q" : "A"}: ${turn.text}`)
+      .join("\n\n");
+    const material = chat.quote ? `> ${chat.quote.selection}\n\n${text}` : text;
+    const title = t("mm.conversationTitle");
+    drawMap({ kind: "text", title, text: material }, title, t("mm.requestConversation"));
+  };
+
   const regenerate = () => {
     if (chat.status === "running") return;
-    const turns = chat.turns[chat.turns.length - 1]?.role === "assistant" ? chat.turns.slice(0, -1) : chat.turns;
+    const last = chat.turns[chat.turns.length - 1];
+    if (last?.role === "assistant" && last.mindmap) {
+      drawMap(last.mindmap.scope, last.mindmap.title, "", { refresh: true, replace: true });
+      return;
+    }
+    const turns = last?.role === "assistant" ? chat.turns.slice(0, -1) : chat.turns;
     run({ ...chat, turns: [...turns, { role: "assistant", text: "" }] });
   };
 
@@ -220,7 +292,7 @@ export default function AiPanel(props: {
   const askBookSummary = async () => {
     if (!(await ai.ensureConsent())) return;
     try {
-      setEstimate(await api.aiEstimateBook(book.id));
+      setEstimate({ data: await api.aiEstimateBook(book.id), purpose: "summary" });
     } catch (e) {
       setNotice(errorText(e));
     }
@@ -296,12 +368,17 @@ export default function AiPanel(props: {
 
   const running = chat.status === "running";
   const lastAnswer = [...chat.turns].reverse().find((turn) => turn.role === "assistant" && turn.text);
-  const suggestions: MessageKey[] = flow
-    ? ["ai.suggestChapter", "ai.suggestPeople", "ai.suggestHard"]
-    : ["ai.suggestPage", "ai.suggestTerms", "ai.suggestHard"];
+  const suggestions: { label: string; run: () => void }[] = [
+    ...(flow
+      ? (["ai.suggestChapter", "ai.suggestPeople"] as MessageKey[])
+      : (["ai.suggestPage", "ai.suggestTerms"] as MessageKey[])
+    ).map((k) => ({ label: t(k), run: () => send(t(k)) })),
+    { label: flow ? t("mm.suggestChapter") : t("mm.suggestPages"), run: mapChapter },
+  ];
+  const hasConversation = chat.turns.some((turn) => turn.text && !turn.mindmap);
 
   return (
-    <aside className="ai-panel">
+    <aside className="ai-panel" onClick={() => setMapMenu(false)}>
       {header}
 
       {tab === "chat" && (
@@ -315,9 +392,9 @@ export default function AiPanel(props: {
                 <div className="ai-welcome-title">{t("ai.emptyTitle")}</div>
                 <p className="muted small">{t("ai.emptyHint")}</p>
                 <div className="ai-suggestions">
-                  {suggestions.map((k) => (
-                    <button key={k} onClick={() => send(t(k))}>
-                      {t(k)}
+                  {suggestions.map((s) => (
+                    <button key={s.label} onClick={s.run}>
+                      {s.label}
                     </button>
                   ))}
                 </div>
@@ -338,7 +415,7 @@ export default function AiPanel(props: {
                   last={i === chat.turns.length - 1}
                   onCopy={() => copy(turn.text)}
                   onNote={
-                    chat.quote?.anchor && turn.text
+                    chat.quote?.anchor && turn.text && !turn.mindmap
                       ? () => {
                           props.onSaveNote(chat.quote!, turn.text);
                           setNotice(t("ai.savedNote"));
@@ -347,6 +424,7 @@ export default function AiPanel(props: {
                   }
                   onRegenerate={!running && i === chat.turns.length - 1 ? regenerate : undefined}
                   onNavigate={props.onNavigate}
+                  onOpenMap={setMapView}
                 />
               ),
             )}
@@ -369,6 +447,34 @@ export default function AiPanel(props: {
               </div>
             )}
             <div className="ai-input">
+              <div className="menu-anchor">
+                <button
+                  className={`ai-tool${mapMenu ? " on" : ""}`}
+                  title={t("mm.create")}
+                  aria-label={t("mm.create")}
+                  disabled={running}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMapMenu((m) => !m);
+                  }}
+                >
+                  <Icon name="mindmap" size={17} />
+                </button>
+                {mapMenu && (
+                  <div className="menu dropup" onClick={(e) => e.stopPropagation()}>
+                    <div className="menu-label">{t("mm.create")}</div>
+                    <button onClick={() => (setMapMenu(false), mapChapter())} disabled={!location}>
+                      <Icon name={flow ? "bookOpen" : "fitPage"} /> {flow ? t("mm.scopeChapter") : t("mm.scopePages")}
+                    </button>
+                    <button onClick={() => (setMapMenu(false), mapBook())}>
+                      <Icon name="library" /> {t("mm.scopeBook")}
+                    </button>
+                    <button onClick={() => (setMapMenu(false), mapConversation())} disabled={!hasConversation}>
+                      <Icon name="message" /> {t("mm.scopeConversation")}
+                    </button>
+                  </div>
+                )}
+              </div>
               <textarea
                 ref={input}
                 rows={1}
@@ -418,16 +524,7 @@ export default function AiPanel(props: {
                 <span className="ellipsis">{summary.title}</span>
                 {summary.cached && <span className="badge-soft">{t("ai.cached")}</span>}
               </div>
-              {summary.progress && (
-                <div className="ai-progress">
-                  <div className="bar">
-                    <div style={{ width: `${(summary.progress.done / Math.max(1, summary.progress.total)) * 100}%` }} />
-                  </div>
-                  <span className="muted small ellipsis">
-                    {summary.progress.done}/{summary.progress.total} · {summary.progress.label}
-                  </span>
-                </div>
-              )}
+              {summary.progress && <ProgressBar progress={summary.progress} />}
               {summary.text ? (
                 <div className={summary.status === "running" ? "streaming" : undefined}>
                   <Markdown text={summary.text} />
@@ -469,7 +566,7 @@ export default function AiPanel(props: {
       )}
       {estimate && (
         <Modal
-          title={t("ai.summarizeBook")}
+          title={estimate.purpose === "mindmap" ? t("mm.bookTitle") : t("ai.summarizeBook")}
           width={420}
           onClose={() => setEstimate(null)}
           footer={
@@ -479,8 +576,10 @@ export default function AiPanel(props: {
                 className="primary"
                 autoFocus
                 onClick={() => {
+                  const purpose = estimate.purpose;
                   setEstimate(null);
-                  startSummary(t("ai.bookSummary"), { kind: "summarizeBook", bookId: book.id });
+                  if (purpose === "mindmap") drawMap({ kind: "book" }, book.title, t("mm.requestBook"));
+                  else startSummary(t("ai.bookSummary"), { kind: "summarizeBook", bookId: book.id });
                 }}
               >
                 {t("common.start")}
@@ -488,25 +587,33 @@ export default function AiPanel(props: {
             </>
           }
         >
-          {estimate.bookCached ? (
+          {estimate.purpose === "summary" && estimate.data.bookCached ? (
             <p>{t("ai.bookCached")}</p>
           ) : (
             <>
               <p>
-                {estimate.cachedUnits > 0
-                  ? t("ai.bookUnitsCached", { n: estimate.units, cached: estimate.cachedUnits })
-                  : t("ai.bookUnits", { n: estimate.units })}{" "}
-                {t("ai.bookPlan")}
+                {estimate.data.cachedUnits > 0
+                  ? t("ai.bookUnitsCached", { n: estimate.data.units, cached: estimate.data.cachedUnits })
+                  : t("ai.bookUnits", { n: estimate.data.units })}{" "}
+                {estimate.purpose === "mindmap" ? t("mm.bookPlan") : t("ai.bookPlan")}
               </p>
               <p className="muted small" style={{ marginTop: 8 }}>
-                {t("ai.estimateTokens", { input: formatNumber(estimate.inputTokens), output: formatNumber(estimate.outputTokens) })}{" "}
-                {estimate.cost !== null &&
-                  (estimate.cost < 0.01 ? t("ai.estimateCostSmall") : t("ai.estimateCost", { cost: estimate.cost.toFixed(2) })) + " "}
+                {t("ai.estimateTokens", { input: formatNumber(estimate.data.inputTokens), output: formatNumber(estimate.data.outputTokens) })}{" "}
+                {estimate.data.cost !== null &&
+                  (estimate.data.cost < 0.01 ? t("ai.estimateCostSmall") : t("ai.estimateCost", { cost: estimate.data.cost.toFixed(2) })) + " "}
                 {t("ai.estimateNote")}
               </p>
             </>
           )}
         </Modal>
+      )}
+      {mapView && (
+        <MindMapViewer
+          outline={mapView.outline}
+          title={mapView.title}
+          onCite={mapView.sources?.length ? (n) => mapView.sources?.[n - 1] && props.onNavigate(mapView.sources[n - 1].location) : undefined}
+          onClose={() => setMapView(null)}
+        />
       )}
     </aside>
   );
@@ -522,15 +629,27 @@ function Dots() {
   );
 }
 
+function ProgressBar({ progress }: { progress: Progress }) {
+  return (
+    <div className="ai-progress">
+      <div className="bar">
+        <div style={{ width: `${(progress.done / Math.max(1, progress.total)) * 100}%` }} />
+      </div>
+      <span className="muted small ellipsis">
+        {progress.total > 1 && `${progress.done}/${progress.total} · `}
+        {progress.label}
+      </span>
+    </div>
+  );
+}
+
 function QuoteCard(props: { quote: Quote; onRemove: () => void; canRemove: boolean }) {
   const [open, setOpen] = useState(false);
   const long = props.quote.selection.length > 120;
   return (
     <div className="ai-quote-card">
       <div className="ai-quote-head">
-        <span className="badge-soft">
-          {props.quote.action ? t(ACTION_LABEL[props.quote.action]) : t("ai.actionAsk")}
-        </span>
+        <span className="badge-soft">{props.quote.action ? t(ACTION_LABEL[props.quote.action]) : t("ai.actionAsk")}</span>
         <span className="muted small">{t("ai.original")}</span>
         <span className="spacer" />
         {props.canRemove && (
@@ -558,23 +677,50 @@ function Answer(props: {
   onNote?: () => void;
   onRegenerate?: () => void;
   onNavigate: (loc: Location) => void;
+  onOpenMap: (view: MapView) => void;
 }) {
   const { turn } = props;
   const sources = turn.sources ?? [];
-  const cite = sources.length
-    ? {
-        count: sources.length,
-        onCite: (n: number) => props.onNavigate(sources[n - 1].location),
-        title: (n: number) => `${sources[n - 1].title} — ${sources[n - 1].excerpt}`,
-      }
+  const onCite = sources.length ? (n: number) => sources[n - 1] && props.onNavigate(sources[n - 1].location) : undefined;
+  const cite = onCite
+    ? { count: sources.length, onCite, title: (n: number) => `${sources[n - 1].title} — ${sources[n - 1].excerpt}` }
     : undefined;
+  // A mind map the model wrote in a ```mindmap block of an ordinary answer.
+  const fence: FenceRenderer = (lang, code) =>
+    lang === "mindmap" ? (
+      <MindMapCard
+        outline={code}
+        title={t("mm.title")}
+        streaming={props.streaming}
+        onOpen={() => props.onOpenMap({ outline: code, title: t("mm.title"), sources })}
+      />
+    ) : null;
+  const map = turn.mindmap;
+  const kind = map ? "mindmap" : props.translation ? "translation" : "";
   return (
-    <div className={`msg ai${props.translation ? " translation" : ""}${props.streaming ? " streaming" : ""}`}>
+    <div className={`msg ai ${kind}${props.streaming ? " streaming" : ""}`}>
       <div className="msg-head">
-        <Icon name={props.translation ? "languages" : "sparkles"} size={13} />
-        <span>{props.translation ? t("ai.translation") : "AI"}</span>
+        <Icon name={map ? "mindmap" : props.translation ? "languages" : "sparkles"} size={13} />
+        <span className="ellipsis">{map ? map.title : props.translation ? t("ai.translation") : "AI"}</span>
+        {map?.cached && <span className="badge-soft">{t("ai.cached")}</span>}
       </div>
-      {turn.text ? <Markdown text={turn.text} cite={cite} /> : props.streaming && <Dots />}
+      {turn.progress && <ProgressBar progress={turn.progress} />}
+      {map ? (
+        turn.text ? (
+          <MindMapCard
+            outline={turn.text}
+            title={map.title}
+            streaming={props.streaming}
+            onOpen={() => props.onOpenMap({ outline: turn.text, title: map.title })}
+          />
+        ) : (
+          props.streaming && !turn.progress && <Dots />
+        )
+      ) : turn.text ? (
+        <Markdown text={turn.text} cite={cite} fence={fence} />
+      ) : (
+        props.streaming && <Dots />
+      )}
       {sources.length > 0 && !props.streaming && (
         <details className="msg-sources">
           <summary>{t("ai.sources", { n: sources.length })}</summary>
@@ -592,7 +738,7 @@ function Answer(props: {
       {turn.text && !props.streaming && (
         <div className={`msg-actions${props.last ? " visible" : ""}`}>
           <button onClick={props.onCopy}>
-            <Icon name="copy" size={13} /> {t("common.copy")}
+            <Icon name="copy" size={13} /> {map ? t("mm.copyOutline") : t("common.copy")}
           </button>
           {props.onNote && (
             <button onClick={props.onNote}>

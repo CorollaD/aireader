@@ -63,6 +63,15 @@ pub enum AiTask {
     },
     /// A question about the whole book, answered from retrieved passages and the text around
     /// the reader's position. `history` ends with the user's newest message.
+    /// A mind map (a nested Markdown list) of part of the book or of given text.
+    #[serde(rename_all = "camelCase")]
+    MindMap {
+        book_id: String,
+        scope: MindMapScope,
+        /// Ignore a cached map and draw a new one.
+        #[serde(default)]
+        refresh: bool,
+    },
     #[serde(rename_all = "camelCase")]
     Ask {
         book_id: String,
@@ -404,18 +413,15 @@ pub async fn summarize_cached(
     Ok((s, false))
 }
 
-/// Whole-book summary: each unit (cached), then merged — in groups first if the unit
-/// summaries together exceed the budget.
-pub async fn summarize_book(
+/// Summaries of every unit (from the cache when possible), headed by their titles. Reports
+/// progress as it goes.
+async fn unit_summaries(
     r: &Runner<'_>,
     cache: &mut SummaryCache,
     book: &str,
     units: &[Unit],
-) -> Result<(String, bool)> {
+) -> Result<Vec<String>> {
     let model = r.cfg.model_key();
-    if let Some(s) = cache.get(&model, "book") {
-        return Ok((s.clone(), true));
-    }
     let mut summaries = Vec::with_capacity(units.len());
     for (i, unit) in units.iter().enumerate() {
         (r.emit)(AiEvent::Progress {
@@ -438,7 +444,11 @@ pub async fn summarize_book(
         total: units.len(),
         label: crate::t!("ai_combining"),
     });
-    // Merge in groups until everything fits in one request.
+    Ok(summaries)
+}
+
+/// Merges summaries in groups until all of them fit in one request.
+async fn condense(r: &Runner<'_>, book: &str, mut summaries: Vec<String>) -> Result<Vec<String>> {
     while estimate_tokens(&summaries.join("\n\n")) > r.budget && summaries.len() > 1 {
         let mut merged = Vec::new();
         for group in split_by_budget(&summaries.join("\n\n"), r.budget) {
@@ -452,6 +462,23 @@ pub async fn summarize_book(
         }
         summaries = merged;
     }
+    Ok(summaries)
+}
+
+/// Whole-book summary: each unit (cached), then merged — in groups first if the unit
+/// summaries together exceed the budget.
+pub async fn summarize_book(
+    r: &Runner<'_>,
+    cache: &mut SummaryCache,
+    book: &str,
+    units: &[Unit],
+) -> Result<(String, bool)> {
+    let model = r.cfg.model_key();
+    if let Some(s) = cache.get(&model, "book") {
+        return Ok((s.clone(), true));
+    }
+    let summaries = unit_summaries(r, cache, book, units).await?;
+    let summaries = condense(r, book, summaries).await?;
     let prompt = format!(
         "Below are summaries of the parts of the book \"{book}\". Write a summary of the whole book with: 1. its central theme (one paragraph); 2. its structure and how the parts connect; 3. the core ideas or main plot; 4. details worth noticing.\n\n{}",
         summaries.join("\n\n")
@@ -459,6 +486,179 @@ pub async fn summarize_book(
     let s = r.stream(prompt, MERGE_TOKENS).await?;
     cache.put(&model, "book", s.clone())?;
     Ok((s, false))
+}
+
+// --- mind maps -------------------------------------------------------------------------------
+
+/// What a mind map covers.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum MindMapScope {
+    Chapter {
+        chapter: usize,
+    },
+    Pages {
+        from: usize,
+        to: usize,
+    },
+    Book,
+    /// Free text, e.g. the current conversation.
+    Text {
+        title: String,
+        text: String,
+    },
+}
+
+/// How a mind map is written, shared by the mind-map task and chat answers.
+pub const MIND_MAP_FORMAT: &str = "Write the mind map as a nested Markdown bullet list: the \
+     first line is a single root item naming the topic, and each level below is indented by \
+     two spaces. Use at most 4 levels and about 60 items, each a short phrase (no sentences). \
+     Group related ideas under clear branch names. Output only the list.";
+
+/// Added to chat prompts so a reader can ask for a mind map in conversation.
+fn chat_mind_map_note() -> String {
+    format!(
+        "\n\nIf the reader asks for a mind map, reply with one fenced code block whose info \
+         string is `mindmap`, containing the outline. {MIND_MAP_FORMAT} Citations like [n] may \
+         follow an item. You may add one short sentence after the block."
+    )
+}
+
+/// Keeps only the outline from a model's mind-map reply: the contents of a fenced block if
+/// there is one, list items, and headings (turned into list levels).
+pub fn clean_outline(reply: &str) -> String {
+    let body = match reply.find("```") {
+        Some(start) => {
+            let after = &reply[start + 3..];
+            let after = after.split_once('\n').map_or("", |(_, rest)| rest);
+            after.split("```").next().unwrap_or(after)
+        }
+        None => reply,
+    };
+    let mut out = Vec::new();
+    for line in body.lines() {
+        let trimmed = line.trim_start();
+        let indent = line.len() - trimmed.len();
+        if let Some(rest) = trimmed.strip_prefix('#') {
+            let level = 1 + rest.chars().take_while(|&c| c == '#').count();
+            let text = rest.trim_start_matches('#').trim();
+            if !text.is_empty() {
+                out.push(format!("{}- {text}", "  ".repeat(level - 1)));
+            }
+        } else if let Some(item) = list_item(trimmed) {
+            out.push(format!("{}- {item}", " ".repeat(indent)));
+        }
+    }
+    out.join("\n")
+}
+
+/// The text of a bullet or numbered list item.
+fn list_item(line: &str) -> Option<&str> {
+    if let Some(rest) = line.strip_prefix(['-', '*', '+']) {
+        return rest.strip_prefix(' ').map(str::trim);
+    }
+    let digits = line.chars().take_while(char::is_ascii_digit).count();
+    if digits > 0 {
+        let rest = &line[digits..];
+        return rest
+            .strip_prefix(['.', ')'])
+            .and_then(|r| r.strip_prefix(' '))
+            .map(str::trim);
+    }
+    None
+}
+
+async fn draw_mind_map(r: &Runner<'_>, book: &str, topic: &str, material: &str) -> Result<String> {
+    let prompt = format!(
+        "Make a mind map of \"{topic}\" from the book \"{book}\", based on the material below. \
+         {MIND_MAP_FORMAT}\n\n<material>\n{material}\n</material>"
+    );
+    Ok(clean_outline(&r.stream(prompt, MERGE_TOKENS).await?))
+}
+
+/// A mind map of a chapter, pages, the whole book or given text. Maps of book content are
+/// cached per model; long material is summarised first (reusing cached summaries).
+pub async fn mind_map(
+    r: &Runner<'_>,
+    cache: &mut SummaryCache,
+    doc: &Document,
+    book: &str,
+    scope: MindMapScope,
+    refresh: bool,
+) -> Result<(String, bool)> {
+    let model = r.cfg.model_key();
+    let cached = |cache: &SummaryCache, key: &str| {
+        if refresh {
+            None
+        } else {
+            cache.get(&model, key).cloned()
+        }
+    };
+    let (key, topic, material) = match scope {
+        MindMapScope::Text { title, text } => {
+            let text: String = split_by_budget(&text, r.budget)
+                .into_iter()
+                .next()
+                .unwrap_or_default();
+            return Ok((draw_mind_map(r, book, &title, &text).await?, false));
+        }
+        MindMapScope::Book => {
+            if let Some(s) = cached(cache, "mindmap:book") {
+                return Ok((s, true));
+            }
+            let units = book_units(doc, r.budget)?;
+            let summaries = unit_summaries(r, cache, book, &units).await?;
+            let material = condense(r, book, summaries).await?.join("\n\n");
+            ("mindmap:book".to_owned(), book.to_owned(), material)
+        }
+        MindMapScope::Chapter { chapter } => {
+            let unit = chapter_unit(doc, chapter)?;
+            let key = format!("mindmap:{}", unit.key);
+            if let Some(s) = cached(cache, &key) {
+                return Ok((s, true));
+            }
+            let material = unit_material(r, cache, book, &unit).await?;
+            (key, unit.title, material)
+        }
+        MindMapScope::Pages { from, to } => {
+            let unit = pages_unit(doc, from, to)?;
+            let key = format!("mindmap:{}", unit.key);
+            if let Some(s) = cached(cache, &key) {
+                return Ok((s, true));
+            }
+            let material = unit_material(r, cache, book, &unit).await?;
+            (key, unit.title, material)
+        }
+    };
+    let outline = draw_mind_map(r, book, &topic, &material).await?;
+    if !outline.trim().is_empty() {
+        cache.put(&model, &key, outline.clone())?;
+    }
+    Ok((outline, false))
+}
+
+/// The unit's text when it fits, otherwise its (cached) summary.
+async fn unit_material(
+    r: &Runner<'_>,
+    cache: &mut SummaryCache,
+    book: &str,
+    unit: &Unit,
+) -> Result<String> {
+    if estimate_tokens(&unit.text) <= r.budget {
+        return Ok(unit.text.clone());
+    }
+    let model = r.cfg.model_key();
+    if let Some(s) = cache.get(&model, &unit.key) {
+        return Ok(s.clone());
+    }
+    (r.emit)(AiEvent::Progress {
+        done: 0,
+        total: 1,
+        label: crate::t!("ai_summarizing", title = unit.title),
+    });
+    let s = summarize_unit(r, book, unit, false).await?;
+    cache.put(&model, &unit.key, s.clone())?;
+    Ok(s)
 }
 
 /// Rough cost of a whole-book summary.
@@ -510,8 +710,9 @@ pub async fn chat(
     history: &[ChatTurn],
 ) -> Result<String> {
     let mut system = format!(
-        "{}\n\nBook: \"{book_title}\"\nThe reader selected this passage in the book:\n<selection>\n{selection}\n</selection>",
-        r.system()
+        "{}{}\n\nBook: \"{book_title}\"\nThe reader selected this passage in the book:\n<selection>\n{selection}\n</selection>",
+        r.system(),
+        chat_mind_map_note()
     );
     if !context.trim().is_empty() && context.trim() != selection.trim() {
         system.push_str(&format!(
@@ -653,6 +854,7 @@ pub async fn ask(
          don't contain the answer, say so briefly and answer only what they support.",
         r.system()
     );
+    system.push_str(&chat_mind_map_note());
     if let Some(here) = here {
         system.push_str(&format!(
             " The reader is currently in \"{here}\"; \"this chapter\" refers to it."
@@ -1050,6 +1252,58 @@ mod tests {
             .to_owned();
         assert!(system.contains("[1] (第一回)\n刘备在桃园"));
         assert!(ask(&r, "书", &index(), None, &[]).await.is_err());
+    }
+
+    #[test]
+    fn outlines_are_cleaned() {
+        let reply = "好的，下面是导图：\n```mindmap\n- 第一回\n  - 人物\n    * 刘备\n  1. 事件\n```\n希望有帮助";
+        assert_eq!(
+            clean_outline(reply),
+            "- 第一回\n  - 人物\n    - 刘备\n  - 事件"
+        );
+        assert_eq!(
+            clean_outline("# 书\n## 主题\n说明文字\n- 要点"),
+            "- 书\n  - 主题\n- 要点"
+        );
+        assert_eq!(clean_outline("没有列表"), "");
+    }
+
+    #[tokio::test]
+    async fn chapter_mind_maps_are_cached() {
+        use crate::model::{Block, Chapter, Span};
+        let model = MockCompletionModel::from_stream_turns([streamed(&["- 第一回\n", "  - 结义"])]);
+        let r = Runner {
+            model: model.clone().erase(),
+            cfg: cfg(),
+            budget: 1_000,
+            emit: &|_| {},
+        };
+        let doc = Document {
+            path: PathBuf::new(),
+            title: "三国".into(),
+            author: None,
+            toc: Vec::new(),
+            content: Content::Flow(vec![Chapter {
+                title: "第一回".into(),
+                blocks: vec![Block::Paragraph(vec![Span::plain("桃园结义")])],
+            }]),
+        };
+        let dir = std::env::temp_dir().join(format!("aireader-mm-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut cache = SummaryCache::open(dir.clone());
+        let scope = || MindMapScope::Chapter { chapter: 0 };
+        let first = mind_map(&r, &mut cache, &doc, "三国", scope(), false)
+            .await
+            .unwrap();
+        assert_eq!(first, ("- 第一回\n  - 结义".to_owned(), false));
+        let prompt = format!("{:?}", model.requests()[0].chat_history);
+        assert!(prompt.contains("桃园结义") && prompt.contains("nested Markdown bullet list"));
+        let again = mind_map(&r, &mut cache, &doc, "三国", scope(), false)
+            .await
+            .unwrap();
+        assert_eq!(again, (first.0, true));
+        assert_eq!(model.requests().len(), 1, "the cached map needs no request");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     fn briefs() -> Vec<BookBrief> {

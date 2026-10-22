@@ -2256,3 +2256,143 @@ button.cite:hover {
 .ai-button .icon-svg {
   color: var(--accent);
 }
+
+/* Mind maps */
+.mm-card {
+  display: block;
+  position: relative;
+  width: 100%;
+  margin: 4px 0;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--bg);
+  overflow: hidden;
+  cursor: zoom-in;
+}
+.mm-card:hover {
+  border-color: var(--accent);
+  background: var(--bg) !important;
+}
+.mm-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+}
+.mm-open {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--panel);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.mm-card:hover .mm-open {
+  opacity: 1;
+}
+.msg.mindmap .msg-head .icon-svg {
+  color: var(--accent);
+}
+.mm-node.clickable,
+.mm-cite.clickable {
+  cursor: pointer;
+}
+.mm-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  user-select: none;
+}
+.mm-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--bar-h);
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.mm-bar > .icon-svg {
+  color: var(--accent);
+}
+.mm-bar .tool-group {
+  margin-right: 0;
+}
+.mm-stage {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.mm-stage.dragging {
+  cursor: grabbing;
+}
+.mm-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+.mm-canvas svg {
+  display: block;
+}
+.mm-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Composer tools (mind map) */
+.ai-input .menu-anchor {
+  align-self: flex-end;
+}
+.ai-tool {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  margin-left: -6px;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+}
+.ai-tool:hover:not(:disabled),
+.ai-tool.on {
+  color: var(--accent);
+  background: var(--accent-soft) !important;
+}
+.menu.dropup {
+  position: absolute;
+  left: -6px;
+  bottom: calc(100% + 8px);
+  min-width: 200px;
+}
+.menu-label {
+  padding: 4px 10px 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.menu button:disabled {
+  opacity: 0.4;
+}

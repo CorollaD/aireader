@@ -468,6 +468,36 @@ pub async fn export_notes(app: AppHandle, id: String) -> CmdResult<Option<String
     .await
 }
 
+/// Saves exported data (base64) through a save dialog; returns the path, or None if cancelled.
+#[tauri::command]
+pub async fn save_export(
+    app: AppHandle,
+    file_name: String,
+    extension: String,
+    data: String,
+) -> CmdResult<Option<String>> {
+    use base64::Engine;
+    use tauri_plugin_dialog::DialogExt;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data)
+        .map_err(err)?;
+    blocking(move || {
+        let Some(path) = app
+            .dialog()
+            .file()
+            .add_filter(extension.to_uppercase(), &[extension.as_str()])
+            .set_file_name(file_name)
+            .blocking_save_file()
+        else {
+            return Ok(None);
+        };
+        let path = path.into_path().map_err(err)?;
+        std::fs::write(&path, bytes).map_err(err)?;
+        Ok(Some(path.display().to_string()))
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn add_reading_time(
     app: AppHandle,

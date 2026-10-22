@@ -181,7 +181,14 @@ export type AiTask =
       action: ChatAction | null;
       history: ChatTurn[];
     }
-  | { kind: "ask"; bookId: string; location: Location | null; history: ChatTurn[] };
+  | { kind: "ask"; bookId: string; location: Location | null; history: ChatTurn[] }
+  | { kind: "mindMap"; bookId: string; scope: MindMapScope; refresh?: boolean };
+
+export type MindMapScope =
+  | { kind: "chapter"; chapter: number }
+  | { kind: "pages"; from: number; to: number }
+  | { kind: "book" }
+  | { kind: "text"; title: string; text: string };
 
 export interface BookEstimate {
   units: number;

@@ -56,6 +56,7 @@ pub fn run() {
             commands::add_reading_time,
             commands::set_settings,
             commands::set_locale,
+            commands::save_export,
             ai::commands::ai_get_config,
             ai::commands::ai_set_config,
             ai::commands::ai_test,

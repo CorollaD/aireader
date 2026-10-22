@@ -245,6 +245,15 @@ async fn run_task(
                 tasks::chat(&runner, &book_title, &selection, &context, action, &history).await?;
             Ok((text, false))
         }
+        AiTask::MindMap {
+            book_id,
+            scope,
+            refresh,
+        } => {
+            let (book, title) = open_book(app, &book_id).await?;
+            let mut cache = cache(app, &book_id);
+            tasks::mind_map(&runner, &mut cache, &book.doc, &title, scope, refresh).await
+        }
         AiTask::Ask {
             book_id,
             location,
