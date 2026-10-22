@@ -9,12 +9,22 @@ use pdfium_render::prelude::*;
 use crate::model::{Content, Document, Location, PageImage, PageSource, TocEntry};
 
 static PDFIUM: OnceLock<Result<Pdfium, String>> = OnceLock::new();
+static RESOURCE_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// Registers the app's bundled resource directory, where installers place `lib/<pdfium>`.
+/// Call before the first PDF is opened.
+pub fn set_resource_dir(dir: PathBuf) {
+    let _ = RESOURCE_DIR.set(dir);
+}
 
 /// Directories searched for the PDFium library before falling back to the system path.
 fn library_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     if let Some(d) = std::env::var_os("AIREADER_PDFIUM_DIR") {
         dirs.push(PathBuf::from(d));
+    }
+    if let Some(res) = RESOURCE_DIR.get() {
+        dirs.push(res.join("lib"));
     }
     if let Some(exe_dir) = std::env::current_exe()
         .ok()
@@ -52,8 +62,9 @@ fn bind() -> Result<Pdfium, String> {
 pub fn pdfium() -> Result<&'static Pdfium> {
     PDFIUM.get_or_init(bind).as_ref().map_err(|e| {
         anyhow!(
-            "未找到 PDFium 动态库（{}）。请运行 scripts/fetch-pdfium.sh，或把 {} 放到程序目录下的 lib/ 中。\n{e}",
-            Pdfium::pdfium_platform_library_name().to_string_lossy(),
+            "未找到 PDFium 动态库 {}，无法打开 PDF。\n\
+             开发环境请运行 src-tauri/scripts/fetch-pdfium.sh 后重新构建；\
+             也可以设置环境变量 AIREADER_PDFIUM_DIR 指向该库所在目录。\n({e})",
             Pdfium::pdfium_platform_library_name().to_string_lossy(),
         )
     })

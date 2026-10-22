@@ -13,6 +13,9 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            if let Ok(dir) = app.path().resource_dir() {
+                formats::pdf::set_resource_dir(dir);
+            }
             let root = app.path().app_data_dir()?.join("library");
             let library = library::Library::open(&root)?;
             // Ignore flags (e.g. `-psn_…` added by macOS) and keep the first existing file.

@@ -44,9 +44,9 @@ npm run tauri build                   # 打包安装程序
 
 ### PDFium
 
-程序会依次在以下位置查找 PDFium：环境变量 `AIREADER_PDFIUM_DIR`、可执行文件旁的 `lib/`、`../Frameworks` 和 `../Resources/lib`（macOS app 包）、`src-tauri/lib`（开发时），最后是系统库路径。找不到时只有 PDF 打不开，其他格式不受影响。
+程序会依次在以下位置查找 PDFium：环境变量 `AIREADER_PDFIUM_DIR`、应用资源目录下的 `lib/`、可执行文件旁的 `lib/`、`../Frameworks` 和 `../Resources/lib`（macOS app 包）、`src-tauri/lib`（开发时），最后是系统库路径。找不到时只有 PDF 打不开，其他格式不受影响。
 
-打包发布时，请把对应平台的 `libpdfium.dylib`、`libpdfium.so` 或 `pdfium.dll` 放到上述位置之一，例如通过 `tauri.conf.json` 的 `bundle.resources` 放进 `Resources/lib/`。
+打包时会自动带上 PDFium：macOS 放进 `Contents/Frameworks/`（见 `tauri.macos.conf.json`），Linux 和 Windows 作为资源文件随安装包分发（见 `tauri.linux.conf.json`、`tauri.windows.conf.json`）。在 macOS 和 Linux 上，`npm run tauri build` 会先运行 `fetch-pdfium.sh --if-missing`，`src-tauri/lib` 中没有这个库时自动下载。在 Windows 上，请先在 Git Bash 中运行该脚本。
 
 ### 数据位置
 

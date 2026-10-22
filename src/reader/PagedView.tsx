@@ -29,14 +29,14 @@ function useSize(ref: React.RefObject<HTMLElement>) {
   return size;
 }
 
+/** A page box; the rendered image, once loaded, covers the page-number placeholder. */
 function Page(props: { bookId: string; index: number; width: number; height: number; load: boolean; style?: React.CSSProperties }) {
-  const [loaded, setLoaded] = useState(false);
-  const src = pageUrl(props.bookId, props.index, renderWidth(props.width));
-  useEffect(() => setLoaded(false), [src]);
   return (
     <div className="page" style={{ width: props.width, height: props.height, ...props.style }}>
-      {!loaded && <span className="page-number">{props.index + 1}</span>}
-      {props.load && <img src={src} alt="" draggable={false} onLoad={() => setLoaded(true)} style={{ opacity: loaded ? 1 : 0 }} />}
+      <span className="page-number">{props.index + 1}</span>
+      {props.load && (
+        <img src={pageUrl(props.bookId, props.index, renderWidth(props.width))} alt="" draggable={false} decoding="async" />
+      )}
     </div>
   );
 }
@@ -53,7 +53,12 @@ export default function PagedView({ book, jump, layout, zoom, onLocation }: Prop
   const scroller = useRef<HTMLDivElement>(null);
   const size = useSize(scroller);
   const [page, setPage] = useState(() => (jump?.loc.kind === "page" ? jump.loc.page : 0));
-  const [range, setRange] = useState<[number, number]>([0, 2]);
+  // Pages whose images are loaded; starts around the initial page so resuming mid-book
+  // does not fetch the first pages.
+  const [range, setRange] = useState<[number, number]>(() => {
+    const p = jump?.loc.kind === "page" ? jump.loc.page : 0;
+    return [Math.max(0, p - 1), p + 2];
+  });
   const count = book.pages.length;
   const pageRef = useRef(page);
   pageRef.current = page;

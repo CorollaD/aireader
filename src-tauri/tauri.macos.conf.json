@@ -1,0 +1,11 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeBuildCommand": "bash src-tauri/scripts/fetch-pdfium.sh --if-missing && npm run build"
+  },
+  "bundle": {
+    "macOS": {
+      "frameworks": ["lib/libpdfium.dylib"]
+    }
+  }
+}

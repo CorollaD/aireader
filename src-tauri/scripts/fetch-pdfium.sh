@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Downloads a prebuilt PDFium library (https://github.com/bblanchon/pdfium-binaries)
-# into ./lib, where AiReader looks for it at runtime.
+# into src-tauri/lib, where development builds find it and installers bundle it from.
+#
+# Usage: fetch-pdfium.sh [--if-missing]
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -13,6 +15,10 @@ case "$(uname -s)-$(uname -m)" in
   MINGW*-x86_64|MSYS*-x86_64|CYGWIN*-x86_64) pkg=pdfium-win-x64; lib=pdfium.dll ;;
   *) echo "Unsupported platform: $(uname -s) $(uname -m)" >&2; exit 1 ;;
 esac
+
+if [ "${1:-}" = "--if-missing" ] && [ -f "lib/$lib" ]; then
+  exit 0
+fi
 
 version="${PDFIUM_VERSION:-latest}"
 if [ "$version" = latest ]; then
