@@ -8,10 +8,11 @@ import { formatList, t, type MessageKey } from "../i18n";
 import { Icon, type IconName } from "../icons";
 import { useOpenSettings } from "../SettingsDialog";
 import type { ShelfSort, Settings } from "../settings";
-import type { Book, BookPatch, ImportProgress, Shelf } from "../types";
+import type { Book, BookPatch, DuplicateGroup, ImportProgress, Shelf } from "../types";
 import { Confirm, Modal, Toast } from "../ui";
 import { BookCard, BookRow } from "./BookCard";
 import { EditDialog } from "./EditDialog";
+import { DedupeDialog, DedupeProgress } from "./DedupeDialog";
 import { useAi } from "../ai/AiContext";
 import OrganizeDialog from "../ai/OrganizeDialog";
 
@@ -71,6 +72,8 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
   const [toast, setToast] = useState<string | null>(null);
   const [organizing, setOrganizing] = useState<Book[] | null>(null);
   const [importMenu, setImportMenu] = useState(false);
+  const [dedupe, setDedupe] = useState<{ groups: DuplicateGroup[]; intro?: string } | null>(null);
+  const [dedupeProgress, setDedupeProgress] = useState<ImportProgress | null>(null);
   const ai = useAi();
   const openSettings = useOpenSettings();
 
@@ -82,6 +85,22 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
   const fail = (e: unknown) => setToast(errorText(e));
 
   const currentGroup = filter.startsWith("\u0000") ? undefined : filter;
+
+  /** Looks for duplicates (only around `only` when given) and shows them for review. */
+  const findDuplicates = useCallback(async (only?: string[], intro?: string) => {
+    setDedupeProgress({ done: 0, total: 0, name: "" });
+    try {
+      const groups = await api.findDuplicates(only);
+      // The dialog shows shelf entries, which must include books imported just now.
+      setShelf(await api.listBooks());
+      // After an import, nothing to review means nothing to say.
+      if (!only || groups.length > 0) setDedupe({ groups, intro });
+    } catch (e) {
+      setToast(errorText(e));
+    } finally {
+      setDedupeProgress(null);
+    }
+  }, []);
 
   const importPaths = useCallback(
     async (paths: string[]) => {
@@ -95,6 +114,11 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
           parts.push(t("shelf.failed", { n: r.failed.length, names: formatList(r.failed.map(([n]) => n).slice(0, 3)) }));
         }
         setToast(formatList(parts));
+        if (r.possibleDuplicates.length) {
+          setProgress(null);
+          refresh();
+          await findDuplicates(r.possibleDuplicates, t("dd.importedHint", { n: r.possibleDuplicates.length }));
+        }
       } catch (e) {
         fail(e);
       } finally {
@@ -102,11 +126,12 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
         refresh();
       }
     },
-    [currentGroup, refresh],
+    [currentGroup, refresh, findDuplicates],
   );
 
   useEffect(() => {
     const unProgress = listen<ImportProgress>("import-progress", (e) => setProgress(e.payload));
+    const unDedupe = listen<ImportProgress>("dedupe-progress", (e) => setDedupeProgress((p) => (p ? e.payload : p)));
     const unDrop = getCurrentWebview().onDragDropEvent((e) => {
       const p = e.payload;
       if (p.type === "enter" || p.type === "over") setDragging(true);
@@ -118,6 +143,7 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
     });
     return () => {
       unProgress.then((f) => f());
+      unDedupe.then((f) => f());
       unDrop.then((f) => f());
     };
   }, [importPaths]);
@@ -282,6 +308,12 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
             </button>
           </div>
           <span className="spacer" />
+          {shelf.books.length > 1 && (
+            <button onClick={() => findDuplicates()} title={t("dd.findTitle")}>
+              <Icon name="layers" />
+              <span className="label">{t("dd.find")}</span>
+            </button>
+          )}
           {shelf.books.length > 0 && (
             <button
               onClick={() => (ai.ready ? setOrganizing(selecting ? selectedBooks : visible) : ai.openSettings())}
@@ -502,6 +534,27 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
             for (const c of changes) await api.updateBook(c.id, c.patch);
             refresh();
             setToast(t("shelf.updated", { n: changes.length }));
+          }}
+        />
+      )}
+      {dedupeProgress && <DedupeProgress {...dedupeProgress} />}
+      {dedupe && (
+        <DedupeDialog
+          groups={dedupe.groups}
+          intro={dedupe.intro}
+          books={new Map(shelf.books.map((b) => [b.id, b]))}
+          onClose={() => setDedupe(null)}
+          onApply={async (merges) => {
+            try {
+              const r = await api.mergeDuplicates(merges);
+              setDedupe(null);
+              setSelected(new Set());
+              setToast(t("dd.done", { n: r.removed, h: r.highlights, b: r.bookmarks }));
+            } catch (e) {
+              fail(e);
+            } finally {
+              refresh();
+            }
           }}
         />
       )}

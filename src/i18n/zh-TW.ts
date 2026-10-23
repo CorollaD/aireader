@@ -365,6 +365,28 @@ const zhTW: Messages = {
   "mm.emptyHint": "選擇要產生心智圖的範圍。產生過的本章和全書心智圖會依模型快取，下次直接顯示。",
   "mm.history": "本次產生",
   "mm.messages": "{n} 則訊息",
+
+  "dd.find": "尋找重複",
+  "dd.findTitle": "找出同一本書的多個檔案，只保留品質最好的一本",
+  "dd.scanning": "正在分析書籍…",
+  "dd.title": "重複的書",
+  "dd.intro": "以下每組是同一本書的不同檔案。選擇要保留的版本，其餘的會移出書架；閱讀進度、書籤和筆記會盡量轉到保留的那本。",
+  "dd.importedHint": "新匯入的書裡有 {n} 本可能與書架上的書重複，請確認每組保留哪一本。",
+  "dd.none": "沒有發現重複的書。",
+  "dd.recommended": "建議保留",
+  "dd.guess": "可能重複：有檔案沒有文字，只能依書名和頁數判斷",
+  "dd.hasText": "有文字",
+  "dd.scan": "掃描版",
+  "dd.dpi": "{n} DPI",
+  "dd.pages": "{n} 頁",
+  "dd.chars": "{n} 字",
+  "dd.toc": "目錄 {n} 項",
+  "dd.incomplete": "內容約為最全版本的 {n}%",
+  "dd.read": "已讀 {p}",
+  "dd.scoreTitle": "品質分數：綜合是否有文字、掃描清晰度、格式、目錄、封面和內容完整度",
+  "dd.footer": "其餘 {n} 本將移出書架（原始檔案不受影響）",
+  "dd.apply": "處理 {n} 組",
+  "dd.done": "已移出 {n} 本重複的書，轉移了 {h} 則畫線和 {b} 個書籤",
 };
 
 export default zhTW;

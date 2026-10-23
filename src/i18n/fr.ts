@@ -365,6 +365,28 @@ const fr: Messages = {
   "mm.emptyHint": "Choisissez ce qu'il faut représenter. Les cartes de chapitre et du livre sont mises en cache par modèle et s'affichent aussitôt la fois suivante.",
   "mm.history": "Créées pendant cette session",
   "mm.messages": "{n} messages",
+
+  "dd.find": "Trouver les doublons",
+  "dd.findTitle": "Trouver les livres présents en plusieurs fichiers et ne garder que la meilleure copie",
+  "dd.scanning": "Analyse des livres…",
+  "dd.title": "Livres en double",
+  "dd.intro": "Chaque groupe est un même livre en plusieurs fichiers. Choisissez la copie à garder ; les autres quittent la bibliothèque et leur progression, leurs signets et leurs notes passent si possible sur la copie gardée.",
+  "dd.importedHint": "{n} des livres importés sont peut-être déjà dans la bibliothèque sous un autre fichier. Choisissez la copie à garder dans chaque groupe.",
+  "dd.none": "Aucun livre en double trouvé.",
+  "dd.recommended": "Recommandé",
+  "dd.guess": "Doublon possible : un fichier n'a pas de texte, seuls le titre et le nombre de pages ont été comparés",
+  "dd.hasText": "Texte",
+  "dd.scan": "Numérisé",
+  "dd.dpi": "{n} DPI",
+  "dd.pages": "{n} pages",
+  "dd.chars": "{n} caractères",
+  "dd.toc": "{n} entrées de sommaire",
+  "dd.incomplete": "environ {n} % de la copie la plus complète",
+  "dd.read": "lu {p}",
+  "dd.scoreTitle": "Score de qualité : texte, netteté du scan, format, sommaire, couverture et complétude",
+  "dd.footer": "{n} autres copies quitteront la bibliothèque (vos fichiers d'origine ne sont pas touchés)",
+  "dd.apply": "Appliquer à {n} groupes",
+  "dd.done": "{n} livres en double retirés ; {h} surlignages et {b} signets déplacés",
 };
 
 export default fr;

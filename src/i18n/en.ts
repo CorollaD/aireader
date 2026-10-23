@@ -365,6 +365,28 @@ const en: Messages = {
   "mm.emptyHint": "Choose what to map. Chapter and book maps are cached per model and shown instantly next time.",
   "mm.history": "Drawn this session",
   "mm.messages": "{n} messages",
+
+  "dd.find": "Find duplicates",
+  "dd.findTitle": "Find books stored in several files and keep only the best copy",
+  "dd.scanning": "Analysing books…",
+  "dd.title": "Duplicate books",
+  "dd.intro": "Each group below is one book in several files. Choose the copy to keep; the others leave the shelf, and their reading progress, bookmarks and notes move to the kept copy where possible.",
+  "dd.importedHint": "{n} of the books you just imported may already be on the shelf in another file. Choose which copy to keep in each group.",
+  "dd.none": "No duplicate books found.",
+  "dd.recommended": "Recommended",
+  "dd.guess": "Possible duplicate: a file has no text, so only the title and page count were compared",
+  "dd.hasText": "Text",
+  "dd.scan": "Scanned",
+  "dd.dpi": "{n} DPI",
+  "dd.pages": "{n} pages",
+  "dd.chars": "{n} characters",
+  "dd.toc": "{n} contents entries",
+  "dd.incomplete": "about {n}% of the fullest copy",
+  "dd.read": "read {p}",
+  "dd.scoreTitle": "Quality score: text, scan sharpness, format, contents, cover and completeness",
+  "dd.footer": "{n} other copies will leave the shelf (your original files are not touched)",
+  "dd.apply": "Apply to {n} groups",
+  "dd.done": "Removed {n} duplicate books; moved {h} highlights and {b} bookmarks",
 };
 
 export default en;

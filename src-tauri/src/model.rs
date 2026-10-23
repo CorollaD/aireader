@@ -139,6 +139,11 @@ pub trait PageSource: Send + Sync {
     fn text_runs(&self, _index: usize) -> Vec<TextRun> {
         Vec::new()
     }
+    /// Resolution of the page's main picture in dots per inch, for judging scan quality;
+    /// `None` when the page has no pictures (or the format can't tell).
+    fn image_dpi(&self, _index: usize) -> Option<f32> {
+        None
+    }
 }
 
 /// A run of text on a page. Coordinates are fractions of the unrotated page size, measured

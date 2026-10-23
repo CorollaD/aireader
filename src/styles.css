@@ -2427,3 +2427,86 @@ button.cite:hover {
 .mm-history-item.on .icon-svg {
   color: var(--accent);
 }
+
+/* Duplicate books */
+.dedupe-intro {
+  margin: 0 0 12px;
+  line-height: 1.6;
+}
+.dedupe-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.dedupe-group {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+}
+.dedupe-group.off .dedupe-copy {
+  opacity: 0.5;
+}
+.dedupe-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 6px;
+  cursor: pointer;
+  min-width: 0;
+}
+.badge-soft.warn {
+  background: color-mix(in srgb, #e5833a 18%, transparent);
+  color: #c46a24;
+  white-space: normal;
+}
+.badge-soft.ok {
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+  color: var(--ok);
+}
+.dedupe-copy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.dedupe-copy:hover {
+  background: var(--hover);
+}
+.dedupe-copy.keep {
+  background: var(--accent-soft);
+}
+.dedupe-cover {
+  width: 30px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.dedupe-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.dedupe-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.dedupe-facts {
+  line-height: 1.5;
+}
+.dedupe-score {
+  flex-shrink: 0;
+  min-width: 34px;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}

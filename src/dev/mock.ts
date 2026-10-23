@@ -97,7 +97,7 @@ export function installMock() {
             db.books.push(b);
             return name;
           });
-          return { added, duplicates: [], failed: [] };
+          return { added, duplicates: [], failed: [], possibleDuplicates: [] };
         }
         case "update_book": {
           const b = find(a.id);
@@ -110,6 +110,10 @@ export function installMock() {
           }
           return b;
         }
+        case "find_duplicates":
+          return [];
+        case "merge_duplicates":
+          return { removed: 0, highlights: 0, bookmarks: 0 };
         case "remove_books":
           db.books = db.books.filter((b) => !(a.ids as string[]).includes(b.id));
           return null;

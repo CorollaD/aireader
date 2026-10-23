@@ -365,6 +365,28 @@ const de: Messages = {
   "mm.emptyHint": "Wähle, was dargestellt werden soll. Kapitel- und Buch-Mindmaps werden je Modell zwischengespeichert und beim nächsten Mal sofort angezeigt.",
   "mm.history": "In dieser Sitzung erstellt",
   "mm.messages": "{n} Nachrichten",
+
+  "dd.find": "Duplikate finden",
+  "dd.findTitle": "Bücher finden, die in mehreren Dateien vorliegen, und nur die beste Kopie behalten",
+  "dd.scanning": "Bücher werden analysiert …",
+  "dd.title": "Doppelte Bücher",
+  "dd.intro": "Jede Gruppe ist ein Buch in mehreren Dateien. Wähle die Kopie, die bleiben soll; die anderen verlassen das Regal, und Lesefortschritt, Lesezeichen und Notizen gehen nach Möglichkeit auf die behaltene Kopie über.",
+  "dd.importedHint": "{n} der eben importierten Bücher sind vielleicht schon in einer anderen Datei im Regal. Wähle in jeder Gruppe die Kopie, die bleiben soll.",
+  "dd.none": "Keine doppelten Bücher gefunden.",
+  "dd.recommended": "Empfohlen",
+  "dd.guess": "Mögliches Duplikat: Eine Datei hat keinen Text, verglichen wurden nur Titel und Seitenzahl",
+  "dd.hasText": "Text",
+  "dd.scan": "Scan",
+  "dd.dpi": "{n} DPI",
+  "dd.pages": "{n} Seiten",
+  "dd.chars": "{n} Zeichen",
+  "dd.toc": "{n} Inhaltseinträge",
+  "dd.incomplete": "etwa {n} % der vollständigsten Kopie",
+  "dd.read": "{p} gelesen",
+  "dd.scoreTitle": "Qualitätswert: Text, Schärfe des Scans, Format, Inhaltsverzeichnis, Cover und Vollständigkeit",
+  "dd.footer": "{n} weitere Kopien verlassen das Regal (deine Originaldateien bleiben unverändert)",
+  "dd.apply": "Auf {n} Gruppen anwenden",
+  "dd.done": "{n} doppelte Bücher entfernt; {h} Markierungen und {b} Lesezeichen übernommen",
 };
 
 export default de;

@@ -365,6 +365,28 @@ const it: Messages = {
   "mm.emptyHint": "Scegli cosa rappresentare. Le mappe di capitoli e libro vengono memorizzate per modello e mostrate subito la volta successiva.",
   "mm.history": "Creati in questa sessione",
   "mm.messages": "{n} messaggi",
+
+  "dd.find": "Trova duplicati",
+  "dd.findTitle": "Trova i libri salvati in più file e tieni solo la copia migliore",
+  "dd.scanning": "Analisi dei libri…",
+  "dd.title": "Libri duplicati",
+  "dd.intro": "Ogni gruppo è lo stesso libro in più file. Scegli la copia da tenere; le altre escono dallo scaffale e avanzamento, segnalibri e note passano, dove possibile, alla copia tenuta.",
+  "dd.importedHint": "{n} dei libri appena importati potrebbero essere già nello scaffale in un altro file. Scegli quale copia tenere in ogni gruppo.",
+  "dd.none": "Nessun libro duplicato trovato.",
+  "dd.recommended": "Consigliato",
+  "dd.guess": "Possibile duplicato: un file non ha testo, sono stati confrontati solo titolo e pagine",
+  "dd.hasText": "Testo",
+  "dd.scan": "Scansione",
+  "dd.dpi": "{n} DPI",
+  "dd.pages": "{n} pagine",
+  "dd.chars": "{n} caratteri",
+  "dd.toc": "{n} voci di indice",
+  "dd.incomplete": "circa il {n}% della copia più completa",
+  "dd.read": "letto {p}",
+  "dd.scoreTitle": "Punteggio di qualità: testo, nitidezza della scansione, formato, indice, copertina e completezza",
+  "dd.footer": "Altre {n} copie usciranno dallo scaffale (i file originali non vengono toccati)",
+  "dd.apply": "Applica a {n} gruppi",
+  "dd.done": "Rimossi {n} libri duplicati; spostate {h} evidenziazioni e {b} segnalibri",
 };
 
 export default it;

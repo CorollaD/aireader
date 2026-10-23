@@ -51,6 +51,34 @@ export interface ImportReport {
   added: string[];
   duplicates: string[];
   failed: [string, string][];
+  /** Ids of added books that may be another file of a book already on the shelf. */
+  possibleDuplicates: string[];
+}
+
+/** One file of a book that is on the shelf several times. */
+export interface DuplicateCopy {
+  id: string;
+  score: number;
+  chars: number;
+  pages: number | null;
+  dpi: number | null;
+  hasText: boolean;
+  tocEntries: number;
+  /** Share of the group's most complete copy (0..1). */
+  completeness: number;
+}
+
+export interface DuplicateGroup {
+  /** Best first. */
+  copies: DuplicateCopy[];
+  /** False when a copy could only be matched by title and page count. */
+  confident: boolean;
+}
+
+export interface MergeReport {
+  removed: number;
+  highlights: number;
+  bookmarks: number;
 }
 
 export interface TocEntry {

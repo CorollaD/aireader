@@ -365,6 +365,28 @@ const pt: Messages = {
   "mm.emptyHint": "Escolha o que mapear. Mapas de capítulos e do livro ficam em cache por modelo e aparecem na hora da próxima vez.",
   "mm.history": "Criados nesta sessão",
   "mm.messages": "{n} mensagens",
+
+  "dd.find": "Encontrar duplicados",
+  "dd.findTitle": "Encontre livros salvos em vários arquivos e mantenha só a melhor cópia",
+  "dd.scanning": "Analisando livros…",
+  "dd.title": "Livros duplicados",
+  "dd.intro": "Cada grupo é o mesmo livro em vários arquivos. Escolha a cópia a manter; as outras saem da estante e o progresso, os marcadores e as notas passam, sempre que possível, para a cópia mantida.",
+  "dd.importedHint": "{n} dos livros importados podem já estar na estante em outro arquivo. Escolha qual cópia manter em cada grupo.",
+  "dd.none": "Nenhum livro duplicado encontrado.",
+  "dd.recommended": "Recomendado",
+  "dd.guess": "Possível duplicado: um arquivo não tem texto, só título e páginas foram comparados",
+  "dd.hasText": "Texto",
+  "dd.scan": "Digitalizado",
+  "dd.dpi": "{n} DPI",
+  "dd.pages": "{n} páginas",
+  "dd.chars": "{n} caracteres",
+  "dd.toc": "{n} itens de sumário",
+  "dd.incomplete": "cerca de {n}% da cópia mais completa",
+  "dd.read": "lido {p}",
+  "dd.scoreTitle": "Pontuação de qualidade: texto, nitidez da digitalização, formato, sumário, capa e completude",
+  "dd.footer": "Outras {n} cópias sairão da estante (seus arquivos originais não são alterados)",
+  "dd.apply": "Aplicar a {n} grupos",
+  "dd.done": "{n} livros duplicados removidos; {h} destaques e {b} marcadores transferidos",
 };
 
 export default pt;

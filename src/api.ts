@@ -11,9 +11,11 @@ import type {
   Book,
   BookEstimate,
   BookPatch,
+  DuplicateGroup,
   Hit,
   ImportReport,
   Location,
+  MergeReport,
   OpenedBook,
   Shelf,
   Suggestion,
@@ -34,6 +36,10 @@ export const api = {
   takeStartupBook: () => invoke<string | null>("take_startup_book"),
   updateBook: (id: string, patch: BookPatch) => invoke<Book>("update_book", { id, patch }),
   removeBooks: (ids: string[]) => invoke<void>("remove_books", { ids }),
+  /** Same books stored in several files; `only` limits it to groups with those books. */
+  findDuplicates: (only?: string[]) => invoke<DuplicateGroup[]>("find_duplicates", { only: only ?? null }),
+  /** Keeps one copy per group; the others' reading data moves onto it before they go. */
+  mergeDuplicates: (merges: { keep: string; remove: string[] }[]) => invoke<MergeReport>("merge_duplicates", { merges }),
   createGroup: (name: string) => invoke<void>("create_group", { name }),
   renameGroup: (old: string, name: string) => invoke<void>("rename_group", { old, new: name }),
   deleteGroup: (name: string) => invoke<void>("delete_group", { name }),

@@ -3,6 +3,7 @@
 pub mod ai;
 pub mod annotations;
 pub mod commands;
+pub mod dedupe;
 pub mod formats;
 pub mod i18n;
 pub mod library;
@@ -57,6 +58,8 @@ pub fn run() {
             commands::set_settings,
             commands::set_locale,
             commands::save_export,
+            commands::find_duplicates,
+            commands::merge_duplicates,
             ai::commands::ai_get_config,
             ai::commands::ai_set_config,
             ai::commands::ai_test,

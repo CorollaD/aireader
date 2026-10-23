@@ -130,6 +130,21 @@ impl PageSource for PdfSource {
             .collect()
     }
 
+    fn image_dpi(&self, index: usize) -> Option<f32> {
+        let page = self.doc.pages().get(index as PdfPageIndex).ok()?;
+        // The largest picture on the page is the scan, if this is a scanned book.
+        page.objects()
+            .iter()
+            .filter_map(|object| {
+                let image = object.as_image_object()?;
+                let inches = object.bounds().ok()?.width().value / 72.0;
+                let pixels = image.width().ok()? as f32;
+                (inches > 1.0 && pixels > 0.0).then_some((inches, pixels / inches))
+            })
+            .max_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, dpi)| dpi)
+    }
+
     fn render(&self, index: usize, width: u32) -> Result<PageImage> {
         let page = self.doc.pages().get(index as PdfPageIndex)?;
         let config = PdfRenderConfig::new()

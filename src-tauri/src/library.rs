@@ -360,6 +360,40 @@ impl Library {
         Ok(())
     }
 
+    /// Folds the reading data of duplicate copies into `keep` before they are removed: reading
+    /// time adds up, the latest reading date wins, `furthest` (the copies' furthest position,
+    /// mapped into the kept book) replaces a position that is less far, and an ungrouped book
+    /// takes a copy's group.
+    pub fn absorb(
+        &mut self,
+        keep: &str,
+        removed: &[String],
+        furthest: Option<(Location, f32)>,
+    ) -> Result<()> {
+        let others: Vec<Book> = self
+            .data
+            .books
+            .iter()
+            .filter(|b| removed.contains(&b.id))
+            .cloned()
+            .collect();
+        let book = self.get_mut(keep)?;
+        for o in &others {
+            book.read_seconds += o.read_seconds;
+            book.last_read = book.last_read.max(o.last_read);
+            if book.group.is_none() {
+                book.group = o.group.clone();
+            }
+        }
+        if let Some((position, progress)) = furthest
+            && progress > book.progress
+        {
+            book.position = Some(position);
+            book.progress = progress.clamp(0.0, 1.0);
+        }
+        Ok(())
+    }
+
     /// Directory for a book's AI caches.
     pub fn ai_dir(&self, id: &str) -> PathBuf {
         self.root.join("ai").join(id)
@@ -609,6 +643,56 @@ mod tests {
         let saved: serde_json::Value = serde_json::from_str(&saved).unwrap();
         let first = &saved["books"][0];
         assert!(first.get("group").is_some() && first.get("groups").is_none());
+    }
+
+    #[test]
+    fn absorbing_duplicates_keeps_the_furthest_reading() {
+        let root = temp("absorb");
+        let book = |id: &str,
+                    progress: f32,
+                    seconds: u64,
+                    last: Option<u64>,
+                    group: Option<&str>| {
+            format!(
+                r#"{{"id":"{id}","title":"t","author":null,"format":"EPUB","fileName":"a","size":1,"sha256":"{id}","hasCover":false,"added":0,"lastRead":{},"progress":{progress},"position":null,"readSeconds":{seconds},"group":{}}}"#,
+                last.map_or("null".into(), |v| v.to_string()),
+                group.map_or("null".into(), |g| format!("\"{g}\""))
+            )
+        };
+        let json = format!(
+            r#"{{"books":[{},{},{}]}}"#,
+            book("keep", 0.1, 60, Some(5), None),
+            book("a", 0.6, 30, Some(9), Some("小说")),
+            book("b", 0.3, 10, None, Some("历史"))
+        );
+        std::fs::write(root.join("library.json"), json).unwrap();
+        let mut lib = Library::open(&root).unwrap();
+        let ids = vec!["a".to_owned(), "b".to_owned()];
+        let at = Location::Flow {
+            chapter: 3,
+            block: 2,
+        };
+        lib.absorb("keep", &ids, Some((at, 0.6))).unwrap();
+        let k = lib.get("keep").unwrap();
+        assert_eq!(
+            (k.read_seconds, k.last_read, k.progress, k.position),
+            (100, Some(9), 0.6, Some(at))
+        );
+        assert_eq!(k.group.as_deref(), Some("小说"), "the first copy's group");
+        // A position less far than the kept book's own does not replace it.
+        lib.absorb(
+            "keep",
+            &[],
+            Some((
+                Location::Flow {
+                    chapter: 0,
+                    block: 0,
+                },
+                0.2,
+            )),
+        )
+        .unwrap();
+        assert_eq!(lib.get("keep").unwrap().position, Some(at));
     }
 
     #[test]

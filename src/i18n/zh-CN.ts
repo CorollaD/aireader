@@ -365,6 +365,28 @@ const zhCN = {
   "mm.emptyHint": "选择要生成思维导图的范围。生成过的本章和全书导图会按模型缓存，下次直接显示。",
   "mm.history": "本次生成",
   "mm.messages": "{n} 条消息",
+
+  "dd.find": "查找重复",
+  "dd.findTitle": "找出同一本书的多个文件，只保留质量最好的一本",
+  "dd.scanning": "正在分析书籍…",
+  "dd.title": "重复的书",
+  "dd.intro": "以下每组是同一本书的不同文件。选择要保留的版本，其余的会移出书架；阅读进度、书签和笔记会尽量转到保留的那本。",
+  "dd.importedHint": "新导入的书里有 {n} 本可能与书架上的书重复，请确认每组保留哪一本。",
+  "dd.none": "没有发现重复的书。",
+  "dd.recommended": "推荐保留",
+  "dd.guess": "可能重复：有文件没有文字，只能按书名和页数判断",
+  "dd.hasText": "有文字",
+  "dd.scan": "扫描版",
+  "dd.dpi": "{n} DPI",
+  "dd.pages": "{n} 页",
+  "dd.chars": "{n} 字",
+  "dd.toc": "目录 {n} 项",
+  "dd.incomplete": "内容约为最全版本的 {n}%",
+  "dd.read": "已读 {p}",
+  "dd.scoreTitle": "质量分：综合是否有文字、扫描清晰度、格式、目录、封面和内容完整度",
+  "dd.footer": "其余 {n} 本将移出书架（原文件不受影响）",
+  "dd.apply": "处理 {n} 组",
+  "dd.done": "已移出 {n} 本重复的书，转移了 {h} 条高亮和 {b} 个书签",
 };
 
 export default zhCN;

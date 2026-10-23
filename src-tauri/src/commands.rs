@@ -4,10 +4,11 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::annotations::{self, AnnotationStore, Annotations};
+use crate::dedupe::{self, DuplicateGroup, ProfileCache};
 use crate::formats;
 use crate::library::{self, Book, BookPatch, Library};
 use crate::model::{Block, Content, Document, Location, TocEntry};
@@ -129,10 +130,13 @@ struct ImportProgress {
 }
 
 #[derive(Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ImportReport {
     added: Vec<String>,
     duplicates: Vec<String>,
     failed: Vec<(String, String)>,
+    /// Ids of added books that may be another file of a book already on the shelf.
+    possible_duplicates: Vec<String>,
 }
 
 enum Imported {
@@ -175,6 +179,7 @@ pub async fn import_books(
         let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
         let files = library::collect_files(&paths);
         let mut report = ImportReport::default();
+        let mut added_ids = Vec::new();
         for (i, file) in files.iter().enumerate() {
             let name = file
                 .file_name()
@@ -189,12 +194,23 @@ pub async fn import_books(
                 },
             );
             match import_file(&app, file, group.as_deref()) {
-                Ok(Imported::Added(_)) => report.added.push(name),
+                Ok(Imported::Added(id)) => {
+                    report.added.push(name);
+                    added_ids.push(id);
+                }
                 Ok(Imported::Existing(_)) => report.duplicates.push(name),
                 Err(e) => report.failed.push((name, err(e))),
             }
         }
         state(&app).library().save().map_err(err)?;
+        // Titles alone are enough to suggest a check; the dialog compares contents.
+        let books = state(&app).library().books();
+        report.possible_duplicates = dedupe::candidate_groups(&books)
+            .into_iter()
+            .flatten()
+            .map(|i| books[i].id.clone())
+            .filter(|id| added_ids.contains(id))
+            .collect();
         let _ = app.emit(
             "import-progress",
             ImportProgress {
@@ -203,6 +219,141 @@ pub async fn import_books(
                 name: String::new(),
             },
         );
+        Ok(report)
+    })
+    .await
+}
+
+#[derive(Clone, Serialize)]
+struct DedupeProgress {
+    done: usize,
+    total: usize,
+    name: String,
+}
+
+/// Books on the shelf that are the same book in several files, best copy first. With `only`,
+/// just the groups containing one of those books (e.g. ones just imported). Emits
+/// `dedupe-progress` while files are analysed (analyses are cached by content hash).
+#[tauri::command]
+pub async fn find_duplicates(
+    app: AppHandle,
+    only: Option<Vec<String>>,
+) -> CmdResult<Vec<DuplicateGroup>> {
+    blocking(move || {
+        let (books, root) = {
+            let lib = state(&app).library();
+            (lib.books(), lib.root().to_owned())
+        };
+        let mut wanted: Vec<usize> = dedupe::candidate_groups(&books)
+            .into_iter()
+            .filter(|g| {
+                only.as_ref()
+                    .is_none_or(|ids| g.iter().any(|&i| ids.contains(&books[i].id)))
+            })
+            .flatten()
+            .filter(|&i| !books[i].missing)
+            .collect();
+        wanted.sort_unstable();
+        let mut cache = ProfileCache::open(&root);
+        let mut profiles = HashMap::new();
+        for (k, &i) in wanted.iter().enumerate() {
+            let book = &books[i];
+            let _ = app.emit(
+                "dedupe-progress",
+                DedupeProgress {
+                    done: k,
+                    total: wanted.len(),
+                    name: book.title.clone(),
+                },
+            );
+            let profile = match cache.get(&book.sha256) {
+                Some(p) => p.clone(),
+                None => {
+                    let path = state(&app).library().book_path(book);
+                    // A file that can't be read is left out rather than failing the search.
+                    let Ok(doc) = formats::open(&path) else {
+                        continue;
+                    };
+                    let p = dedupe::profile(&doc);
+                    cache.put(&book.sha256, p.clone());
+                    p
+                }
+            };
+            profiles.insert(book.id.clone(), profile);
+        }
+        let hashes: Vec<String> = books.iter().map(|b| b.sha256.clone()).collect();
+        let _ = cache.save(&hashes);
+        let _ = app.emit(
+            "dedupe-progress",
+            DedupeProgress {
+                done: wanted.len(),
+                total: wanted.len(),
+                name: String::new(),
+            },
+        );
+        let subset: Vec<Book> = wanted.iter().map(|&i| books[i].clone()).collect();
+        Ok(dedupe::group_duplicates(&subset, &profiles))
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+pub struct Merge {
+    keep: String,
+    remove: Vec<String>,
+}
+
+#[derive(Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeReport {
+    removed: usize,
+    highlights: usize,
+    bookmarks: usize,
+}
+
+/// Keeps one copy of each duplicate group: the others' reading time, furthest position,
+/// bookmarks and highlights move onto it, then they are removed from the shelf.
+#[tauri::command]
+pub async fn merge_duplicates(app: AppHandle, merges: Vec<Merge>) -> CmdResult<MergeReport> {
+    blocking(move || {
+        let store = annotation_store(&app);
+        let mut report = MergeReport::default();
+        for m in merges {
+            let remove: Vec<String> = m.remove.into_iter().filter(|id| *id != m.keep).collect();
+            let (keep_path, copies) = {
+                let lib = state(&app).library();
+                let Some(keep) = lib.get(&m.keep) else {
+                    continue;
+                };
+                let copies: Vec<(Book, PathBuf)> = remove
+                    .iter()
+                    .filter_map(|id| lib.get(id).map(|b| (b.clone(), lib.book_path(b))))
+                    .collect();
+                (lib.book_path(keep), copies)
+            };
+            let keep_doc = formats::open(&keep_path).map_err(err)?;
+            let mut keep_ann = store.load(&m.keep).map_err(err)?;
+            let mut furthest: Option<(Location, f32)> = None;
+            for (book, path) in &copies {
+                // A copy that can't be opened still goes; its notes can't be placed.
+                if let Ok(doc) = formats::open(path) {
+                    let ann = store.load(&book.id).map_err(err)?;
+                    let moved = dedupe::transfer_annotations(&doc, &ann, &keep_doc, &mut keep_ann);
+                    report.highlights += moved.highlights;
+                    report.bookmarks += moved.bookmarks;
+                }
+                if book.position.is_some() && furthest.is_none_or(|(_, p)| book.progress > p) {
+                    furthest = Some((dedupe::location_at(&keep_doc, book.progress), book.progress));
+                }
+            }
+            store.save(&m.keep, &keep_ann).map_err(err)?;
+            let ids: Vec<String> = copies.iter().map(|(b, _)| b.id.clone()).collect();
+            let mut lib = state(&app).library();
+            lib.absorb(&m.keep, &ids, furthest).map_err(err)?;
+            lib.remove(&ids);
+            lib.save().map_err(err)?;
+            report.removed += ids.len();
+        }
         Ok(report)
     })
     .await
