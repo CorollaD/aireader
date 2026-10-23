@@ -21,6 +21,7 @@ import { MOD } from "./shortcuts";
 import Sidebar, { type SidebarTab } from "./Sidebar";
 import { useAnnotations } from "./useAnnotations";
 import { useReadingStats } from "./useReadingStats";
+import { Resizer, fitWidth, minWidth, usePanelWidths, type Panel } from "./Resizer";
 
 /** A navigation request; `n` makes repeated jumps to the same place distinct. */
 export interface Jump {
@@ -71,6 +72,17 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
   const saveTimer = useRef<number>();
 
   const ann = useAnnotations(bookId);
+  const panels = usePanelWidths(bookId);
+  const body = useRef<HTMLDivElement>(null);
+  const [bodyWidth, setBodyWidth] = useState(0);
+  useEffect(() => {
+    const el = body.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setBodyWidth(el.clientWidth));
+    ro.observe(el);
+    setBodyWidth(el.clientWidth);
+    return () => ro.disconnect();
+  }, [book]);
   const stats = useReadingStats(book, location);
 
   useEffect(() => {
@@ -291,6 +303,10 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
         e.preventDefault();
         setSearch((s) => ({ ...s, open: true }));
         setTimeout(() => searchInput.current?.focus(), 0);
+      } else if (cmd && e.shiftKey && key === "a") {
+        e.preventDefault();
+        setAiOpen((o) => !o);
+        setSearch((s) => ({ ...s, open: false }));
       } else if (cmd && key === "d") {
         e.preventDefault();
         toggleBookmark();
@@ -354,6 +370,14 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
   if (!book) return <div className="reader center-msg muted">{t("reader.opening")}</div>;
 
   const chapterTitle = location?.kind === "flow" ? book.chapters[location.chapter]?.title : null;
+
+  // Panels and their widths; the text always keeps room, so panels shrink in narrow windows.
+  const tocShown = settings.showToc && !focus;
+  const aiShown = aiOpen && !focus;
+  const searchShown = search.open && isFlow && !focus;
+  const rightPanel: Panel | null = aiShown ? "ai" : searchShown ? "search" : null;
+  const tocWidth = tocShown ? fitWidth("toc", panels.widths.toc, bodyWidth - (rightPanel ? minWidth(rightPanel) : 0)) : 0;
+  const rightWidth = rightPanel ? fitWidth(rightPanel, panels.widths[rightPanel], bodyWidth - tocWidth) : 0;
   const mark = activeMark ? ann.data.highlights.find((h) => h.id === activeMark.id) : null;
   const noteHighlight = noteFor ? ann.data.highlights.find((h) => h.id === noteFor) : null;
 
@@ -449,7 +473,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
           )}
           <button
             className={`icon-button wide ai-button${aiOpen ? " on" : ""}`}
-            title={t("reader.ai")}
+            title={`${t("reader.ai")} (${MOD}+Shift+A)`}
             aria-label={t("reader.ai")}
             onClick={() => {
               setAiOpen((o) => !o);
@@ -530,9 +554,11 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
         </div>
       </header>
 
-      <div className="reader-body">
-        {settings.showToc && !focus && (
+      <div className="reader-body" ref={body}>
+        {tocShown && (
           <Sidebar
+            width={tocWidth}
+            onCollapse={() => update({ showToc: false })}
             book={book}
             tab={sideTab}
             onTab={setSideTab}
@@ -545,6 +571,16 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
             onEditNote={setNoteFor}
             onRemoveHighlight={ann.removeHighlight}
             onExport={exportNotes}
+          />
+        )}
+        {tocShown && (
+          <Resizer
+            panel="toc"
+            side="left"
+            width={tocWidth}
+            max={fitWidth("toc", Infinity, bodyWidth - rightWidth)}
+            onChange={(w) => panels.set("toc", w)}
+            onReset={() => panels.reset("toc")}
           />
         )}
         <section className="reader-view">
@@ -575,8 +611,19 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
           )}
           {!focus && <ProgressBar book={book} location={location} stats={stats} onJump={(loc) => navigate(loc)} />}
         </section>
-        {aiOpen && !focus && (
+        {rightPanel && (
+          <Resizer
+            panel={rightPanel}
+            side="right"
+            width={rightWidth}
+            max={fitWidth(rightPanel, Infinity, bodyWidth - tocWidth)}
+            onChange={(w) => panels.set(rightPanel, w)}
+            onReset={() => panels.reset(rightPanel)}
+          />
+        )}
+        {aiShown && (
           <AiPanel
+            width={rightWidth}
             book={book}
             location={location}
             chatRequest={chatRequest}
@@ -585,8 +632,8 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
             onClose={() => setAiOpen(false)}
           />
         )}
-        {search.open && isFlow && !focus && (
-          <aside className="search-panel">
+        {searchShown && (
+          <aside className="search-panel" style={{ width: rightWidth }}>
             <input
               ref={searchInput}
               className="full"

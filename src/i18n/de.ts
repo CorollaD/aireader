@@ -387,6 +387,11 @@ const de: Messages = {
   "dd.footer": "{n} weitere Kopien verlassen das Regal (deine Originaldateien bleiben unverändert)",
   "dd.apply": "Auf {n} Gruppen anwenden",
   "dd.done": "{n} doppelte Bücher entfernt; {h} Markierungen und {b} Lesezeichen übernommen",
+
+  "reader.collapseSidebar": "Seitenleiste ausblenden",
+  "reader.collapseAi": "KI-Bereich ausblenden",
+  "reader.resizeHint": "Ziehen ändert die Breite, Doppelklick setzt sie zurück",
+  "sc.aiPanel": "KI-Bereich ein- / ausblenden",
 };
 
 export default de;

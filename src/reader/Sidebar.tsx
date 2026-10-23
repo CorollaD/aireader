@@ -23,6 +23,8 @@ interface Props {
   onEditNote: (id: string) => void;
   onRemoveHighlight: (id: string) => void;
   onExport: () => void;
+  width: number;
+  onCollapse: () => void;
 }
 
 export default function Sidebar(props: Props) {
@@ -50,7 +52,7 @@ export default function Sidebar(props: Props) {
   ];
 
   return (
-    <aside className="toc">
+    <aside className="toc" style={{ width: props.width }}>
       <div className="side-tabs">
         {tabs.map(([key, label, count]) => (
           <button key={key} className={tab === key ? "on" : ""} onClick={() => props.onTab(key)}>
@@ -58,6 +60,14 @@ export default function Sidebar(props: Props) {
             {count ? <span className="tab-count">{count}</span> : null}
           </button>
         ))}
+        <button
+          className="icon tab-icon"
+          title={`${t("reader.collapseSidebar")} (T)`}
+          aria-label={t("reader.collapseSidebar")}
+          onClick={props.onCollapse}
+        >
+          <Icon name="panelLeft" />
+        </button>
       </div>
       <div className="side-list" ref={list}>
         {tab === "toc" &&

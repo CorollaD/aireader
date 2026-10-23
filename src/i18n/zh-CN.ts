@@ -387,6 +387,11 @@ const zhCN = {
   "dd.footer": "其余 {n} 本将移出书架（原文件不受影响）",
   "dd.apply": "处理 {n} 组",
   "dd.done": "已移出 {n} 本重复的书，转移了 {h} 条高亮和 {b} 个书签",
+
+  "reader.collapseSidebar": "收起侧栏",
+  "reader.collapseAi": "收起 AI 面板",
+  "reader.resizeHint": "拖动调整宽度，双击恢复默认",
+  "sc.aiPanel": "显示 / 隐藏 AI 面板",
 };
 
 export default zhCN;

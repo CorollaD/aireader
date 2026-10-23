@@ -387,6 +387,11 @@ const en: Messages = {
   "dd.footer": "{n} other copies will leave the shelf (your original files are not touched)",
   "dd.apply": "Apply to {n} groups",
   "dd.done": "Removed {n} duplicate books; moved {h} highlights and {b} bookmarks",
+
+  "reader.collapseSidebar": "Hide sidebar",
+  "reader.collapseAi": "Hide AI panel",
+  "reader.resizeHint": "Drag to resize; double-click to reset",
+  "sc.aiPanel": "Show / hide the AI panel",
 };
 
 export default en;

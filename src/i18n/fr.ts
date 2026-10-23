@@ -387,6 +387,11 @@ const fr: Messages = {
   "dd.footer": "{n} autres copies quitteront la bibliothèque (vos fichiers d'origine ne sont pas touchés)",
   "dd.apply": "Appliquer à {n} groupes",
   "dd.done": "{n} livres en double retirés ; {h} surlignages et {b} signets déplacés",
+
+  "reader.collapseSidebar": "Masquer la barre latérale",
+  "reader.collapseAi": "Masquer le panneau IA",
+  "reader.resizeHint": "Faites glisser pour redimensionner ; double-cliquez pour réinitialiser",
+  "sc.aiPanel": "Afficher / masquer le panneau IA",
 };
 
 export default fr;

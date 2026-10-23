@@ -11,6 +11,7 @@ import type { TextRange } from "../reader/anchors";
 import { formatNumber, t, type MessageKey } from "../i18n";
 import { Icon, type IconName } from "../icons";
 import { describe } from "../reader/locations";
+import { MOD } from "../reader/shortcuts";
 import { useAi } from "./AiContext";
 import Markdown from "./Markdown";
 import { MindMapPreview, MindMapViewer, outlineMarkdown, saveMindMap } from "./MindMap";
@@ -95,6 +96,7 @@ export default function AiPanel(props: {
   onSaveNote: (quote: Quote, note: string) => void;
   onNavigate: (loc: Location) => void;
   onClose: () => void;
+  width: number;
 }) {
   const { book, location } = props;
   const ai = useAi();
@@ -372,15 +374,15 @@ export default function AiPanel(props: {
       <button className="icon-button" title={t("ai.settings")} aria-label={t("ai.settings")} onClick={ai.openSettings}>
         <Icon name="settings" />
       </button>
-      <button className="icon-button" title={t("common.close")} aria-label={t("common.close")} onClick={props.onClose}>
-        <Icon name="close" />
+      <button className="icon-button" title={`${t("reader.collapseAi")} (${MOD}+Shift+A)`} aria-label={t("reader.collapseAi")} onClick={props.onClose}>
+        <Icon name="panelRight" />
       </button>
     </div>
   );
 
   if (!ai.ready) {
     return (
-      <aside className="ai-panel">
+      <aside className="ai-panel" style={{ width: props.width }}>
         {header}
         <div className="ai-welcome">
           <div className="ai-orb">
@@ -405,7 +407,7 @@ export default function AiPanel(props: {
   const mapBusy = maps.some((m) => m.status === "running");
 
   return (
-    <aside className="ai-panel">
+    <aside className="ai-panel" style={{ width: props.width }}>
       {header}
 
       {tab === "chat" && (

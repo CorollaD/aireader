@@ -387,6 +387,11 @@ const zhTW: Messages = {
   "dd.footer": "其餘 {n} 本將移出書架（原始檔案不受影響）",
   "dd.apply": "處理 {n} 組",
   "dd.done": "已移出 {n} 本重複的書，轉移了 {h} 則畫線和 {b} 個書籤",
+
+  "reader.collapseSidebar": "收合側欄",
+  "reader.collapseAi": "收合 AI 面板",
+  "reader.resizeHint": "拖曳調整寬度，按兩下恢復預設",
+  "sc.aiPanel": "顯示 / 隱藏 AI 面板",
 };
 
 export default zhTW;

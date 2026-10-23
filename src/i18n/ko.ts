@@ -387,6 +387,11 @@ const ko: Messages = {
   "dd.footer": "나머지 {n}권은 책장에서 빠집니다(원본 파일은 그대로)",
   "dd.apply": "{n}개 그룹 처리",
   "dd.done": "중복 책 {n}권을 뺐고 하이라이트 {h}개와 책갈피 {b}개를 옮겼습니다",
+
+  "reader.collapseSidebar": "사이드바 숨기기",
+  "reader.collapseAi": "AI 패널 숨기기",
+  "reader.resizeHint": "드래그해 너비 조절, 두 번 클릭하면 기본값",
+  "sc.aiPanel": "AI 패널 보이기 / 숨기기",
 };
 
 export default ko;

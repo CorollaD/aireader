@@ -387,6 +387,11 @@ const pt: Messages = {
   "dd.footer": "Outras {n} cópias sairão da estante (seus arquivos originais não são alterados)",
   "dd.apply": "Aplicar a {n} grupos",
   "dd.done": "{n} livros duplicados removidos; {h} destaques e {b} marcadores transferidos",
+
+  "reader.collapseSidebar": "Ocultar barra lateral",
+  "reader.collapseAi": "Ocultar painel de IA",
+  "reader.resizeHint": "Arraste para ajustar a largura; clique duas vezes para restaurar",
+  "sc.aiPanel": "Mostrar / ocultar o painel de IA",
 };
 
 export default pt;

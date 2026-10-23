@@ -387,6 +387,11 @@ const es: Messages = {
   "dd.footer": "{n} copias más saldrán de la estantería (tus archivos originales no se tocan)",
   "dd.apply": "Aplicar a {n} grupos",
   "dd.done": "Se quitaron {n} libros duplicados; se movieron {h} subrayados y {b} marcadores",
+
+  "reader.collapseSidebar": "Ocultar barra lateral",
+  "reader.collapseAi": "Ocultar panel de IA",
+  "reader.resizeHint": "Arrastra para cambiar el ancho; doble clic para restablecer",
+  "sc.aiPanel": "Mostrar / ocultar el panel de IA",
 };
 
 export default es;

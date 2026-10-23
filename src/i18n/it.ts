@@ -387,6 +387,11 @@ const it: Messages = {
   "dd.footer": "Altre {n} copie usciranno dallo scaffale (i file originali non vengono toccati)",
   "dd.apply": "Applica a {n} gruppi",
   "dd.done": "Rimossi {n} libri duplicati; spostate {h} evidenziazioni e {b} segnalibri",
+
+  "reader.collapseSidebar": "Nascondi barra laterale",
+  "reader.collapseAi": "Nascondi pannello IA",
+  "reader.resizeHint": "Trascina per ridimensionare; doppio clic per ripristinare",
+  "sc.aiPanel": "Mostra / nascondi il pannello IA",
 };
 
 export default it;

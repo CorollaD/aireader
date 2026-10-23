@@ -387,6 +387,11 @@ const ja: Messages = {
   "dd.footer": "ほかの {n} 冊は本棚から外れます（元のファイルはそのまま）",
   "dd.apply": "{n} グループを処理",
   "dd.done": "重複した本 {n} 冊を外し、ハイライト {h} 件とブックマーク {b} 件を移しました",
+
+  "reader.collapseSidebar": "サイドバーを隠す",
+  "reader.collapseAi": "AI パネルを隠す",
+  "reader.resizeHint": "ドラッグで幅を変更、ダブルクリックで元に戻す",
+  "sc.aiPanel": "AI パネルの表示 / 非表示",
 };
 
 export default ja;

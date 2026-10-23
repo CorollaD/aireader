@@ -2510,3 +2510,39 @@ button.cite:hover {
   font-variant-numeric: tabular-nums;
   color: var(--accent);
 }
+
+/* Panel dividers in the reader */
+.resizer {
+  position: relative;
+  flex: 0 0 8px;
+  margin: 0 -4px;
+  z-index: 6;
+  cursor: col-resize;
+  touch-action: none;
+}
+.resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background 0.15s;
+}
+.resizer:hover::after,
+.resizer.active::after {
+  background: var(--accent);
+}
+body.resizing,
+body.resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+.side-tabs .tab-icon {
+  flex: 0 0 34px;
+  color: var(--muted);
+}
+.side-tabs .tab-icon:hover {
+  color: var(--fg);
+}
