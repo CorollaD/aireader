@@ -1,8 +1,6 @@
 // Mirrors the Rust types serialized by src-tauri (model.rs, library.rs, commands.rs).
 
-export type Location =
-  | { kind: "flow"; chapter: number; block: number }
-  | { kind: "page"; page: number };
+export type Location = { kind: "flow"; chapter: number; block: number } | { kind: "page"; page: number };
 
 export interface Book {
   id: string;
@@ -238,10 +236,7 @@ export type AiTask =
   | { kind: "mindMap"; bookId: string; scope: MindMapScope; refresh?: boolean };
 
 export type MindMapScope =
-  | { kind: "chapter"; chapter: number }
-  | { kind: "pages"; from: number; to: number }
-  | { kind: "book" }
-  | { kind: "text"; title: string; text: string };
+  { kind: "chapter"; chapter: number } | { kind: "pages"; from: number; to: number } | { kind: "book" } | { kind: "text"; title: string; text: string };
 
 export interface BookEstimate {
   units: number;

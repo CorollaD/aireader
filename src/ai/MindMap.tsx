@@ -172,7 +172,11 @@ async function pngBase64(svg: SVGSVGElement, theme: Theme): Promise<string> {
   }
 }
 
-const fileSafe = (s: string) => s.replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 80) || "mindmap";
+const fileSafe = (s: string) =>
+  s
+    .replace(/[\\/:*?"<>|]+/g, " ")
+    .trim()
+    .slice(0, 80) || "mindmap";
 
 /** Saves a drawn map through a save dialog; resolves to the path, or null if cancelled. */
 export async function saveMindMap(svg: SVGSVGElement, title: string, kind: "png" | "svg"): Promise<string | null> {
@@ -190,13 +194,7 @@ export function outlineMarkdown(outline: string, title: string): string {
 // --- preview -----------------------------------------------------------------------------------
 
 /** The whole map scaled to the panel width; clicking opens the viewer. */
-export function MindMapPreview(props: {
-  outline: string;
-  title: string;
-  streaming: boolean;
-  svgRef?: React.Ref<SVGSVGElement>;
-  onOpen: () => void;
-}) {
+export function MindMapPreview(props: { outline: string; title: string; streaming: boolean; svgRef?: React.Ref<SVGSVGElement>; onOpen: () => void }) {
   const root = useMemo(() => parseOutline(props.outline, props.title), [props.outline, props.title]);
   const theme = readTheme();
   const none = useMemo(() => new Set<string>(), []);
@@ -357,13 +355,7 @@ export function MindMapViewer(props: { outline: string; title: string; onClose: 
         onPointerCancel={() => (drag.current = null)}
       >
         <div className="mm-canvas" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})` }}>
-          <Svg
-            root={root}
-            collapsed={collapsed}
-            theme={theme}
-            svgRef={svg}
-            onToggle={toggle}
-          />
+          <Svg root={root} collapsed={collapsed} theme={theme} svgRef={svg} onToggle={toggle} />
         </div>
         <div className="mm-hint muted small">{t("mm.hint")}</div>
       </div>

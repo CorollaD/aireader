@@ -4,26 +4,11 @@ import type { UpdateSettings } from "../App";
 import { t } from "../i18n";
 import { BACKGROUNDS, FONT_STACKS, isDark, type FontFamily, type Settings } from "../settings";
 
-function Slider(props: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  format: (v: number) => string;
-  onChange: (v: number) => void;
-}) {
+function Slider(props: { label: string; value: number; min: number; max: number; step: number; format: (v: number) => string; onChange: (v: number) => void }) {
   return (
     <label className="slider">
       <span>{props.label}</span>
-      <input
-        type="range"
-        min={props.min}
-        max={props.max}
-        step={props.step}
-        value={props.value}
-        onChange={(e) => props.onChange(Number(e.target.value))}
-      />
+      <input type="range" min={props.min} max={props.max} step={props.step} value={props.value} onChange={(e) => props.onChange(Number(e.target.value))} />
       <span className="slider-value">{props.format(props.value)}</span>
     </label>
   );
@@ -84,16 +69,11 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
             <button className={s.textColor === null ? "on" : ""} onClick={() => update({ textColor: null })}>
               {t("rs.auto")}
             </button>
-            <button
-              className={s.textColor !== null ? "on" : ""}
-              onClick={() => update({ textColor: isDark(s.background) ? "#d8d8d8" : "#222222" })}
-            >
+            <button className={s.textColor !== null ? "on" : ""} onClick={() => update({ textColor: isDark(s.background) ? "#d8d8d8" : "#222222" })}>
               {t("rs.custom")}
             </button>
           </div>
-          {s.textColor !== null && (
-            <input type="color" value={s.textColor} onChange={(e) => update({ textColor: e.target.value })} />
-          )}
+          {s.textColor !== null && <input type="color" value={s.textColor} onChange={(e) => update({ textColor: e.target.value })} />}
         </div>
       </div>
 
@@ -103,12 +83,7 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
             <div className="panel-label">{t("rs.font")}</div>
             <div className="segmented">
               {(Object.keys(FONT_STACKS) as FontFamily[]).map((f) => (
-                <button
-                  key={f}
-                  className={s.fontFamily === f ? "on" : ""}
-                  style={{ fontFamily: FONT_STACKS[f].css }}
-                  onClick={() => update({ fontFamily: f })}
-                >
+                <button key={f} className={s.fontFamily === f ? "on" : ""} style={{ fontFamily: FONT_STACKS[f].css }} onClick={() => update({ fontFamily: f })}>
                   {t(FONT_STACKS[f].name)}
                 </button>
               ))}
@@ -116,11 +91,35 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
           </div>
           <div className="panel-section">
             <Slider label={t("rs.fontSize")} value={s.fontSize} min={13} max={36} step={1} format={(v) => `${v}px`} onChange={(v) => update({ fontSize: v })} />
-            <Slider label={t("rs.lineHeight")} value={s.lineHeight} min={1.3} max={2.6} step={0.1} format={(v) => v.toFixed(1)} onChange={(v) => update({ lineHeight: v })} />
-            <Slider label={t("rs.paragraphSpacing")} value={s.paragraphSpacing} min={0} max={2} step={0.05} format={(v) => `${v.toFixed(2)}em`} onChange={(v) => update({ paragraphSpacing: v })} />
+            <Slider
+              label={t("rs.lineHeight")}
+              value={s.lineHeight}
+              min={1.3}
+              max={2.6}
+              step={0.1}
+              format={(v) => v.toFixed(1)}
+              onChange={(v) => update({ lineHeight: v })}
+            />
+            <Slider
+              label={t("rs.paragraphSpacing")}
+              value={s.paragraphSpacing}
+              min={0}
+              max={2}
+              step={0.05}
+              format={(v) => `${v.toFixed(2)}em`}
+              onChange={(v) => update({ paragraphSpacing: v })}
+            />
             <Slider label={t("rs.margin")} value={s.margin} min={0} max={120} step={4} format={(v) => `${v}px`} onChange={(v) => update({ margin: v })} />
             {s.flowMode === "scroll" && (
-              <Slider label={t("rs.maxWidth")} value={s.maxWidth} min={480} max={1400} step={20} format={(v) => `${v}px`} onChange={(v) => update({ maxWidth: v })} />
+              <Slider
+                label={t("rs.maxWidth")}
+                value={s.maxWidth}
+                min={480}
+                max={1400}
+                step={20}
+                format={(v) => `${v}px`}
+                onChange={(v) => update({ maxWidth: v })}
+              />
             )}
             <div className="row-gap toggles">
               <Toggle label={t("rs.indent")} on={s.indent} onChange={(indent) => update({ indent })} />
@@ -185,12 +184,7 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
 }
 
 /** The reader's "Aa" popover. */
-export default function SettingsPanel(props: {
-  settings: Settings;
-  update: UpdateSettings;
-  textOptions: boolean;
-  onMore: () => void;
-}) {
+export default function SettingsPanel(props: { settings: Settings; update: UpdateSettings; textOptions: boolean; onMore: () => void }) {
   return (
     <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
       <ReadingSettings settings={props.settings} update={props.update} text={props.textOptions} paged={false} />

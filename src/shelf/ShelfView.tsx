@@ -78,7 +78,10 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
   const openSettings = useOpenSettings();
 
   const refresh = useCallback(() => {
-    api.listBooks().then(setShelf).catch((e) => setToast(errorText(e)));
+    api
+      .listBooks()
+      .then(setShelf)
+      .catch((e) => setToast(errorText(e)));
   }, []);
   useEffect(refresh, [refresh]);
 
@@ -219,8 +222,18 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
         <aside className="sidebar">
           <div className="brand">AiReader</div>
           {sideItem(ALL, "library", t("shelf.all"), shelf.books.length)}
-          {sideItem(RECENT, "clock", t("shelf.recent"), count((b) => !!b.lastRead))}
-          {sideItem(UNGROUPED, "inbox", t("shelf.ungrouped"), count((b) => !b.group))}
+          {sideItem(
+            RECENT,
+            "clock",
+            t("shelf.recent"),
+            count((b) => !!b.lastRead),
+          )}
+          {sideItem(
+            UNGROUPED,
+            "inbox",
+            t("shelf.ungrouped"),
+            count((b) => !b.group),
+          )}
           <div className="side-heading">
             <span>{t("shelf.groups")}</span>
             <button className="icon" title={t("shelf.newGroup")} aria-label={t("shelf.newGroup")} onClick={() => setGroupDialog({ old: null })}>
@@ -229,7 +242,12 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
           </div>
           {shelf.groups.map((g) => (
             <div key={g} className="side-group">
-              {sideItem(g, "folder", g, count((b) => b.group === g))}
+              {sideItem(
+                g,
+                "folder",
+                g,
+                count((b) => b.group === g),
+              )}
               <span className="side-actions">
                 <button className="icon" title={t("shelf.renameGroup")} onClick={() => setGroupDialog({ old: g })}>
                   <Icon name="edit" size={14} />
@@ -242,11 +260,7 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
           ))}
           {shelf.groups.length === 0 && <div className="muted small side-empty">{t("shelf.groupsHint")}</div>}
           <div className="side-footer">
-            <button
-              className="side-item"
-              onClick={ai.openSettings}
-              title={`${t("ai.settings")}: ${ai.ready ? t("ai.configured") : t("ai.notConfigured")}`}
-            >
+            <button className="side-item" onClick={ai.openSettings} title={`${t("ai.settings")}: ${ai.ready ? t("ai.configured") : t("ai.notConfigured")}`}>
               <Icon name="sparkles" />
               <span className="ellipsis grow">{t("ai.settings")}</span>
               <span
@@ -437,9 +451,7 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
             {t("shelf.open")}
           </button>
           <button onClick={() => (setMenu(null), setEditing([menu.book]))}>{t("shelf.editInfo")}</button>
-          <button onClick={() => (setMenu(null), toggle(menu.book.id))}>
-            {selected.has(menu.book.id) ? t("shelf.clearSelection") : t("common.select")}
-          </button>
+          <button onClick={() => (setMenu(null), toggle(menu.book.id))}>{selected.has(menu.book.id) ? t("shelf.clearSelection") : t("common.select")}</button>
           <hr />
           <button className="danger" onClick={() => (setMenu(null), setDeleting([menu.book]))}>
             {t("shelf.remove")}
@@ -447,26 +459,13 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
         </div>
       )}
 
-      {editing && (
-        <EditDialog
-          books={editing}
-          groups={shelf.groups}
-          onSave={(patch) => saveEdit(editing, patch)}
-          onClose={() => setEditing(null)}
-        />
-      )}
+      {editing && <EditDialog books={editing} groups={shelf.groups} onSave={(patch) => saveEdit(editing, patch)} onClose={() => setEditing(null)} />}
       {deleting && (
         <Confirm
           title={t("shelf.remove")}
           danger
           confirmText={t("common.delete")}
-          message={
-            <p>
-              {deleting.length === 1
-                ? t("shelf.removeOne", { title: deleting[0].title })
-                : t("shelf.removeMany", { n: deleting.length })}
-            </p>
-          }
+          message={<p>{deleting.length === 1 ? t("shelf.removeOne", { title: deleting[0].title }) : t("shelf.removeMany", { n: deleting.length })}</p>}
           onConfirm={() => remove(deleting)}
           onClose={() => setDeleting(null)}
         />
@@ -515,17 +514,11 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
             <div className="bar">
               <div style={{ width: progress.total ? `${(progress.done / progress.total) * 100}%` : "0%" }} />
             </div>
-            <div className="muted small ellipsis">
-              {progress.total ? `${progress.done} / ${progress.total}　${progress.name}` : t("shelf.scanning")}
-            </div>
+            <div className="muted small ellipsis">{progress.total ? `${progress.done} / ${progress.total}　${progress.name}` : t("shelf.scanning")}</div>
           </div>
         </div>
       )}
-      {dragging && (
-        <div className="drop-overlay">
-          {currentGroup ? t("shelf.dropToGroup", { group: currentGroup }) : t("shelf.dropToShelf")}
-        </div>
-      )}
+      {dragging && <div className="drop-overlay">{currentGroup ? t("shelf.dropToGroup", { group: currentGroup }) : t("shelf.dropToShelf")}</div>}
       {organizing && (
         <OrganizeDialog
           books={organizing}

@@ -132,8 +132,10 @@ const it: Messages = {
   "shelf.open": "Apri",
   "shelf.editInfo": "Modifica dati e gruppi",
   "shelf.remove": "Rimuovi dallo scaffale",
-  "shelf.removeOne": "«{title}» verrà rimosso insieme ad avanzamento, segnalibri e note. La copia nella libreria viene eliminata; il file originale che hai importato non viene toccato.",
-  "shelf.removeMany": "{n} libri verranno rimossi insieme ad avanzamento, segnalibri e note. Le copie nella libreria vengono eliminate; i file originali che hai importato non vengono toccati.",
+  "shelf.removeOne":
+    "«{title}» verrà rimosso insieme ad avanzamento, segnalibri e note. La copia nella libreria viene eliminata; il file originale che hai importato non viene toccato.",
+  "shelf.removeMany":
+    "{n} libri verranno rimossi insieme ad avanzamento, segnalibri e note. Le copie nella libreria vengono eliminate; i file originali che hai importato non vengono toccati.",
   "shelf.importing": "Importazione…",
   "shelf.scanning": "Analisi dei file…",
   "shelf.dropToGroup": "Rilascia per importare in «{group}»",
@@ -282,7 +284,8 @@ const it: Messages = {
   "ai.actionTranslate": "Traduci",
   "ai.actionSummarize": "Riassumi",
   "ai.consentTitle": "Inviare il contenuto del libro a un servizio di IA?",
-  "ai.consentBody": "Le funzioni di IA inviano a {provider} il testo del libro di cui hanno bisogno (testo dei capitoli, testo selezionato, titolo e così via). Viene usato il tuo account presso quel servizio, può avere un costo e si applica la sua informativa sulla privacy.",
+  "ai.consentBody":
+    "Le funzioni di IA inviano a {provider} il testo del libro di cui hanno bisogno (testo dei capitoli, testo selezionato, titolo e così via). Viene usato il tuo account presso quel servizio, può avere un costo e si applica la sua informativa sulla privacy.",
   "ai.consentHint": "Per tenere i contenuti su questo computer, scegli un modello locale come Ollama nelle impostazioni IA. Te lo chiediamo una sola volta.",
   "ai.consentAgree": "Accetta e continua",
   "ai.provider": "Servizio",
@@ -297,7 +300,8 @@ const it: Messages = {
   "ai.language": "Lingua delle risposte",
   "ai.languageAuto": "Come l'interfaccia",
   "ai.localNote": "I modelli locali funzionano sul tuo computer; il contenuto del libro non lo lascia mai.",
-  "ai.cloudNote": "Con un servizio cloud, il testo necessario viene inviato a quel servizio e addebitato secondo i suoi prezzi. La chiave API è salvata solo nel portachiavi di sistema.",
+  "ai.cloudNote":
+    "Con un servizio cloud, il testo necessario viene inviato a quel servizio e addebitato secondo i suoi prezzi. La chiave API è salvata solo nel portachiavi di sistema.",
   "ai.test": "Prova connessione",
   "ai.testing": "Verifica…",
   "ai.testOk": "Connesso: {reply}",
@@ -318,7 +322,8 @@ const it: Messages = {
 
   "ai.newChat": "Nuova chat",
   "ai.emptyTitle": "Chiedi qualcosa su questo libro",
-  "ai.emptyHint": "L'IA cerca i passi pertinenti in tutto il libro; fai clic sui numeri nella risposta per andare al testo. Seleziona del testo nel libro per farlo spiegare, tradurre o per porre domande su di esso.",
+  "ai.emptyHint":
+    "L'IA cerca i passi pertinenti in tutto il libro; fai clic sui numeri nella risposta per andare al testo. Seleziona del testo nel libro per farlo spiegare, tradurre o per porre domande su di esso.",
   "ai.suggestChapter": "Cosa succede in questo capitolo?",
   "ai.suggestPeople": "Chi sono i personaggi principali di questo capitolo?",
   "ai.suggestHard": "Spiega le parti difficili qui",
@@ -368,7 +373,8 @@ const it: Messages = {
   "dd.findTitle": "Trova i libri salvati in più file e tieni solo la copia migliore",
   "dd.scanning": "Analisi dei libri…",
   "dd.title": "Libri duplicati",
-  "dd.intro": "Ogni gruppo è lo stesso libro in più file. Scegli la copia da tenere; le altre escono dallo scaffale e avanzamento, segnalibri e note passano, dove possibile, alla copia tenuta.",
+  "dd.intro":
+    "Ogni gruppo è lo stesso libro in più file. Scegli la copia da tenere; le altre escono dallo scaffale e avanzamento, segnalibri e note passano, dove possibile, alla copia tenuta.",
   "dd.importedHint": "{n} dei libri appena importati potrebbero essere già nello scaffale in un altro file. Scegli quale copia tenere in ogni gruppo.",
   "dd.none": "Nessun libro duplicato trovato.",
   "dd.recommended": "Consigliato",
@@ -392,7 +398,8 @@ const it: Messages = {
   "sc.aiPanel": "Mostra / nascondi il pannello IA",
 
   "ai.embedTitle": "Ricerca semantica (modello di embedding)",
-  "ai.embedHint": "Permette alle domande di trovare i passi per significato, anche se formulate diversamente. Si usa solo per i libri con indice semantico. DeepSeek e Claude non offrono embedding: usa Ollama su questo computer o un servizio compatibile con OpenAI.",
+  "ai.embedHint":
+    "Permette alle domande di trovare i passi per significato, anche se formulate diversamente. Si usa solo per i libri con indice semantico. DeepSeek e Claude non offrono embedding: usa Ollama su questo computer o un servizio compatibile con OpenAI.",
   "ai.embedNone": "Non usare",
   "ai.basisKeyword": "ricerca per parole chiave",
   "ai.basisHybrid": "ricerca per parole chiave + semantica",

@@ -392,7 +392,8 @@ const zhCN = {
   "sc.aiPanel": "显示 / 隐藏 AI 面板",
 
   "ai.embedTitle": "语义检索（向量模型）",
-  "ai.embedHint": "让「问问这本书」按意思找到相关段落，换种说法也能找到。只用于你手动建立了语义索引的书。DeepSeek 和 Claude 没有向量接口，可以用本机的 Ollama 或 OpenAI 兼容服务。",
+  "ai.embedHint":
+    "让「问问这本书」按意思找到相关段落，换种说法也能找到。只用于你手动建立了语义索引的书。DeepSeek 和 Claude 没有向量接口，可以用本机的 Ollama 或 OpenAI 兼容服务。",
   "ai.embedNone": "不使用",
   "ai.basisKeyword": "关键词检索",
   "ai.basisHybrid": "关键词 + 语义检索",

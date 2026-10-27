@@ -93,7 +93,9 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
         setRotation(b.rotation);
         const start = b.position && isValid(b, b.position) ? b.position : START[b.kind];
         setJump({ loc: start, n: 0 });
-        getCurrentWindow().setTitle(`${b.title} — AiReader`).catch(() => {});
+        getCurrentWindow()
+          .setTitle(`${b.title} — AiReader`)
+          .catch(() => {});
       })
       .catch((e) => setError(errorText(e)));
   }, [bookId]);
@@ -169,8 +171,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
       setToast(t("reader.bookmarkRemoved"));
       return;
     }
-    const excerpt =
-      location.kind === "flow" ? (flowRef.current?.blockText(location.chapter, location.block) ?? "").trim().slice(0, 100) : "";
+    const excerpt = location.kind === "flow" ? (flowRef.current?.blockText(location.chapter, location.block) ?? "").trim().slice(0, 100) : "";
     ann.addBookmark({ location, title: describe(book, location), excerpt });
     setToast(t("reader.bookmarkAdded"));
   }, [book, location, currentBookmark, ann]);
@@ -237,7 +238,10 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
     window.getSelection()?.removeAllRanges();
     setPageSel(null);
     const runs = await pageText(bookId, page);
-    const context = runs.map((r) => r.text).join(" ").slice(0, 2000);
+    const context = runs
+      .map((r) => r.text)
+      .join(" ")
+      .slice(0, 2000);
     openChat({ anchor: null, selection: text, context, action });
   };
 
@@ -349,7 +353,25 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isFlow, settings.fontSize, settings.showToc, panel, moreMenu, search.open, aiOpen, focus, selection, activeMark, pageSel, update, props.onClose, toggleBookmark, back, forward, openSettings]);
+  }, [
+    isFlow,
+    settings.fontSize,
+    settings.showToc,
+    panel,
+    moreMenu,
+    search.open,
+    aiOpen,
+    focus,
+    selection,
+    activeMark,
+    pageSel,
+    update,
+    props.onClose,
+    toggleBookmark,
+    back,
+    forward,
+    openSettings,
+  ]);
 
   // The reader keeps its text at the size chosen under Reading, whatever the interface zoom.
   const flowSettings = useMemo(() => {
@@ -398,7 +420,13 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
           >
             <Icon name="panelLeft" />
           </button>
-          <button className="icon-button" onClick={back} disabled={history.back.length === 0} title={`${t("reader.back")} (Alt+←)`} aria-label={t("reader.back")}>
+          <button
+            className="icon-button"
+            onClick={back}
+            disabled={history.back.length === 0}
+            title={`${t("reader.back")} (Alt+←)`}
+            aria-label={t("reader.back")}
+          >
             <Icon name="chevronLeft" />
           </button>
           <button
@@ -418,7 +446,12 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
         <div className="bar-group">
           {book.kind === "paged" && (
             <div className="tool-group">
-              <button className="icon-button" onClick={() => setZoom((z) => Math.max(0.3, z / 1.2))} title={t("reader.zoomOut")} aria-label={t("reader.zoomOut")}>
+              <button
+                className="icon-button"
+                onClick={() => setZoom((z) => Math.max(0.3, z / 1.2))}
+                title={t("reader.zoomOut")}
+                aria-label={t("reader.zoomOut")}
+              >
                 <Icon name="minus" />
               </button>
               <button className="zoom" onClick={() => setZoom(1)} title={t("reader.zoomReset")}>
@@ -496,14 +529,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
             >
               <Icon name="type" />
             </button>
-            {panel && (
-              <SettingsPanel
-                settings={settings}
-                update={update}
-                textOptions={isFlow}
-                onMore={() => (setPanel(false), openSettings("reading"))}
-              />
-            )}
+            {panel && <SettingsPanel settings={settings} update={update} textOptions={isFlow} onMore={() => (setPanel(false), openSettings("reading"))} />}
           </div>
           <div className="menu-anchor">
             <button

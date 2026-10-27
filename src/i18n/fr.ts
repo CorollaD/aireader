@@ -132,8 +132,10 @@ const fr: Messages = {
   "shelf.open": "Ouvrir",
   "shelf.editInfo": "Modifier les infos et les groupes",
   "shelf.remove": "Retirer de la bibliothèque",
-  "shelf.removeOne": "« {title} » sera retiré avec sa progression, ses signets et ses notes. La copie dans la bibliothèque est supprimée ; le fichier d'origine que vous avez importé n'est pas touché.",
-  "shelf.removeMany": "{n} livres seront retirés avec leur progression, leurs signets et leurs notes. Les copies dans la bibliothèque sont supprimées ; les fichiers d'origine que vous avez importés ne sont pas touchés.",
+  "shelf.removeOne":
+    "« {title} » sera retiré avec sa progression, ses signets et ses notes. La copie dans la bibliothèque est supprimée ; le fichier d'origine que vous avez importé n'est pas touché.",
+  "shelf.removeMany":
+    "{n} livres seront retirés avec leur progression, leurs signets et leurs notes. Les copies dans la bibliothèque sont supprimées ; les fichiers d'origine que vous avez importés ne sont pas touchés.",
   "shelf.importing": "Importation…",
   "shelf.scanning": "Analyse des fichiers…",
   "shelf.dropToGroup": "Déposez pour importer dans « {group} »",
@@ -282,8 +284,10 @@ const fr: Messages = {
   "ai.actionTranslate": "Traduire",
   "ai.actionSummarize": "Résumer",
   "ai.consentTitle": "Envoyer le contenu du livre à un service d'IA ?",
-  "ai.consentBody": "Les fonctions d'IA envoient à {provider} le texte du livre dont elles ont besoin (texte des chapitres, texte sélectionné, titre, etc.). Cela utilise votre compte auprès de ce service, peut être payant et relève de sa politique de confidentialité.",
-  "ai.consentHint": "Pour garder le contenu sur cet ordinateur, choisissez un modèle local comme Ollama dans les réglages IA. Cette question n'est posée qu'une fois.",
+  "ai.consentBody":
+    "Les fonctions d'IA envoient à {provider} le texte du livre dont elles ont besoin (texte des chapitres, texte sélectionné, titre, etc.). Cela utilise votre compte auprès de ce service, peut être payant et relève de sa politique de confidentialité.",
+  "ai.consentHint":
+    "Pour garder le contenu sur cet ordinateur, choisissez un modèle local comme Ollama dans les réglages IA. Cette question n'est posée qu'une fois.",
   "ai.consentAgree": "Accepter et continuer",
   "ai.provider": "Service",
   "ai.model": "Modèle",
@@ -297,7 +301,8 @@ const fr: Messages = {
   "ai.language": "Langue des réponses",
   "ai.languageAuto": "Celle de l'interface",
   "ai.localNote": "Les modèles locaux tournent sur votre ordinateur ; le contenu du livre ne le quitte jamais.",
-  "ai.cloudNote": "Avec un service cloud, le texte nécessaire est envoyé à ce service et facturé selon ses tarifs. La clé d'API est conservée uniquement dans le trousseau du système.",
+  "ai.cloudNote":
+    "Avec un service cloud, le texte nécessaire est envoyé à ce service et facturé selon ses tarifs. La clé d'API est conservée uniquement dans le trousseau du système.",
   "ai.test": "Tester la connexion",
   "ai.testing": "Test…",
   "ai.testOk": "Connecté : {reply}",
@@ -318,7 +323,8 @@ const fr: Messages = {
 
   "ai.newChat": "Nouvelle conversation",
   "ai.emptyTitle": "Posez une question sur ce livre",
-  "ai.emptyHint": "L'IA cherche les passages utiles dans tout le livre ; cliquez sur les numéros d'une réponse pour aller au texte. Sélectionnez du texte pour que l'IA l'explique, le traduise ou réponde à vos questions dessus.",
+  "ai.emptyHint":
+    "L'IA cherche les passages utiles dans tout le livre ; cliquez sur les numéros d'une réponse pour aller au texte. Sélectionnez du texte pour que l'IA l'explique, le traduise ou réponde à vos questions dessus.",
   "ai.suggestChapter": "Que se passe-t-il dans ce chapitre ?",
   "ai.suggestPeople": "Qui sont les personnages principaux de ce chapitre ?",
   "ai.suggestHard": "Expliquez les passages difficiles ici",
@@ -360,7 +366,8 @@ const fr: Messages = {
   "edit.newGroupOption": "Nouveau groupe…",
   "org.moveTo": "Déplacer vers le groupe",
   "ai.mapTab": "Carte",
-  "mm.emptyHint": "Choisissez ce qu'il faut représenter. Les cartes de chapitre et du livre sont mises en cache par modèle et s'affichent aussitôt la fois suivante.",
+  "mm.emptyHint":
+    "Choisissez ce qu'il faut représenter. Les cartes de chapitre et du livre sont mises en cache par modèle et s'affichent aussitôt la fois suivante.",
   "mm.history": "Créées pendant cette session",
   "mm.messages": "{n} messages",
 
@@ -368,7 +375,8 @@ const fr: Messages = {
   "dd.findTitle": "Trouver les livres présents en plusieurs fichiers et ne garder que la meilleure copie",
   "dd.scanning": "Analyse des livres…",
   "dd.title": "Livres en double",
-  "dd.intro": "Chaque groupe est un même livre en plusieurs fichiers. Choisissez la copie à garder ; les autres quittent la bibliothèque et leur progression, leurs signets et leurs notes passent si possible sur la copie gardée.",
+  "dd.intro":
+    "Chaque groupe est un même livre en plusieurs fichiers. Choisissez la copie à garder ; les autres quittent la bibliothèque et leur progression, leurs signets et leurs notes passent si possible sur la copie gardée.",
   "dd.importedHint": "{n} des livres importés sont peut-être déjà dans la bibliothèque sous un autre fichier. Choisissez la copie à garder dans chaque groupe.",
   "dd.none": "Aucun livre en double trouvé.",
   "dd.recommended": "Recommandé",
@@ -392,7 +400,8 @@ const fr: Messages = {
   "sc.aiPanel": "Afficher / masquer le panneau IA",
 
   "ai.embedTitle": "Recherche sémantique (modèle d'embeddings)",
-  "ai.embedHint": "Permet aux questions de trouver les passages par le sens, même formulées autrement. Utilisé seulement pour les livres dotés d'un index sémantique. DeepSeek et Claude n'ont pas d'API d'embeddings : utilisez Ollama sur cet ordinateur ou un service compatible OpenAI.",
+  "ai.embedHint":
+    "Permet aux questions de trouver les passages par le sens, même formulées autrement. Utilisé seulement pour les livres dotés d'un index sémantique. DeepSeek et Claude n'ont pas d'API d'embeddings : utilisez Ollama sur cet ordinateur ou un service compatible OpenAI.",
   "ai.embedNone": "Ne pas utiliser",
   "ai.basisKeyword": "recherche par mots-clés",
   "ai.basisHybrid": "recherche par mots-clés + sémantique",

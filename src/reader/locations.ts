@@ -24,9 +24,7 @@ export function sameLocation(a: Location | null, b: Location | null): boolean {
 
 /** Whether a stored location still exists in the opened book. */
 export function isValid(book: OpenedBook, loc: Location): boolean {
-  return loc.kind === "flow"
-    ? book.kind === "flow" && loc.chapter < book.chapters.length
-    : book.kind === "paged" && loc.page < book.pages.length;
+  return loc.kind === "flow" ? book.kind === "flow" && loc.chapter < book.chapters.length : book.kind === "paged" && loc.page < book.pages.length;
 }
 
 /** Progress through the book in 0..1, measured in blocks (reflowable) or pages. */

@@ -69,10 +69,10 @@ export function installMock() {
   const stream = (channel: { id: number }, text: string, progress = false, sources?: Source[]) => {
     let index = 0;
     const send = (message: AiEvent) =>
-      (window as unknown as { __TAURI_INTERNALS__: { runCallback: (id: number, d: unknown) => void } }).__TAURI_INTERNALS__.runCallback(
-        channel.id,
-        { index: index++, message },
-      );
+      (window as unknown as { __TAURI_INTERNALS__: { runCallback: (id: number, d: unknown) => void } }).__TAURI_INTERNALS__.runCallback(channel.id, {
+        index: index++,
+        message,
+      });
     const pieces = text.match(/.{1,6}/gs) ?? [];
     let t = 0;
     if (sources) setTimeout(() => send({ type: "sources", sources }), (t += 80));
@@ -113,7 +113,12 @@ export function installMock() {
           return b;
         }
         case "ai_semantic_status":
-          return { available: !!db.ai.embedding?.provider, local: db.ai.embedding?.provider === "ollama", passages: db.indexed.has(a.bookId as string) ? 120 : 0, stale: false };
+          return {
+            available: !!db.ai.embedding?.provider,
+            local: db.ai.embedding?.provider === "ollama",
+            passages: db.indexed.has(a.bookId as string) ? 120 : 0,
+            stale: false,
+          };
         case "find_duplicates":
           return [];
         case "merge_duplicates":
@@ -217,9 +222,7 @@ export function installMock() {
                 (a.onEvent as { id: number }).id,
                 { index: index++, message },
               );
-            [0, 32, 64, 96, 120].forEach((done, i) =>
-              setTimeout(() => send({ type: "progress", done, total: 120, label: "" }), 200 * (i + 1)),
-            );
+            [0, 32, 64, 96, 120].forEach((done, i) => setTimeout(() => send({ type: "progress", done, total: 120, label: "" }), 200 * (i + 1)));
             setTimeout(() => {
               db.indexed.add(task.bookId);
               send({ type: "done", text: "120", cached: false });
@@ -239,7 +242,10 @@ export function installMock() {
               location: { kind: "flow", chapter: c, block: 3 },
               excerpt: "话说天下大势，分久必合，合久必分。周末七国分争，并入于秦。",
             }));
-            const answer = task.history.length > 1 ? "继续说明：后来**楚汉相争**，又并入于汉 [2]。" : "开篇点明了全书主旨：**天下大势，分久必合，合久必分** [1]。\n\n- 周末七国分争，并入于秦 [1]\n- 楚汉分争，又并入于汉 [2][3]";
+            const answer =
+              task.history.length > 1
+                ? "继续说明：后来**楚汉相争**，又并入于汉 [2]。"
+                : "开篇点明了全书主旨：**天下大势，分久必合，合久必分** [1]。\n\n- 周末七国分争，并入于秦 [1]\n- 楚汉分争，又并入于汉 [2][3]";
             stream(a.onEvent as { id: number }, answer, false, sources);
             return null;
           }

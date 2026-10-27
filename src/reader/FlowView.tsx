@@ -1,17 +1,7 @@
 // Reflowable text, one chapter at a time, either scrolled vertically or laid out in CSS columns
 // and turned page by page. Renders highlights and reports the visible blocks and selections.
 
-import {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, errorText, imageUrl } from "../api";
 import { isTyping } from "../ui";
 import { t } from "../i18n";
@@ -195,7 +185,13 @@ const FlowView = forwardRef<FlowHandle, Props>(function FlowView(props, ref) {
   const shown = blocks && blocks.chapter === chapter ? blocks.blocks : null;
 
   const resolved = useMemo(
-    () => (shown ? resolveHighlights(shown, highlights.filter((h) => h.chapter === chapter)) : null),
+    () =>
+      shown
+        ? resolveHighlights(
+            shown,
+            highlights.filter((h) => h.chapter === chapter),
+          )
+        : null,
     [shown, highlights, chapter],
   );
   useEffect(() => {
@@ -274,7 +270,19 @@ const FlowView = forwardRef<FlowHandle, Props>(function FlowView(props, ref) {
     }
     requestAnimationFrame(() => reportRef.current());
     // Typography and size changes re-layout the text, so they re-run this too.
-  }, [shown, chapter, paged, stride, size.h, settings.fontSize, settings.lineHeight, settings.fontFamily, settings.columns, settings.paragraphSpacing, settings.maxWidth]);
+  }, [
+    shown,
+    chapter,
+    paged,
+    stride,
+    size.h,
+    settings.fontSize,
+    settings.lineHeight,
+    settings.fontFamily,
+    settings.columns,
+    settings.paragraphSpacing,
+    settings.maxWidth,
+  ]);
 
   useEffect(report, [page, report]);
 
@@ -376,12 +384,7 @@ const FlowView = forwardRef<FlowHandle, Props>(function FlowView(props, ref) {
   };
 
   const flashBlock = flash && flash.chapter === chapter ? flash.block : -2;
-  const classes = [
-    "flow",
-    paged ? "paged" : "",
-    settings.indent ? "indent" : "",
-    settings.justify ? "justify" : "",
-  ].join(" ");
+  const classes = ["flow", paged ? "paged" : "", settings.indent ? "indent" : "", settings.justify ? "justify" : ""].join(" ");
   const style: React.CSSProperties & Record<string, string | number> = {
     fontSize: settings.fontSize,
     lineHeight: settings.lineHeight,

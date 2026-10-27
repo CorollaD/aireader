@@ -66,8 +66,7 @@ export function useReadingStats(book: OpenedBook | null, location: Location | nu
     const tick = () => {
       const loc = locRef.current;
       const units = loc ? unitsAt(book, loc) : null;
-      const active =
-        document.visibilityState === "visible" && document.hasFocus() && Date.now() - lastActivity.current < IDLE_MS;
+      const active = document.visibilityState === "visible" && document.hasFocus() && Date.now() - lastActivity.current < IDLE_MS;
       if (active) {
         a.seconds += TICK_MS / 1000;
         if (units !== null && a.lastUnits !== null) {

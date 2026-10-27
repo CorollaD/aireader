@@ -20,8 +20,7 @@ body,
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI",
-    "Noto Sans CJK SC", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", "Noto Sans CJK SC", sans-serif;
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   user-select: none;
@@ -1268,11 +1267,21 @@ input[type="color"] {
   border-radius: 2px;
   cursor: pointer;
 }
-.hl-yellow { --hl: rgba(255, 213, 0, 0.42); }
-.hl-green { --hl: rgba(76, 200, 90, 0.36); }
-.hl-blue { --hl: rgba(70, 150, 255, 0.34); }
-.hl-pink { --hl: rgba(255, 90, 150, 0.32); }
-.hl-purple { --hl: rgba(160, 100, 255, 0.34); }
+.hl-yellow {
+  --hl: rgba(255, 213, 0, 0.42);
+}
+.hl-green {
+  --hl: rgba(76, 200, 90, 0.36);
+}
+.hl-blue {
+  --hl: rgba(70, 150, 255, 0.34);
+}
+.hl-pink {
+  --hl: rgba(255, 90, 150, 0.32);
+}
+.hl-purple {
+  --hl: rgba(160, 100, 255, 0.34);
+}
 .flow mark.hl {
   background: var(--hl);
 }
@@ -1281,11 +1290,21 @@ input[type="color"] {
   text-decoration-color: var(--muted);
   text-underline-offset: 4px;
 }
-.note-entry.hl-bar-yellow { border-left-color: rgb(240, 196, 0); }
-.note-entry.hl-bar-green { border-left-color: rgb(60, 180, 75); }
-.note-entry.hl-bar-blue { border-left-color: rgb(60, 130, 240); }
-.note-entry.hl-bar-pink { border-left-color: rgb(240, 80, 140); }
-.note-entry.hl-bar-purple { border-left-color: rgb(140, 90, 240); }
+.note-entry.hl-bar-yellow {
+  border-left-color: rgb(240, 196, 0);
+}
+.note-entry.hl-bar-green {
+  border-left-color: rgb(60, 180, 75);
+}
+.note-entry.hl-bar-blue {
+  border-left-color: rgb(60, 130, 240);
+}
+.note-entry.hl-bar-pink {
+  border-left-color: rgb(240, 80, 140);
+}
+.note-entry.hl-bar-purple {
+  border-left-color: rgb(140, 90, 240);
+}
 
 /* Floating toolbar for selections and highlights */
 .float-toolbar {
@@ -1850,7 +1869,9 @@ button.cite:hover {
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--bg);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 .ai-input:focus-within {
   border-color: var(--accent);

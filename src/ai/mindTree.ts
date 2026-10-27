@@ -106,8 +106,7 @@ export interface Placed {
   parent: Placed | null;
 }
 
-export const FONT_FAMILY =
-  '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif';
+export const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif';
 
 export function fontOf(depth: number) {
   return depth === 0 ? { size: 17, weight: 600 } : depth === 1 ? { size: 14, weight: 600 } : { size: 13, weight: 400 };

@@ -93,11 +93,7 @@ export function BookCard({ book, selected, selecting, onOpen, onToggle, onMenu }
 
 export function BookRow({ book, selected, selecting, onOpen, onToggle, onMenu }: CardProps) {
   return (
-    <div
-      className={`book-row${selected ? " selected" : ""}${book.missing ? " missing" : ""}`}
-      onClick={selecting ? onToggle : onOpen}
-      onContextMenu={onMenu}
-    >
+    <div className={`book-row${selected ? " selected" : ""}${book.missing ? " missing" : ""}`} onClick={selecting ? onToggle : onOpen} onContextMenu={onMenu}>
       <button
         className={`check inline${selected ? " on" : ""}`}
         aria-label={t("common.select")}

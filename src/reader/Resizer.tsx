@@ -55,14 +55,7 @@ export function usePanelWidths(bookId: string) {
  * A divider beside a panel. `side` is where the panel is: dragging towards the text makes it
  * wider. `max` is the widest the panel may get right now.
  */
-export function Resizer(props: {
-  panel: Panel;
-  side: "left" | "right";
-  width: number;
-  max: number;
-  onChange: (width: number) => void;
-  onReset: () => void;
-}) {
+export function Resizer(props: { panel: Panel; side: "left" | "right"; width: number; max: number; onChange: (width: number) => void; onReset: () => void }) {
   const [dragging, setDragging] = useState(false);
   const [min] = LIMITS[props.panel];
 

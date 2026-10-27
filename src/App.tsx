@@ -85,7 +85,9 @@ export default function App() {
 
   const close = useCallback(() => {
     setReading(null);
-    getCurrentWindow().setTitle("AiReader").catch(() => {});
+    getCurrentWindow()
+      .setTitle("AiReader")
+      .catch(() => {});
   }, []);
 
   const openSettings = useCallback((tab: SettingsTab = "general") => setSettingsTab(tab), []);
@@ -100,15 +102,7 @@ export default function App() {
         ) : (
           <ShelfView settings={settings} update={update} onOpen={setReading} />
         )}
-        {settingsTab && (
-          <SettingsDialog
-            settings={settings}
-            update={update}
-            tab={settingsTab}
-            onTab={setSettingsTab}
-            onClose={() => setSettingsTab(null)}
-          />
-        )}
+        {settingsTab && <SettingsDialog settings={settings} update={update} tab={settingsTab} onTab={setSettingsTab} onClose={() => setSettingsTab(null)} />}
       </AiProvider>
     </SettingsOpener.Provider>
   );

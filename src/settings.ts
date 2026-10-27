@@ -107,7 +107,16 @@ function rgb(hex: string): [number, number, number] {
 }
 
 function hex([r, g, b]: number[]): string {
-  return "#" + [r, g, b].map((v) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0")).join("");
+  return (
+    "#" +
+    [r, g, b]
+      .map((v) =>
+        Math.round(Math.max(0, Math.min(255, v)))
+          .toString(16)
+          .padStart(2, "0"),
+      )
+      .join("")
+  );
 }
 
 /** Mixes `a` towards `b` by `t` (0..1). */

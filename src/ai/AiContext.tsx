@@ -39,12 +39,14 @@ export function AiProvider({ children, openSettings }: { children: ReactNode; op
   const consentResolve = useRef<((ok: boolean) => void) | null>(null);
 
   const refresh = useCallback(() => {
-    api.aiGetConfig().then(setStatus).catch(() => {});
+    api
+      .aiGetConfig()
+      .then(setStatus)
+      .catch(() => {});
   }, []);
   useEffect(refresh, [refresh]);
 
-  const ready =
-    !!status?.configured && (status.hasKey || status.local || !presetOf(status.config.provider)?.needsKey);
+  const ready = !!status?.configured && (status.hasKey || status.local || !presetOf(status.config.provider)?.needsKey);
 
   const ensureConsent = useCallback(() => {
     if (!status || status.local || status.config.consented) return Promise.resolve(true);

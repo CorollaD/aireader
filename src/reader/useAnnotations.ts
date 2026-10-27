@@ -65,8 +65,7 @@ export function useAnnotations(bookId: string): AnnotationsApi {
 
   const methods = useMemo(
     () => ({
-      addBookmark: (b: Omit<Bookmark, "id" | "created">) =>
-        change((a) => ({ ...a, bookmarks: [...a.bookmarks, { ...b, id: newId(), created: now() }] })),
+      addBookmark: (b: Omit<Bookmark, "id" | "created">) => change((a) => ({ ...a, bookmarks: [...a.bookmarks, { ...b, id: newId(), created: now() }] })),
       updateBookmark: (id: string, patch: Partial<Pick<Bookmark, "title">>) =>
         change((a) => ({ ...a, bookmarks: a.bookmarks.map((b) => (b.id === id ? { ...b, ...patch } : b)) })),
       removeBookmark: (id: string) => change((a) => ({ ...a, bookmarks: a.bookmarks.filter((b) => b.id !== id) })),

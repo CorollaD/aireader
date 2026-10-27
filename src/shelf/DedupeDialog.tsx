@@ -28,9 +28,7 @@ export function DedupeDialog(props: {
   const apply = async () => {
     setBusy(true);
     try {
-      await props.onApply(
-        chosen.map(({ g, i }) => ({ keep: keep[i], remove: g.copies.map((c) => c.id).filter((id) => id !== keep[i]) })),
-      );
+      await props.onApply(chosen.map(({ g, i }) => ({ keep: keep[i], remove: g.copies.map((c) => c.id).filter((id) => id !== keep[i]) })));
     } finally {
       setBusy(false);
     }
@@ -67,11 +65,7 @@ export function DedupeDialog(props: {
               return (
                 <div key={g.copies[0].id} className={`dedupe-group${selected[i] ? "" : " off"}`}>
                   <label className="dedupe-head">
-                    <input
-                      type="checkbox"
-                      checked={selected[i]}
-                      onChange={(e) => setSelected((s) => s.map((v, j) => (j === i ? e.target.checked : v)))}
-                    />
+                    <input type="checkbox" checked={selected[i]} onChange={(e) => setSelected((s) => s.map((v, j) => (j === i ? e.target.checked : v)))} />
                     <strong className="ellipsis">{first?.title}</strong>
                     {!g.confident && <span className="badge-soft warn">{t("dd.guess")}</span>}
                   </label>

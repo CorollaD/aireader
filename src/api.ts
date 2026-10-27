@@ -28,8 +28,7 @@ const BASE = navigator.userAgent.includes("Windows") ? "http://book.localhost/" 
 
 export const coverUrl = (book: Book) => `${BASE}cover/${book.id}?v=${book.added}`;
 export const imageUrl = (bookId: string, imageId: number) => `${BASE}img/${bookId}/${imageId}`;
-export const pageUrl = (bookId: string, page: number, width: number, rotation = 0) =>
-  `${BASE}page/${bookId}/${page}/${width}${rotation ? `/${rotation}` : ""}`;
+export const pageUrl = (bookId: string, page: number, width: number, rotation = 0) => `${BASE}page/${bookId}/${page}/${width}${rotation ? `/${rotation}` : ""}`;
 
 export const api = {
   listBooks: () => invoke<Shelf>("list_books"),
@@ -48,22 +47,18 @@ export const api = {
   getChapter: (id: string, index: number) => invoke<Block[]>("get_chapter", { id, index }),
   getPageText: (id: string, page: number) => invoke<TextRun[]>("get_page_text", { id, page }),
   searchBook: (id: string, query: string) => invoke<Hit[]>("search_book", { id, query }),
-  saveProgress: (id: string, position: Location, progress: number) =>
-    invoke<void>("save_progress", { id, position, progress }),
+  saveProgress: (id: string, position: Location, progress: number) => invoke<void>("save_progress", { id, position, progress }),
   getAnnotations: (id: string) => invoke<Annotations>("get_annotations", { id }),
   saveAnnotations: (id: string, annotations: Annotations) => invoke<void>("save_annotations", { id, annotations }),
   /** Opens a save dialog; resolves to the written path, or null if cancelled. */
   exportNotes: (id: string) => invoke<string | null>("export_notes", { id }),
   /** Saves base64 data through a save dialog; resolves to the path, or null if cancelled. */
-  saveExport: (fileName: string, extension: string, data: string) =>
-    invoke<string | null>("save_export", { fileName, extension, data }),
-  addReadingTime: (id: string, seconds: number, speed: number | null) =>
-    invoke<Book>("add_reading_time", { id, seconds, speed }),
+  saveExport: (fileName: string, extension: string, data: string) => invoke<string | null>("save_export", { fileName, extension, data }),
+  addReadingTime: (id: string, seconds: number, speed: number | null) => invoke<Book>("add_reading_time", { id, seconds, speed }),
   aiGetConfig: () => invoke<AiStatus>("ai_get_config"),
   /** `apiKey`: undefined keeps the stored key, "" removes it. */
   /** Keys: undefined keeps the stored one, "" removes it. */
-  aiSetConfig: (config: AiConfig, apiKey?: string, embeddingKey?: string) =>
-    invoke<AiStatus>("ai_set_config", { config, apiKey, embeddingKey }),
+  aiSetConfig: (config: AiConfig, apiKey?: string, embeddingKey?: string) => invoke<AiStatus>("ai_set_config", { config, apiKey, embeddingKey }),
   aiSemanticStatus: (bookId: string) => invoke<SemanticStatus>("ai_semantic_status", { bookId }),
   aiTest: () => invoke<string>("ai_test"),
   aiListModels: (config: AiConfig) => invoke<string[]>("ai_list_models", { config }),

@@ -132,8 +132,10 @@ const en: Messages = {
   "shelf.open": "Open",
   "shelf.editInfo": "Edit details and groups",
   "shelf.remove": "Remove from shelf",
-  "shelf.removeOne": "“{title}” will be removed along with its reading progress, bookmarks and notes. The copy in the library is deleted; the original file you imported is not affected.",
-  "shelf.removeMany": "{n} books will be removed along with their reading progress, bookmarks and notes. The copies in the library are deleted; the original files you imported are not affected.",
+  "shelf.removeOne":
+    "“{title}” will be removed along with its reading progress, bookmarks and notes. The copy in the library is deleted; the original file you imported is not affected.",
+  "shelf.removeMany":
+    "{n} books will be removed along with their reading progress, bookmarks and notes. The copies in the library are deleted; the original files you imported are not affected.",
   "shelf.importing": "Importing…",
   "shelf.scanning": "Scanning files…",
   "shelf.dropToGroup": "Drop to import into “{group}”",
@@ -282,7 +284,8 @@ const en: Messages = {
   "ai.actionTranslate": "Translate",
   "ai.actionSummarize": "Summarize",
   "ai.consentTitle": "Send book content to an AI service?",
-  "ai.consentBody": "AI features send the book text they need (chapter text, selected text, the title and so on) to {provider}. This uses your account with that service, may cost money, and is covered by its privacy policy.",
+  "ai.consentBody":
+    "AI features send the book text they need (chapter text, selected text, the title and so on) to {provider}. This uses your account with that service, may cost money, and is covered by its privacy policy.",
   "ai.consentHint": "To keep content on this computer, choose a local model such as Ollama in AI settings. You'll only be asked once.",
   "ai.consentAgree": "Agree and continue",
   "ai.provider": "Service",
@@ -297,7 +300,8 @@ const en: Messages = {
   "ai.language": "Answer language",
   "ai.languageAuto": "Same as the interface",
   "ai.localNote": "Local models run on your computer; book content never leaves it.",
-  "ai.cloudNote": "With a cloud service, the book text needed is sent to that service and billed at its prices. The API key is stored only in the system keychain.",
+  "ai.cloudNote":
+    "With a cloud service, the book text needed is sent to that service and billed at its prices. The API key is stored only in the system keychain.",
   "ai.test": "Test connection",
   "ai.testing": "Testing…",
   "ai.testOk": "Connected: {reply}",
@@ -318,7 +322,8 @@ const en: Messages = {
 
   "ai.newChat": "New chat",
   "ai.emptyTitle": "Ask about this book",
-  "ai.emptyHint": "AI searches the whole book for relevant passages; click the numbers in an answer to jump to the text. Select text in the book to have AI explain, translate or answer questions about it.",
+  "ai.emptyHint":
+    "AI searches the whole book for relevant passages; click the numbers in an answer to jump to the text. Select text in the book to have AI explain, translate or answer questions about it.",
   "ai.suggestChapter": "What happens in this chapter?",
   "ai.suggestPeople": "Who are the main people in this chapter?",
   "ai.suggestHard": "Explain the difficult parts here",
@@ -368,7 +373,8 @@ const en: Messages = {
   "dd.findTitle": "Find books stored in several files and keep only the best copy",
   "dd.scanning": "Analysing books…",
   "dd.title": "Duplicate books",
-  "dd.intro": "Each group below is one book in several files. Choose the copy to keep; the others leave the shelf, and their reading progress, bookmarks and notes move to the kept copy where possible.",
+  "dd.intro":
+    "Each group below is one book in several files. Choose the copy to keep; the others leave the shelf, and their reading progress, bookmarks and notes move to the kept copy where possible.",
   "dd.importedHint": "{n} of the books you just imported may already be on the shelf in another file. Choose which copy to keep in each group.",
   "dd.none": "No duplicate books found.",
   "dd.recommended": "Recommended",
@@ -392,7 +398,8 @@ const en: Messages = {
   "sc.aiPanel": "Show / hide the AI panel",
 
   "ai.embedTitle": "Semantic search (embedding model)",
-  "ai.embedHint": "Lets questions about a book find passages by meaning, even when worded differently. Used only for books you build a semantic index for. DeepSeek and Claude have no embedding API; use Ollama on this computer or an OpenAI-compatible service.",
+  "ai.embedHint":
+    "Lets questions about a book find passages by meaning, even when worded differently. Used only for books you build a semantic index for. DeepSeek and Claude have no embedding API; use Ollama on this computer or an OpenAI-compatible service.",
   "ai.embedNone": "Don't use",
   "ai.basisKeyword": "keyword search",
   "ai.basisHybrid": "keyword + semantic search",

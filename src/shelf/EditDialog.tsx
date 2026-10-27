@@ -12,12 +12,7 @@ const NEW = "\u0000new";
  * Edits one book's title, author and group, or moves several books to one group. A book is in
  * at most one group.
  */
-export function EditDialog(props: {
-  books: Book[];
-  groups: string[];
-  onSave: (patch: BookPatch) => void;
-  onClose: () => void;
-}) {
+export function EditDialog(props: { books: Book[]; groups: string[]; onSave: (patch: BookPatch) => void; onClose: () => void }) {
   const single = props.books.length === 1 ? props.books[0] : null;
   const [title, setTitle] = useState(single?.title ?? "");
   const [author, setAuthor] = useState(single?.author ?? "");

@@ -132,8 +132,10 @@ const ko: Messages = {
   "shelf.open": "열기",
   "shelf.editInfo": "정보 및 그룹 편집",
   "shelf.remove": "책장에서 삭제",
-  "shelf.removeOne": "《{title}》을(를) 읽기 진행률, 책갈피, 메모와 함께 삭제합니다. 서재에 저장된 사본도 삭제되지만, 가져올 때 선택한 원본 파일에는 영향이 없습니다.",
-  "shelf.removeMany": "책 {n}권을 읽기 진행률, 책갈피, 메모와 함께 삭제합니다. 서재에 저장된 사본도 삭제되지만, 가져올 때 선택한 원본 파일에는 영향이 없습니다.",
+  "shelf.removeOne":
+    "《{title}》을(를) 읽기 진행률, 책갈피, 메모와 함께 삭제합니다. 서재에 저장된 사본도 삭제되지만, 가져올 때 선택한 원본 파일에는 영향이 없습니다.",
+  "shelf.removeMany":
+    "책 {n}권을 읽기 진행률, 책갈피, 메모와 함께 삭제합니다. 서재에 저장된 사본도 삭제되지만, 가져올 때 선택한 원본 파일에는 영향이 없습니다.",
   "shelf.importing": "가져오는 중…",
   "shelf.scanning": "파일을 찾는 중…",
   "shelf.dropToGroup": "놓으면 '{group}'(으)로 가져옵니다",
@@ -282,7 +284,8 @@ const ko: Messages = {
   "ai.actionTranslate": "번역",
   "ai.actionSummarize": "요약",
   "ai.consentTitle": "책 내용을 AI 서비스로 보낼까요?",
-  "ai.consentBody": "AI 기능은 필요한 책 내용(장 본문, 선택한 글, 제목 등)을 '{provider}'(으)로 보내 처리합니다. 해당 서비스의 사용 요금이 발생할 수 있으며, 그 개인정보 처리방침이 적용됩니다.",
+  "ai.consentBody":
+    "AI 기능은 필요한 책 내용(장 본문, 선택한 글, 제목 등)을 '{provider}'(으)로 보내 처리합니다. 해당 서비스의 사용 요금이 발생할 수 있으며, 그 개인정보 처리방침이 적용됩니다.",
   "ai.consentHint": "내용을 업로드하고 싶지 않다면 AI 설정에서 Ollama 같은 로컬 모델을 선택하세요. 이 확인은 한 번만 표시됩니다.",
   "ai.consentAgree": "동의하고 계속",
   "ai.provider": "서비스",
@@ -297,7 +300,8 @@ const ko: Messages = {
   "ai.language": "답변 언어",
   "ai.languageAuto": "화면 언어와 같게",
   "ai.localNote": "로컬 모델은 이 컴퓨터에서 실행되며, 책 내용이 외부로 나가지 않습니다.",
-  "ai.cloudNote": "클라우드 서비스를 사용하면 필요한 책 내용이 해당 서비스로 전송되고, 그 가격에 따라 요금이 청구됩니다. API 키는 시스템 키체인에만 저장됩니다.",
+  "ai.cloudNote":
+    "클라우드 서비스를 사용하면 필요한 책 내용이 해당 서비스로 전송되고, 그 가격에 따라 요금이 청구됩니다. API 키는 시스템 키체인에만 저장됩니다.",
   "ai.test": "연결 테스트",
   "ai.testing": "테스트 중…",
   "ai.testOk": "연결됨: {reply}",
@@ -318,7 +322,8 @@ const ko: Messages = {
 
   "ai.newChat": "새 대화",
   "ai.emptyTitle": "이 책에 대해 물어보세요",
-  "ai.emptyHint": "AI가 책 전체에서 관련 부분을 찾아 답합니다. 답변의 번호를 누르면 본문으로 이동합니다. 본문을 선택하면 설명, 번역, 그 부분에 대한 질문을 할 수 있습니다.",
+  "ai.emptyHint":
+    "AI가 책 전체에서 관련 부분을 찾아 답합니다. 답변의 번호를 누르면 본문으로 이동합니다. 본문을 선택하면 설명, 번역, 그 부분에 대한 질문을 할 수 있습니다.",
   "ai.suggestChapter": "이 장에서는 무슨 일이 일어나나요?",
   "ai.suggestPeople": "이 장의 주요 인물은 누구인가요?",
   "ai.suggestHard": "여기서 어려운 부분을 설명해 줘",
@@ -392,7 +397,8 @@ const ko: Messages = {
   "sc.aiPanel": "AI 패널 보이기 / 숨기기",
 
   "ai.embedTitle": "의미 검색(벡터 모델)",
-  "ai.embedHint": "질문의 의미로 관련 부분을 찾게 해 줍니다(표현이 달라도 찾을 수 있음). 의미 검색 색인을 만든 책에만 쓰입니다. DeepSeek와 Claude는 벡터 API가 없으니 이 컴퓨터의 Ollama나 OpenAI 호환 서비스를 쓰세요.",
+  "ai.embedHint":
+    "질문의 의미로 관련 부분을 찾게 해 줍니다(표현이 달라도 찾을 수 있음). 의미 검색 색인을 만든 책에만 쓰입니다. DeepSeek와 Claude는 벡터 API가 없으니 이 컴퓨터의 Ollama나 OpenAI 호환 서비스를 쓰세요.",
   "ai.embedNone": "사용 안 함",
   "ai.basisKeyword": "키워드 검색",
   "ai.basisHybrid": "키워드 + 의미 검색",

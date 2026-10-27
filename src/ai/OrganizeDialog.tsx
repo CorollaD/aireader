@@ -18,11 +18,7 @@ interface Row {
   acceptAuthor: boolean;
 }
 
-export default function OrganizeDialog(props: {
-  books: Book[];
-  onApply: (changes: { id: string; patch: BookPatch }[]) => Promise<void>;
-  onClose: () => void;
-}) {
+export default function OrganizeDialog(props: { books: Book[]; onApply: (changes: { id: string; patch: BookPatch }[]) => Promise<void>; onClose: () => void }) {
   const ai = useAi();
   const [phase, setPhase] = useState<"running" | "review" | "error">("running");
   const [rows, setRows] = useState<Row[]>([]);
@@ -133,22 +129,12 @@ export default function OrganizeDialog(props: {
                     <label className="organize-field">
                       <span className={`group-chip${r.book.group ? "" : " none"}`}>{r.book.group ?? t("shelf.ungrouped")}</span>
                       <span className="muted">→</span>
-                      <input
-                        value={r.group}
-                        disabled={!r.accept}
-                        aria-label={t("org.moveTo")}
-                        onChange={(e) => update(i, { group: e.target.value })}
-                      />
+                      <input value={r.group} disabled={!r.accept} aria-label={t("org.moveTo")} onChange={(e) => update(i, { group: e.target.value })} />
                     </label>
                   )}
                   {r.suggestion.author && (
                     <label className="organize-field toggle">
-                      <input
-                        type="checkbox"
-                        checked={r.acceptAuthor}
-                        disabled={!r.accept}
-                        onChange={(e) => update(i, { acceptAuthor: e.target.checked })}
-                      />
+                      <input type="checkbox" checked={r.acceptAuthor} disabled={!r.accept} onChange={(e) => update(i, { acceptAuthor: e.target.checked })} />
                       <span className="small">{t("org.setAuthor", { author: r.suggestion.author })}</span>
                     </label>
                   )}

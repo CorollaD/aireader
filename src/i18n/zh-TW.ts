@@ -392,7 +392,8 @@ const zhTW: Messages = {
   "sc.aiPanel": "顯示 / 隱藏 AI 面板",
 
   "ai.embedTitle": "語意檢索（向量模型）",
-  "ai.embedHint": "讓「問問這本書」依意思找到相關段落，換種說法也能找到。只用於你手動建立了語意索引的書。DeepSeek 和 Claude 沒有向量介面，可以用本機的 Ollama 或 OpenAI 相容服務。",
+  "ai.embedHint":
+    "讓「問問這本書」依意思找到相關段落，換種說法也能找到。只用於你手動建立了語意索引的書。DeepSeek 和 Claude 沒有向量介面，可以用本機的 Ollama 或 OpenAI 相容服務。",
   "ai.embedNone": "不使用",
   "ai.basisKeyword": "關鍵字檢索",
   "ai.basisHybrid": "關鍵字 + 語意檢索",

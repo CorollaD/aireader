@@ -26,14 +26,7 @@ export function Modal(props: { title: string; onClose: () => void; children: Rea
   );
 }
 
-export function Confirm(props: {
-  title: string;
-  message: ReactNode;
-  confirmText: string;
-  danger?: boolean;
-  onConfirm: () => void;
-  onClose: () => void;
-}) {
+export function Confirm(props: { title: string; message: ReactNode; confirmText: string; danger?: boolean; onConfirm: () => void; onClose: () => void }) {
   return (
     <Modal
       title={props.title}

@@ -93,10 +93,7 @@ function TextLayer(props: { bookId: string; index: number; width: number; height
         const newLine = next && Math.abs(next.y - r.y) > r.h / 2;
         return (
           <span key={i}>
-            <span
-              className="run"
-              style={{ left: r.x * w, top: r.y * h, fontSize: r.h * h }}
-            >
+            <span className="run" style={{ left: r.x * w, top: r.y * h, fontSize: r.h * h }}>
               {r.text}
             </span>
             {next && (newLine ? <br /> : <span className="sep"> </span>)}
@@ -108,26 +105,11 @@ function TextLayer(props: { bookId: string; index: number; width: number; height
 }
 
 /** A page box; the rendered image, once loaded, covers the page-number placeholder. */
-function Page(props: {
-  bookId: string;
-  index: number;
-  width: number;
-  height: number;
-  rotation: number;
-  load: boolean;
-  style?: React.CSSProperties;
-}) {
+function Page(props: { bookId: string; index: number; width: number; height: number; rotation: number; load: boolean; style?: React.CSSProperties }) {
   return (
     <div className="page" data-page={props.index} style={{ width: props.width, height: props.height, ...props.style }}>
       <span className="page-number">{props.index + 1}</span>
-      {props.load && (
-        <img
-          src={pageUrl(props.bookId, props.index, renderWidth(props.width), props.rotation)}
-          alt=""
-          draggable={false}
-          decoding="async"
-        />
-      )}
+      {props.load && <img src={pageUrl(props.bookId, props.index, renderWidth(props.width), props.rotation)} alt="" draggable={false} decoding="async" />}
       {props.load && <TextLayer bookId={props.bookId} index={props.index} width={props.width} height={props.height} rotation={props.rotation} />}
     </div>
   );
@@ -282,9 +264,7 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, onL
     return (
       <div className="paged-scroller single" ref={scroller} onMouseUp={checkSelection}>
         <div className="single-stage" style={{ minWidth: w + 32, minHeight: w * aspect + 32 }}>
-          {size.w > 0 && (
-            <Page key={page} bookId={book.id} index={page} width={w} height={w * aspect} rotation={rotation} load />
-          )}
+          {size.w > 0 && <Page key={page} bookId={book.id} index={page} width={w} height={w * aspect} rotation={rotation} load />}
         </div>
         <button className="page-turn left" onClick={() => goto(page - 1)} disabled={page === 0} aria-label={t("reader.prevPage")}>
           <Icon name="chevronLeft" size={30} />

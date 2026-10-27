@@ -23,7 +23,10 @@ function inline(text: string, cite?: Cite): ReactNode[] {
     if (t.startsWith("**")) out.push(<strong key={i++}>{t.slice(2, -2)}</strong>);
     else if (t.startsWith("`")) out.push(<code key={i++}>{t.slice(1, -1)}</code>);
     else if (t.startsWith("[")) {
-      const ns = t.slice(1, -1).split(/[,，]/).map((x) => Number(x.trim()));
+      const ns = t
+        .slice(1, -1)
+        .split(/[,，]/)
+        .map((x) => Number(x.trim()));
       if (cite && ns.every((n) => n >= 1 && n <= cite.count)) {
         for (const n of ns) {
           out.push(

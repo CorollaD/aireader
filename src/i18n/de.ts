@@ -132,8 +132,10 @@ const de: Messages = {
   "shelf.open": "Öffnen",
   "shelf.editInfo": "Details und Gruppen bearbeiten",
   "shelf.remove": "Aus dem Regal entfernen",
-  "shelf.removeOne": "„{title}“ wird samt Lesefortschritt, Lesezeichen und Notizen entfernt. Die Kopie in der Bibliothek wird gelöscht; die importierte Originaldatei bleibt unverändert.",
-  "shelf.removeMany": "{n} Bücher werden samt Lesefortschritt, Lesezeichen und Notizen entfernt. Die Kopien in der Bibliothek werden gelöscht; die importierten Originaldateien bleiben unverändert.",
+  "shelf.removeOne":
+    "„{title}“ wird samt Lesefortschritt, Lesezeichen und Notizen entfernt. Die Kopie in der Bibliothek wird gelöscht; die importierte Originaldatei bleibt unverändert.",
+  "shelf.removeMany":
+    "{n} Bücher werden samt Lesefortschritt, Lesezeichen und Notizen entfernt. Die Kopien in der Bibliothek werden gelöscht; die importierten Originaldateien bleiben unverändert.",
   "shelf.importing": "Wird importiert …",
   "shelf.scanning": "Dateien werden durchsucht …",
   "shelf.dropToGroup": "Loslassen, um in „{group}“ zu importieren",
@@ -282,7 +284,8 @@ const de: Messages = {
   "ai.actionTranslate": "Übersetzen",
   "ai.actionSummarize": "Zusammenfassen",
   "ai.consentTitle": "Buchinhalt an einen KI-Dienst senden?",
-  "ai.consentBody": "KI-Funktionen senden den benötigten Buchtext (Kapiteltext, markierten Text, Titel usw.) an {provider}. Dabei wird dein Konto bei diesem Dienst genutzt, es können Kosten entstehen, und es gilt dessen Datenschutzerklärung.",
+  "ai.consentBody":
+    "KI-Funktionen senden den benötigten Buchtext (Kapiteltext, markierten Text, Titel usw.) an {provider}. Dabei wird dein Konto bei diesem Dienst genutzt, es können Kosten entstehen, und es gilt dessen Datenschutzerklärung.",
   "ai.consentHint": "Damit Inhalte auf diesem Computer bleiben, wähle in den KI-Einstellungen ein lokales Modell wie Ollama. Diese Frage kommt nur einmal.",
   "ai.consentAgree": "Zustimmen und fortfahren",
   "ai.provider": "Dienst",
@@ -297,7 +300,8 @@ const de: Messages = {
   "ai.language": "Sprache der Antworten",
   "ai.languageAuto": "Wie die Oberfläche",
   "ai.localNote": "Lokale Modelle laufen auf deinem Computer; der Buchinhalt verlässt ihn nie.",
-  "ai.cloudNote": "Bei einem Cloud-Dienst wird der benötigte Buchtext an diesen Dienst gesendet und nach dessen Preisen abgerechnet. Der API-Schlüssel wird nur im Schlüsselbund des Systems gespeichert.",
+  "ai.cloudNote":
+    "Bei einem Cloud-Dienst wird der benötigte Buchtext an diesen Dienst gesendet und nach dessen Preisen abgerechnet. Der API-Schlüssel wird nur im Schlüsselbund des Systems gespeichert.",
   "ai.test": "Verbindung testen",
   "ai.testing": "Wird getestet …",
   "ai.testOk": "Verbunden: {reply}",
@@ -318,7 +322,8 @@ const de: Messages = {
 
   "ai.newChat": "Neuer Chat",
   "ai.emptyTitle": "Frag etwas zu diesem Buch",
-  "ai.emptyHint": "Die KI durchsucht das ganze Buch nach passenden Stellen; ein Klick auf die Nummern in der Antwort springt zum Text. Markiere Text im Buch, um ihn erklären, übersetzen oder Fragen dazu beantworten zu lassen.",
+  "ai.emptyHint":
+    "Die KI durchsucht das ganze Buch nach passenden Stellen; ein Klick auf die Nummern in der Antwort springt zum Text. Markiere Text im Buch, um ihn erklären, übersetzen oder Fragen dazu beantworten zu lassen.",
   "ai.suggestChapter": "Worum geht es in diesem Kapitel?",
   "ai.suggestPeople": "Wer sind die wichtigsten Personen in diesem Kapitel?",
   "ai.suggestHard": "Erkläre die schwierigen Stellen hier",
@@ -368,8 +373,10 @@ const de: Messages = {
   "dd.findTitle": "Bücher finden, die in mehreren Dateien vorliegen, und nur die beste Kopie behalten",
   "dd.scanning": "Bücher werden analysiert …",
   "dd.title": "Doppelte Bücher",
-  "dd.intro": "Jede Gruppe ist ein Buch in mehreren Dateien. Wähle die Kopie, die bleiben soll; die anderen verlassen das Regal, und Lesefortschritt, Lesezeichen und Notizen gehen nach Möglichkeit auf die behaltene Kopie über.",
-  "dd.importedHint": "{n} der eben importierten Bücher sind vielleicht schon in einer anderen Datei im Regal. Wähle in jeder Gruppe die Kopie, die bleiben soll.",
+  "dd.intro":
+    "Jede Gruppe ist ein Buch in mehreren Dateien. Wähle die Kopie, die bleiben soll; die anderen verlassen das Regal, und Lesefortschritt, Lesezeichen und Notizen gehen nach Möglichkeit auf die behaltene Kopie über.",
+  "dd.importedHint":
+    "{n} der eben importierten Bücher sind vielleicht schon in einer anderen Datei im Regal. Wähle in jeder Gruppe die Kopie, die bleiben soll.",
   "dd.none": "Keine doppelten Bücher gefunden.",
   "dd.recommended": "Empfohlen",
   "dd.guess": "Mögliches Duplikat: Eine Datei hat keinen Text, verglichen wurden nur Titel und Seitenzahl",
@@ -392,7 +399,8 @@ const de: Messages = {
   "sc.aiPanel": "KI-Bereich ein- / ausblenden",
 
   "ai.embedTitle": "Semantische Suche (Embedding-Modell)",
-  "ai.embedHint": "Lässt Fragen passende Stellen nach ihrer Bedeutung finden, auch bei anderer Formulierung. Nur für Bücher mit semantischem Index. DeepSeek und Claude haben keine Embedding-API; nutze Ollama auf diesem Computer oder einen OpenAI-kompatiblen Dienst.",
+  "ai.embedHint":
+    "Lässt Fragen passende Stellen nach ihrer Bedeutung finden, auch bei anderer Formulierung. Nur für Bücher mit semantischem Index. DeepSeek und Claude haben keine Embedding-API; nutze Ollama auf diesem Computer oder einen OpenAI-kompatiblen Dienst.",
   "ai.embedNone": "Nicht verwenden",
   "ai.basisKeyword": "Stichwortsuche",
   "ai.basisHybrid": "Stichwort- + semantische Suche",

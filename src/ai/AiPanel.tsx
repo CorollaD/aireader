@@ -377,7 +377,11 @@ export default function AiPanel(props: {
     });
   }
 
-  const copy = (text: string) => navigator.clipboard.writeText(text).then(() => setNotice(t("common.copied")), () => {});
+  const copy = (text: string) =>
+    navigator.clipboard.writeText(text).then(
+      () => setNotice(t("common.copied")),
+      () => {},
+    );
 
   useEffect(() => {
     if (!notice) return;
@@ -399,7 +403,13 @@ export default function AiPanel(props: {
       </div>
       <span className="spacer" />
       {tab === "chat" && ai.ready && (
-        <button className="icon-button" title={t("ai.newChat")} aria-label={t("ai.newChat")} onClick={newChat} disabled={chat.turns.length === 0 && !chat.quote}>
+        <button
+          className="icon-button"
+          title={t("ai.newChat")}
+          aria-label={t("ai.newChat")}
+          onClick={newChat}
+          disabled={chat.turns.length === 0 && !chat.quote}
+        >
           <Icon name="plus" />
         </button>
       )}
@@ -512,9 +522,7 @@ export default function AiPanel(props: {
                 <span className="spacer" />
                 {indexing ? (
                   <>
-                    <span className="index-progress">
-                      {t("ai.indexing", { done: indexing.done, total: indexing.total || "…" })}
-                    </span>
+                    <span className="index-progress">{t("ai.indexing", { done: indexing.done, total: indexing.total || "…" })}</span>
                     <button className="link-button" onClick={() => (stop(indexing.taskId), setIndexing(null))}>
                       {t("common.stop")}
                     </button>
@@ -644,13 +652,7 @@ export default function AiPanel(props: {
               </div>
               {map.progress && <ProgressBar progress={map.progress} />}
               {map.outline ? (
-                <MindMapPreview
-                  outline={map.outline}
-                  title={map.title}
-                  streaming={map.status === "running"}
-                  svgRef={mapSvg}
-                  onOpen={() => setViewing(map)}
-                />
+                <MindMapPreview outline={map.outline} title={map.title} streaming={map.status === "running"} svgRef={mapSvg} onOpen={() => setViewing(map)} />
               ) : (
                 map.status === "running" && !map.progress && <Dots />
               )}
