@@ -198,7 +198,11 @@ impl Walker<'_> {
             "b" | "strong" => self.styled_walk(node, |s| s.bold = true),
             "i" | "em" | "cite" | "dfn" | "var" => self.styled_walk(node, |s| s.italic = true),
             "code" | "tt" | "kbd" | "samp" => self.styled_walk(node, |s| s.code = true),
-            "a" if e.attr("href").is_some() => self.styled_walk(node, |s| s.link = true),
+            "a" if e.attr("href").is_some() => {
+                let saved = std::mem::replace(&mut self.b.href, e.attr("href").map(str::to_owned));
+                self.styled_walk(node, |s| s.link = true);
+                self.b.href = saved;
+            }
             "svg" => {
                 for d in node.descendants() {
                     if let Some(img) = d.value().as_element().filter(|el| el.name() == "image") {

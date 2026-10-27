@@ -313,6 +313,36 @@ const MESSAGES: &[(&str, [&str; 10])] = &[
         ],
     ),
     (
+        "font_unsupported",
+        [
+            "不支持的字体文件（支持 TTF、OTF、WOFF、WOFF2）",
+            "不支援的字型檔（支援 TTF、OTF、WOFF、WOFF2）",
+            "Unsupported font file (use TTF, OTF, WOFF or WOFF2)",
+            "Archivo de fuente no compatible (usa TTF, OTF, WOFF o WOFF2)",
+            "File di font non supportato (usa TTF, OTF, WOFF o WOFF2)",
+            "Fichier de police non pris en charge (TTF, OTF, WOFF ou WOFF2)",
+            "Nicht unterstützte Schriftdatei (TTF, OTF, WOFF oder WOFF2)",
+            "対応していないフォントファイルです（TTF、OTF、WOFF、WOFF2）",
+            "지원하지 않는 글꼴 파일입니다 (TTF, OTF, WOFF, WOFF2)",
+            "Arquivo de fonte não suportado (use TTF, OTF, WOFF ou WOFF2)",
+        ],
+    ),
+    (
+        "font_filter",
+        [
+            "字体",
+            "字型",
+            "Fonts",
+            "Fuentes",
+            "Font",
+            "Polices",
+            "Schriften",
+            "フォント",
+            "글꼴",
+            "Fontes",
+        ],
+    ),
+    (
         "title_empty",
         [
             "书名不能为空",

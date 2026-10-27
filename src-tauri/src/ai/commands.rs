@@ -26,7 +26,9 @@ use crate::commands::AppState;
 type CmdResult<T> = Result<T, String>;
 
 fn err(e: impl std::fmt::Display) -> String {
-    format!("{e:#}")
+    let message = format!("{e:#}");
+    log::warn!("{message}");
+    message
 }
 
 /// AI state kept alongside [`AppState`].
@@ -383,9 +385,7 @@ pub fn ai_run(app: AppHandle, task_id: String, task: AiTask, on_event: Channel<A
         };
         let event = match run_task(&app2, task, &emit).await {
             Ok((text, cached)) => AiEvent::Done { text, cached },
-            Err(e) => AiEvent::Error {
-                message: format!("{e:#}"),
-            },
+            Err(e) => AiEvent::Error { message: err(e) },
         };
         let _ = on_event.send(event);
         ai_state(&app2).running.lock().unwrap().remove(&id);

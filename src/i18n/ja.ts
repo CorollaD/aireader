@@ -409,6 +409,26 @@ const ja: Messages = {
   "ai.buildIndexTitle": "ベクトルモデルでこの本のインデックスを作り、質問の意味から箇所を探せるようにします",
   "ai.indexing": "インデックス作成 {done}/{total}",
   "ai.indexBuilt": "意味検索のインデックスを作成しました：{n} 箇所",
+  "error.title": "問題が発生しました",
+  "error.hint": "この画面を表示できませんでした。再読み込みしても本とメモは失われません。",
+  "error.reload": "再読み込み",
+  "error.backToShelf": "本棚に戻る",
+  "rs.spread": "見開き",
+  "rs.fitHeight": "高さに合わせる",
+  "rs.comicRtl": "漫画を右から左へ",
+  "settings.backup": "ライブラリのバックアップ",
+  "settings.backupData": "データのみ",
+  "settings.backupAll": "データと本のファイル",
+  "settings.backupHint":
+    "1つの zip に保存します：本棚、グループ、進捗、しおりとメモ、AI キャッシュ、表紙（本のファイルも選択可）。復元するには空のライブラリフォルダーに展開します。",
+  "settings.backingUp": "バックアップ中…",
+  "settings.backupDone": "{path} にバックアップしました",
+  "ai.history": "過去の会話",
+  "ai.usage": "{input} → {output} トークン",
+  "rs.customFont": "カスタムフォント",
+  "rs.customFontNone": "カスタムフォントなし",
+  "rs.addFont": "フォントを追加…",
+  "rs.removeFont": "このフォントをライブラリから削除",
 };
 
 export default ja;

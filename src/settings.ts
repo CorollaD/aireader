@@ -10,12 +10,17 @@ export interface Settings {
   /** `null` picks a readable colour automatically. */
   textColor: string | null;
   fontFamily: FontFamily;
+  /** A font file the user added (see `api.listFonts`), used before `fontFamily`. */
+  customFont: string | null;
   fontSize: number;
   lineHeight: number;
   maxWidth: number;
-  pageLayout: "continuous" | "single";
+  /** Paged books: one long scroll, one page at a time, or two pages side by side. */
+  pageLayout: "continuous" | "single" | "spread";
   /** How paged books are scaled before zoom. */
-  pageFit: "width" | "page";
+  pageFit: "width" | "page" | "height";
+  /** Comics turn right to left (manga): reversed arrow keys, and spreads read right to left. */
+  comicRtl: boolean;
   /** Reflowable books: vertical scrolling or horizontal pages. */
   flowMode: "scroll" | "paged";
   columns: 1 | 2;
@@ -39,11 +44,13 @@ export const DEFAULT_SETTINGS: Settings = {
   background: "#faf7ef",
   textColor: null,
   fontFamily: "sans",
+  customFont: null,
   fontSize: 19,
   lineHeight: 1.8,
   maxWidth: 760,
   pageLayout: "continuous",
   pageFit: "width",
+  comicRtl: false,
   flowMode: "scroll",
   columns: 1,
   paragraphSpacing: 0.75,
@@ -80,6 +87,9 @@ export const BACKGROUNDS: { name: MessageKey; color: string }[] = [
   { name: "bg.black", color: "#000000" },
 ];
 
+/** CSS family name under which the user's added font is registered. */
+export const CUSTOM_FONT = "AiReader Custom";
+
 export const FONT_STACKS: Record<FontFamily, { name: MessageKey; css: string }> = {
   sans: {
     name: "font.sans",
@@ -97,7 +107,10 @@ export function normalizeSettings(raw: unknown): Settings {
   if (!/^#[0-9a-f]{6}$/i.test(s.background)) s.background = DEFAULT_SETTINGS.background;
   if (s.textColor !== null && !/^#[0-9a-f]{6}$/i.test(s.textColor)) s.textColor = null;
   if (!(s.fontFamily in FONT_STACKS)) s.fontFamily = DEFAULT_SETTINGS.fontFamily;
+  if (typeof s.customFont !== "string" || !s.customFont) s.customFont = null;
   if (!UI_SCALES.some((u) => u.value === s.uiScale)) s.uiScale = DEFAULT_SETTINGS.uiScale;
+  if (!["continuous", "single", "spread"].includes(s.pageLayout)) s.pageLayout = DEFAULT_SETTINGS.pageLayout;
+  if (!["width", "page", "height"].includes(s.pageFit)) s.pageFit = DEFAULT_SETTINGS.pageFit;
   return s;
 }
 
@@ -155,7 +168,8 @@ export function themeVars(s: Settings): Record<string, string> {
     "--danger": dark ? "#ff8a80" : "#c62828",
     "--ok": dark ? "#81c784" : "#2e7d32",
     "--shadow": dark ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.12)",
-    "--reader-font": FONT_STACKS[s.fontFamily].css,
+    // An added font comes first; the chosen family covers characters it lacks.
+    "--reader-font": s.customFont ? `"${CUSTOM_FONT}", ${FONT_STACKS[s.fontFamily].css}` : FONT_STACKS[s.fontFamily].css,
     "color-scheme": dark ? "dark" : "light",
   };
 }

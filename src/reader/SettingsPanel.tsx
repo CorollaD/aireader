@@ -1,6 +1,8 @@
 // Reading appearance controls, shown in the reader's "Aa" popover and in the Settings dialog.
 
+import { useEffect, useState } from "react";
 import type { UpdateSettings } from "../App";
+import { api, errorText } from "../api";
 import { t } from "../i18n";
 import { BACKGROUNDS, FONT_STACKS, isDark, type FontFamily, type Settings } from "../settings";
 
@@ -11,6 +13,56 @@ function Slider(props: { label: string; value: number; min: number; max: number;
       <input type="range" min={props.min} max={props.max} step={props.step} value={props.value} onChange={(e) => props.onChange(Number(e.target.value))} />
       <span className="slider-value">{props.format(props.value)}</span>
     </label>
+  );
+}
+
+/** Picking (or adding) a font file of the user's own for book text. */
+function CustomFont(props: { value: string | null; onChange: (name: string | null) => void }) {
+  const [fonts, setFonts] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    api
+      .listFonts()
+      .then(setFonts)
+      .catch(() => {});
+  }, []);
+  const add = async () => {
+    setError(null);
+    try {
+      const name = await api.importFont();
+      if (!name) return;
+      setFonts((f) => [...new Set([...f, name])].sort());
+      props.onChange(name);
+    } catch (e) {
+      setError(errorText(e));
+    }
+  };
+  const remove = async () => {
+    if (!props.value) return;
+    const name = props.value;
+    props.onChange(null);
+    await api.removeFont(name).catch(() => {});
+    setFonts((f) => f.filter((x) => x !== name));
+  };
+  const label = (name: string) => name.replace(/\.[^.]+$/, "");
+  return (
+    <div className="custom-font">
+      <select value={props.value ?? ""} onChange={(e) => props.onChange(e.target.value || null)} aria-label={t("rs.customFont")}>
+        <option value="">{t("rs.customFontNone")}</option>
+        {fonts.map((f) => (
+          <option key={f} value={f}>
+            {label(f)}
+          </option>
+        ))}
+      </select>
+      <button onClick={add}>{t("rs.addFont")}</button>
+      {props.value && (
+        <button onClick={remove} title={t("rs.removeFont")}>
+          {t("common.delete")}
+        </button>
+      )}
+      {error && <div className="error small">{error}</div>}
+    </div>
   );
 }
 
@@ -88,6 +140,7 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
                 </button>
               ))}
             </div>
+            <CustomFont value={s.customFont} onChange={(customFont) => update({ customFont })} />
           </div>
           <div className="panel-section">
             <Slider label={t("rs.fontSize")} value={s.fontSize} min={13} max={36} step={1} format={(v) => `${v}px`} onChange={(v) => update({ fontSize: v })} />
@@ -162,6 +215,7 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
               options={[
                 ["continuous", t("rs.continuous")],
                 ["single", t("rs.single")],
+                ["spread", t("rs.spread")],
               ]}
               onChange={(pageLayout) => update({ pageLayout })}
             />
@@ -173,10 +227,12 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
               options={[
                 ["width", t("rs.fitWidth")],
                 ["page", t("rs.fitPage")],
+                ["height", t("rs.fitHeight")],
               ]}
               onChange={(pageFit) => update({ pageFit })}
             />
           </div>
+          <Toggle label={t("rs.comicRtl")} on={s.comicRtl} onChange={(comicRtl) => update({ comicRtl })} />
         </div>
       )}
     </>

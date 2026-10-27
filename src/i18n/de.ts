@@ -411,6 +411,26 @@ const de: Messages = {
   "ai.buildIndexTitle": "Dieses Buch mit dem Embedding-Modell indizieren, damit Fragen Stellen nach Bedeutung finden",
   "ai.indexing": "Indizierung {done}/{total}",
   "ai.indexBuilt": "Semantischer Index erstellt: {n} Abschnitte",
+  "error.title": "Etwas ist schiefgelaufen",
+  "error.hint": "Diese Ansicht konnte nicht angezeigt werden. Neu laden ist sicher: Bücher und Notizen bleiben erhalten.",
+  "error.reload": "Neu laden",
+  "error.backToShelf": "Zurück zum Regal",
+  "rs.spread": "Doppelseite",
+  "rs.fitHeight": "An Höhe anpassen",
+  "rs.comicRtl": "Comics von rechts nach links",
+  "settings.backup": "Bibliothek sichern",
+  "settings.backupData": "Nur Daten",
+  "settings.backupAll": "Daten und Buchdateien",
+  "settings.backupHint":
+    "Speichert eine ZIP-Datei: Regal, Gruppen, Fortschritt, Lesezeichen und Notizen, KI-Caches und Cover, optional auch die Buchdateien. Zum Wiederherstellen in einen leeren Bibliotheksordner entpacken.",
+  "settings.backingUp": "Wird gesichert…",
+  "settings.backupDone": "Gesichert unter {path}",
+  "ai.history": "Frühere Unterhaltungen",
+  "ai.usage": "{input} → {output} Tokens",
+  "rs.customFont": "Eigene Schrift",
+  "rs.customFontNone": "Keine eigene Schrift",
+  "rs.addFont": "Schrift hinzufügen…",
+  "rs.removeFont": "Diese Schrift aus der Bibliothek entfernen",
 };
 
 export default de;

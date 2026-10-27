@@ -5,14 +5,15 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, errorText, runAiTask } from "../api";
-import type { AiEvent, AiTask, BookEstimate, ChatAction, Location, MindMapScope, OpenedBook, SemanticStatus, Source } from "../types";
+import type { AiEvent, AiTask, BookEstimate, ChatAction, ChatRecord, Location, MindMapScope, OpenedBook, SemanticStatus, Source, Usage } from "../types";
 import { Modal } from "../ui";
 import type { TextRange } from "../reader/anchors";
-import { formatNumber, t, type MessageKey } from "../i18n";
+import { formatDate, formatNumber, t, type MessageKey } from "../i18n";
 import { Icon, type IconName } from "../icons";
 import { describe } from "../reader/locations";
 import { MOD } from "../reader/shortcuts";
 import { useAi } from "./AiContext";
+import { presetOf } from "./presets";
 import Markdown from "./Markdown";
 import { MindMapPreview, MindMapViewer, outlineMarkdown, saveMindMap } from "./MindMap";
 
@@ -39,9 +40,29 @@ interface Turn {
   role: "user" | "assistant";
   text: string;
   sources?: Source[];
+  usage?: Usage;
+}
+
+/** Adds one request's usage to a running total. */
+function addUsage(total: Usage | undefined, e: Usage): Usage {
+  if (!total) return { input: e.input, output: e.output, cost: e.cost };
+  return {
+    input: total.input + e.input,
+    output: total.output + e.output,
+    cost: total.cost === null && e.cost === null ? null : (total.cost ?? 0) + (e.cost ?? 0),
+  };
+}
+
+/** "1.2k → 340 tokens · $0.0031" */
+function usageLabel(u: Usage): string {
+  const k = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n));
+  const cost = u.cost !== null && u.cost > 0 ? ` · $${u.cost < 0.01 ? u.cost.toFixed(4) : u.cost.toFixed(2)}` : "";
+  return t("ai.usage", { input: k(u.input), output: k(u.output) }) + cost;
 }
 
 interface Chat {
+  /** Saved conversation id; assigned when the first request is sent. */
+  id: string | null;
   turns: Turn[];
   quote: Quote | null;
   status: Status;
@@ -58,6 +79,7 @@ interface Summary {
   error: string | null;
   taskId: string | null;
   task: AiTask;
+  usage?: Usage;
 }
 
 /** A mind map drawn in this session. */
@@ -81,7 +103,20 @@ const ACTION_LABEL: Record<ChatAction, MessageKey> = {
   summarize: "ai.actionSummarize",
 };
 
-const EMPTY_CHAT: Chat = { turns: [], quote: null, status: "idle", error: null, taskId: null };
+const EMPTY_CHAT: Chat = { id: null, turns: [], quote: null, status: "idle", error: null, taskId: null };
+
+/** What a saved conversation is called in the history list. */
+function chatTitle(c: Chat): string {
+  const first = c.turns.find((turn) => turn.role === "user")?.text ?? c.quote?.selection ?? "";
+  const line = first.replace(/\s+/g, " ").trim();
+  return line.length > 40 ? `${line.slice(0, 40)}…` : line || t("ai.chatTab");
+}
+
+/** A saved conversation back as a chat (stored data is checked loosely). */
+function restoreChat(r: ChatRecord): Chat {
+  const data = (r.data ?? {}) as { turns?: Turn[]; quote?: Quote | null };
+  return { ...EMPTY_CHAT, id: r.id, turns: Array.isArray(data.turns) ? data.turns : [], quote: data.quote ?? null };
+}
 
 const TABS: { key: Tab; icon: IconName; label: MessageKey }[] = [
   { key: "chat", icon: "message", label: "ai.chatTab" },
@@ -113,6 +148,8 @@ export default function AiPanel(props: {
   const input = useRef<HTMLTextAreaElement>(null);
   const mapSvg = useRef<SVGSVGElement>(null);
   const nextMapId = useRef(1);
+  const [sessions, setSessions] = useState<ChatRecord[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [semantic, setSemantic] = useState<SemanticStatus | null>(null);
   const [indexing, setIndexing] = useState<{ done: number; total: number; taskId: string } | null>(null);
 
@@ -149,6 +186,59 @@ export default function AiPanel(props: {
   const flow = book.kind === "flow";
   const here = location ? describe(book, location) : null;
 
+  // Saved conversations: the latest one is shown again when the book is opened.
+  useEffect(() => {
+    let alive = true;
+    api
+      .listChats(book.id)
+      .then((list) => {
+        if (!alive) return;
+        setSessions(list);
+        if (list[0]) setChat((c) => (c.turns.length || c.quote ? c : restoreChat(list[0])));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [book.id]);
+
+  // A conversation is saved whenever an answer finishes (or stops).
+  useEffect(() => {
+    if (chat.status === "idle" || chat.status === "running" || !chat.id || chat.turns.length === 0) return;
+    const record: ChatRecord = {
+      id: chat.id,
+      title: chatTitle(chat),
+      updated: Math.floor(Date.now() / 1000),
+      data: { turns: chat.turns, quote: chat.quote },
+    };
+    api
+      .saveChat(book.id, record)
+      .then(() => setSessions((s) => [record, ...s.filter((x) => x.id !== record.id)]))
+      .catch(() => {});
+  }, [chat.status, chat.id, chat.turns.length]);
+
+  // The history menu closes on a click anywhere else.
+  useEffect(() => {
+    if (!historyOpen) return;
+    const close = (e: MouseEvent) => {
+      if (!(e.target as Element).closest?.(".chat-history-anchor")) setHistoryOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [historyOpen]);
+
+  const openSession = (r: ChatRecord) => {
+    stop(chat.taskId);
+    setChat(restoreChat(r));
+    setHistoryOpen(false);
+  };
+
+  const deleteSession = (id: string) => {
+    api.deleteChat(id).catch(() => {});
+    setSessions((s) => s.filter((x) => x.id !== id));
+    if (chat.id === id) setChat(EMPTY_CHAT);
+  };
+
   // --- chat ------------------------------------------------------------------------------------
 
   /** Answers the conversation whose last turn is the (empty) answer being generated. */
@@ -173,6 +263,9 @@ export default function AiPanel(props: {
           case "sources":
             turns[turns.length - 1] = { ...last, sources: e.sources };
             return { ...cur, turns };
+          case "usage":
+            turns[turns.length - 1] = { ...last, usage: addUsage(last.usage, e) };
+            return { ...cur, turns };
           case "delta":
             turns[turns.length - 1] = { ...last, text: last.text + e.text };
             return { ...cur, turns };
@@ -186,7 +279,7 @@ export default function AiPanel(props: {
         }
       }),
     );
-    setChat({ ...c, status: "running", error: null, taskId });
+    setChat({ ...c, id: c.id ?? crypto.randomUUID(), status: "running", error: null, taskId });
   };
 
   const send = async (text: string) => {
@@ -231,11 +324,20 @@ export default function AiPanel(props: {
     // Only a new request (its nonce) should start a conversation.
   }, [props.chatRequest?.n]);
 
-  // Keep the newest output in view while it streams.
+  // Keep the newest output in view while it streams, unless the reader has scrolled up to read
+  // something earlier; a new question or tab follows the output again.
+  const stick = useRef(true);
+  const onScroll = () => {
+    const el = body.current;
+    if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+  };
+  useEffect(() => {
+    stick.current = true;
+  }, [chat.turns.length, tab]);
   const lastText = chat.turns[chat.turns.length - 1]?.text;
   useEffect(() => {
     const el = body.current;
-    if (el && tab !== "map") el.scrollTop = el.scrollHeight;
+    if (el && tab !== "map" && stick.current) el.scrollTop = el.scrollHeight;
   }, [chat.turns.length, lastText, summary?.text, tab]);
 
   // The question box grows with its text.
@@ -260,6 +362,8 @@ export default function AiPanel(props: {
             return { ...s, text: s.text + e.text, progress: null };
           case "progress":
             return { ...s, progress: e };
+          case "usage":
+            return { ...s, usage: addUsage(s.usage, e) };
           case "done":
             return { ...s, text: e.text, cached: e.cached, status: "done", progress: null };
           case "error":
@@ -395,13 +499,47 @@ export default function AiPanel(props: {
     <div className="ai-head">
       <div className="ai-switch" role="tablist">
         {TABS.map((tb) => (
-          <button key={tb.key} role="tab" aria-selected={tab === tb.key} className={tab === tb.key ? "on" : ""} onClick={() => setTab(tb.key)}>
+          <button
+            key={tb.key}
+            role="tab"
+            aria-selected={tab === tb.key}
+            className={tab === tb.key ? "on" : ""}
+            title={t(tb.label)}
+            onClick={() => setTab(tb.key)}
+          >
             <Icon name={tb.icon} size={14} />
-            {t(tb.label)}
+            <span className="tab-label">{t(tb.label)}</span>
           </button>
         ))}
       </div>
       <span className="spacer" />
+      {tab === "chat" && ai.ready && sessions.length > 0 && (
+        <div className="menu-anchor chat-history-anchor">
+          <button
+            className={`icon-button${historyOpen ? " on" : ""}`}
+            title={t("ai.history")}
+            aria-label={t("ai.history")}
+            onClick={() => setHistoryOpen((o) => !o)}
+          >
+            <Icon name="clock" />
+          </button>
+          {historyOpen && (
+            <div className="menu dropdown chat-history">
+              {sessions.map((r) => (
+                <div key={r.id} className={`chat-session${r.id === chat.id ? " current" : ""}`}>
+                  <button className="chat-session-open" onClick={() => openSession(r)}>
+                    <span className="ellipsis">{r.title}</span>
+                    <span className="muted small">{formatDate(r.updated)}</span>
+                  </button>
+                  <button className="icon-button" title={t("common.delete")} aria-label={t("common.delete")} onClick={() => deleteSession(r.id)}>
+                    <Icon name="close" size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {tab === "chat" && ai.ready && (
         <button
           className="icon-button"
@@ -454,7 +592,7 @@ export default function AiPanel(props: {
 
       {tab === "chat" && (
         <>
-          <div className="ai-scroll" ref={body}>
+          <div className="ai-scroll" ref={body} onScroll={onScroll}>
             {chat.turns.length === 0 && !chat.quote && (
               <div className="ai-welcome">
                 <div className="ai-orb">
@@ -561,13 +699,16 @@ export default function AiPanel(props: {
                 </button>
               )}
             </div>
-            <div className="ai-input-hint muted">{lastAnswer || chat.quote ? t("ai.enterHint") : t("ai.selectHint")}</div>
+            <div className="ai-input-foot">
+              <ModelSwitch disabled={running} />
+              <span className="ai-input-hint muted ellipsis">{lastAnswer || chat.quote ? t("ai.enterHint") : t("ai.selectHint")}</span>
+            </div>
           </div>
         </>
       )}
 
       {tab === "summary" && (
-        <div className="ai-scroll" ref={body}>
+        <div className="ai-scroll" ref={body} onScroll={onScroll}>
           <div className="ai-cards">
             <button className="ai-card" onClick={summarizeHere} disabled={summary?.status === "running" || !location}>
               <Icon name={flow ? "bookOpen" : "fitPage"} size={18} />
@@ -614,6 +755,7 @@ export default function AiPanel(props: {
                         <Icon name="refresh" size={13} /> {t("ai.regenerate")}
                       </button>
                     )}
+                    {summary.usage && <span className="usage muted">{usageLabel(summary.usage)}</span>}
                   </>
                 )}
               </div>
@@ -623,7 +765,7 @@ export default function AiPanel(props: {
       )}
 
       {tab === "map" && (
-        <div className="ai-scroll" ref={body}>
+        <div className="ai-scroll" ref={body} onScroll={onScroll}>
           <div className="ai-cards three">
             <button className="ai-card" onClick={mapHere} disabled={mapBusy || !location}>
               <Icon name={flow ? "bookOpen" : "fitPage"} size={18} />
@@ -861,8 +1003,40 @@ function Answer(props: {
               <Icon name="refresh" size={13} /> {t("ai.regenerate")}
             </button>
           )}
+          {turn.usage && <span className="usage muted">{usageLabel(turn.usage)}</span>}
         </div>
       )}
     </div>
+  );
+}
+
+/** Switches the chat model of the configured service without opening Settings. */
+function ModelSwitch({ disabled }: { disabled: boolean }) {
+  const ai = useAi();
+  const status = ai.status;
+  if (!status) return null;
+  const current = status.config.model;
+  const models = [...new Set([current, ...(presetOf(status.config.provider)?.models ?? [])])].filter(Boolean);
+  if (models.length < 2) return null;
+  return (
+    <select
+      className="model-switch"
+      value={current}
+      disabled={disabled}
+      title={t("ai.model")}
+      aria-label={t("ai.model")}
+      onChange={(e) => {
+        api
+          .aiSetConfig({ ...status.config, model: e.target.value })
+          .then(ai.setStatus)
+          .catch(() => {});
+      }}
+    >
+      {models.map((m) => (
+        <option key={m} value={m}>
+          {m}
+        </option>
+      ))}
+    </select>
   );
 }

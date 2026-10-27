@@ -46,8 +46,9 @@ export function locationAt(book: OpenedBook, fraction: number): Location {
     if (target < n) return { kind: "flow", chapter, block: Math.min(target, Math.max(0, book.chapters[chapter].blocks - 1)) };
     target -= n;
   }
-  const last = book.chapters.length - 1;
-  return { kind: "flow", chapter: Math.max(0, last), block: 0 };
+  // The very end (fraction 1): the last block of the last chapter.
+  const last = Math.max(0, book.chapters.length - 1);
+  return { kind: "flow", chapter: last, block: Math.max(0, (book.chapters[last]?.blocks ?? 1) - 1) };
 }
 
 /** A short description of a location, e.g. for the progress slider's tooltip. */

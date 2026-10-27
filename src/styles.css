@@ -1519,6 +1519,16 @@ kbd {
   background: var(--panel);
   position: relative;
   min-height: 0;
+  container: ai-panel / inline-size;
+}
+/* Narrow panels: only the current tab keeps its label. */
+@container ai-panel (max-width: 420px) {
+  .ai-switch button:not(.on) .tab-label {
+    display: none;
+  }
+  .ai-switch button {
+    padding: 4px 8px;
+  }
 }
 .ai-head {
   display: flex;
@@ -1544,6 +1554,9 @@ kbd {
   background: var(--hover);
 }
 .ai-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: none;
   background: none;
   border-radius: 7px;
@@ -1917,9 +1930,30 @@ button.cite:hover {
 .ai-send.stop:hover {
   background: var(--fg) !important;
 }
+.ai-input-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 5px 4px 0;
+  min-width: 0;
+}
 .ai-input-hint {
   font-size: 11px;
-  margin: 5px 4px 0;
+  min-width: 0;
+}
+.model-switch {
+  font-size: 11px;
+  max-width: 50%;
+  padding: 1px 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--muted);
+}
+.msg-actions .usage {
+  margin-left: auto;
+  font-size: 11px;
+  align-self: center;
 }
 
 /* Summary tab */
@@ -2580,4 +2614,133 @@ body.resizing * {
 }
 .settings-form .hint {
   margin-bottom: 12px;
+}
+
+/* --- keyboard focus, loading and error screens ------------------------------------------- */
+
+.book-card:focus-visible,
+.book-row:focus-visible,
+.progress-track:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.progress-track:focus-visible .progress-thumb {
+  opacity: 1;
+}
+
+.modal:focus {
+  outline: none;
+}
+
+.app-loading {
+  height: 100%;
+  background: var(--bg);
+}
+
+.error-screen {
+  max-width: 560px;
+  margin: 12vh auto 0;
+  padding: 0 24px;
+  user-select: text;
+}
+
+.error-detail {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 30vh;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  font-size: 12px;
+}
+
+/* Internal links (footnotes, cross-references) in book text. */
+article.flow a.internal {
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+article.flow a.internal:hover {
+  text-decoration: underline;
+}
+
+/* Paged text: the click areas that turn pages, shown faintly on hover. */
+.turn-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 30%;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  color: var(--muted);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 1;
+}
+.turn-zone.prev {
+  left: 0;
+  justify-content: flex-start;
+  background: linear-gradient(to right, var(--hover), transparent 40%);
+}
+.turn-zone.next {
+  right: 0;
+  justify-content: flex-end;
+  background: linear-gradient(to left, var(--hover), transparent 40%);
+}
+.flow-scroller.paged[data-zone="prev"] .turn-zone.prev,
+.flow-scroller.paged[data-zone="next"] .turn-zone.next {
+  opacity: 0.8;
+}
+
+/* Two pages side by side; right to left for manga. */
+.single-stage.spread {
+  gap: 4px;
+}
+.single-stage.spread.rtl {
+  flex-direction: row-reverse;
+}
+
+/* AI conversation history. */
+.chat-history {
+  width: 280px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.chat-session {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+.chat-session:hover,
+.chat-session.current {
+  background: var(--hover);
+}
+.chat-session-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.chat-session-open .ellipsis {
+  max-width: 100%;
+}
+
+/* Reading font of the user's own. */
+.custom-font {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.custom-font select {
+  flex: 1;
+  min-width: 120px;
 }

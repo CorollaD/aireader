@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, errorText } from "../api";
+import { onBeforeExit } from "../lifecycle";
 import type { UpdateSettings } from "../App";
 import type { Settings } from "../settings";
 import type { Hit, HighlightColor, Location, OpenedBook } from "../types";
@@ -104,9 +105,15 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
     window.clearTimeout(saveTimer.current);
     const p = pendingSave.current;
     pendingSave.current = null;
-    if (p) api.saveProgress(bookId, p.loc, p.progress).catch(() => {});
+    return p ? api.saveProgress(bookId, p.loc, p.progress).catch(() => {}) : undefined;
   }, [bookId]);
-  useEffect(() => flush, [flush]);
+  useEffect(() => {
+    const unregister = onBeforeExit(flush);
+    return () => {
+      unregister();
+      flush();
+    };
+  }, [flush]);
 
   const onLocation = useCallback(
     (loc: Location, last: number) => {
@@ -283,6 +290,8 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
   };
 
   const isFlow = book?.kind === "flow";
+  // PDFs are searched through their text layer; comics have no text.
+  const searchable = isFlow || book?.format === "PDF";
 
   const rotate = () => {
     const next = (rotation + 90) % 360;
@@ -297,13 +306,11 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
       const cmd = e.metaKey || e.ctrlKey;
       const typing = isTyping(e);
       const key = e.key.toLowerCase();
-      if (cmd && key === "f" && e.ctrlKey && e.metaKey) {
+      // ⌃⌘F on macOS is handled by the app menu.
+      if (e.key === "F11") {
         e.preventDefault();
         toggleFullscreen().catch(() => {});
-      } else if (e.key === "F11") {
-        e.preventDefault();
-        toggleFullscreen().catch(() => {});
-      } else if (cmd && key === "f" && isFlow) {
+      } else if (cmd && key === "f" && searchable) {
         e.preventDefault();
         setSearch((s) => ({ ...s, open: true }));
         setTimeout(() => searchInput.current?.focus(), 0);
@@ -355,6 +362,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
     return () => window.removeEventListener("keydown", onKey);
   }, [
     isFlow,
+    searchable,
     settings.fontSize,
     settings.showToc,
     panel,
@@ -396,7 +404,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
   // Panels and their widths; the text always keeps room, so panels shrink in narrow windows.
   const tocShown = settings.showToc && !focus;
   const aiShown = aiOpen && !focus;
-  const searchShown = search.open && isFlow && !focus;
+  const searchShown = search.open && searchable && !focus;
   const rightPanel: Panel | null = aiShown ? "ai" : searchShown ? "search" : null;
   const tocWidth = tocShown ? fitWidth("toc", panels.widths.toc, bodyWidth - (rightPanel ? minWidth(rightPanel) : 0)) : 0;
   const rightWidth = rightPanel ? fitWidth(rightPanel, panels.widths[rightPanel], bodyWidth - tocWidth) : 0;
@@ -477,6 +485,14 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
               >
                 <Icon name="fitPage" />
               </button>
+              <button
+                className={`icon-button${settings.pageFit === "height" ? " on" : ""}`}
+                onClick={() => (update({ pageFit: "height" }), setZoom(1))}
+                title={t("rs.fitHeight")}
+                aria-label={t("rs.fitHeight")}
+              >
+                <Icon name="fitHeight" />
+              </button>
               <button className="icon-button" onClick={rotate} title={t("reader.rotate")} aria-label={t("reader.rotate")}>
                 <Icon name="rotate" />
               </button>
@@ -490,7 +506,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
           >
             <Icon name="bookmark" filled={!!currentBookmark} />
           </button>
-          {isFlow && (
+          {searchable && (
             <button
               className={`icon-button${search.open ? " on" : ""}`}
               title={`${t("reader.search")} (${MOD}+F)`}
@@ -554,6 +570,14 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
                     <button className={settings.pageLayout === "single" ? "checked" : ""} onClick={() => update({ pageLayout: "single" })}>
                       <Icon name="fitPage" /> {t("rs.single")}
                     </button>
+                    <button className={settings.pageLayout === "spread" ? "checked" : ""} onClick={() => update({ pageLayout: "spread" })}>
+                      <Icon name="spread" /> {t("rs.spread")}
+                    </button>
+                    {book.format === "CBZ" && (
+                      <button className={settings.comicRtl ? "checked" : ""} onClick={() => update({ comicRtl: !settings.comicRtl })}>
+                        <Icon name="arrowLeft" /> {t("rs.comicRtl")}
+                      </button>
+                    )}
                     <hr />
                   </>
                 )}
@@ -622,6 +646,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
               onSelect={onSelect}
               onMarkClick={onMarkClick}
               onMoved={onMoved}
+              onLink={(loc) => navigate(loc, true)}
             />
           ) : (
             <PagedView
@@ -629,6 +654,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
               jump={jump}
               layout={settings.pageLayout}
               fit={settings.pageFit}
+              rtl={settings.comicRtl && book.format === "CBZ"}
               zoom={zoom}
               rotation={rotation}
               onLocation={onLocation}
@@ -677,8 +703,12 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
             </div>
             <div className="search-hits">
               {search.hits?.map((h, i) => (
-                <button key={i} className="hit" onClick={() => navigate({ kind: "flow", chapter: h.chapter, block: h.block }, true)}>
-                  <span className="hit-chapter">{book.chapters[h.chapter]?.title || t("loc.chapter", { n: h.chapter + 1 })}</span>
+                <button key={i} className="hit" onClick={() => navigate(h.location, true)}>
+                  <span className="hit-chapter">
+                    {h.location.kind === "flow"
+                      ? book.chapters[h.location.chapter]?.title || t("loc.chapter", { n: h.location.chapter + 1 })
+                      : t("loc.page", { n: h.location.page + 1 })}
+                  </span>
                   <span>{h.snippet}</span>
                 </button>
               ))}

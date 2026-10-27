@@ -410,6 +410,26 @@ const it: Messages = {
   "ai.buildIndexTitle": "Indicizza questo libro con il modello di embedding, così le domande trovano i passi per significato",
   "ai.indexing": "Indicizzazione {done}/{total}",
   "ai.indexBuilt": "Indice semantico creato: {n} passi",
+  "error.title": "Qualcosa è andato storto",
+  "error.hint": "Impossibile mostrare questa vista. Ricaricare è sicuro: libri e note restano salvati.",
+  "error.reload": "Ricarica",
+  "error.backToShelf": "Torna alla libreria",
+  "rs.spread": "Due pagine",
+  "rs.fitHeight": "Adatta altezza",
+  "rs.comicRtl": "Fumetti da destra a sinistra",
+  "settings.backup": "Backup della libreria",
+  "settings.backupData": "Solo dati",
+  "settings.backupAll": "Dati e file dei libri",
+  "settings.backupHint":
+    "Salva un file zip: libreria, gruppi, avanzamento, segnalibri e note, cache IA e copertine, e se vuoi i file dei libri. Per ripristinare, estrailo in una cartella di libreria vuota.",
+  "settings.backingUp": "Backup in corso…",
+  "settings.backupDone": "Backup salvato in {path}",
+  "ai.history": "Conversazioni precedenti",
+  "ai.usage": "{input} → {output} token",
+  "rs.customFont": "Font personalizzato",
+  "rs.customFontNone": "Nessun font personalizzato",
+  "rs.addFont": "Aggiungi font…",
+  "rs.removeFont": "Rimuovi questo font dalla libreria",
 };
 
 export default it;

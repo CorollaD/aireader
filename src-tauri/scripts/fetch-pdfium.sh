@@ -6,7 +6,8 @@
 #
 # The library matches the Rust target being built: PDFIUM_TARGET, else TAURI_ENV_TARGET_TRIPLE
 # (set by the Tauri CLI for build hooks), else this machine. PDFIUM_VERSION picks a release
-# (e.g. 8111); the default is the version the release builds use.
+# (e.g. 8111); the default is the version the release builds use, whose archives are checked
+# against the SHA-256 sums below. Other versions are not checked.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -33,6 +34,18 @@ case "$target" in
 esac
 
 version="${PDFIUM_VERSION:-8111}"
+
+# SHA-256 of the chromium/8111 archives.
+sha256=""
+if [ "$version" = 8111 ]; then
+  case "$pkg" in
+    pdfium-mac-arm64) sha256=46c674298c60123f1195c2a03c65ee08c4783c84874ce4f5b3a054abb3ecaf30 ;;
+    pdfium-mac-x64) sha256=e7fece4693f65a7e47f84fa38099068d573d4dcbd46b1a3c8d2c26581c308466 ;;
+    pdfium-linux-x64) sha256=bdc60126399f39fe768566a18d4be055a7b3681bc9e248e8a6656b4f6cae0aa2 ;;
+    pdfium-linux-arm64) sha256=042de247138f96341534cccf24ed21c2550a7245b936bb4a60d2340120000f05 ;;
+    pdfium-win-x64) sha256=3452d11031050ec65e57f180215b57b9e6d465e3fbedafa8a77ad90885c7d23e ;;
+  esac
+fi
 # Records which package is in lib/, so switching targets fetches the right one.
 stamp="lib/.pdfium"
 if [ "${1:-}" = "--if-missing" ] && [ -f "lib/$lib" ] && [ "$(cat "$stamp" 2>/dev/null)" = "$pkg@$version" ]; then
@@ -50,6 +63,17 @@ trap 'rm -rf "$tmp"' EXIT
 
 echo "Downloading $url"
 curl -fL --retry 3 --progress-bar "$url" -o "$tmp/pdfium.tgz"
+if [ -n "$sha256" ]; then
+  if command -v sha256sum >/dev/null; then
+    actual="$(sha256sum "$tmp/pdfium.tgz" | cut -d' ' -f1)"
+  else
+    actual="$(shasum -a 256 "$tmp/pdfium.tgz" | cut -d' ' -f1)"
+  fi
+  if [ "$actual" != "$sha256" ]; then
+    echo "Checksum mismatch for $pkg.tgz: expected $sha256, got $actual" >&2
+    exit 1
+  fi
+fi
 tar -xzf "$tmp/pdfium.tgz" -C "$tmp"
 
 mkdir -p lib

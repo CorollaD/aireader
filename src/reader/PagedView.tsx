@@ -8,6 +8,7 @@ import type { Jump } from "./Reader";
 import { pixelRatio } from "../zoom";
 import { t } from "../i18n";
 import { Icon } from "../icons";
+import { spreads } from "./spreads";
 
 const GAP = 14;
 /** Pages within this many screens of the viewport get their images loaded. */
@@ -137,8 +138,10 @@ function pageSelection(): PageSelection | null {
 interface Props {
   book: OpenedBook;
   jump: Jump | null;
-  layout: "continuous" | "single";
-  fit: "width" | "page";
+  layout: "continuous" | "single" | "spread";
+  fit: "width" | "page" | "height";
+  /** Pages turn right to left (manga). */
+  rtl: boolean;
   zoom: number;
   /** Clockwise page rotation in degrees. */
   rotation: number;
@@ -146,7 +149,7 @@ interface Props {
   onSelect: (selection: PageSelection | null) => void;
 }
 
-export default function PagedView({ book, jump, layout, fit, zoom, rotation, onLocation, onSelect }: Props) {
+export default function PagedView({ book, jump, layout, fit, zoom, rotation, rtl, onLocation, onSelect }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const size = useSize(scroller);
   const [page, setPage] = useState(() => (jump?.loc.kind === "page" ? jump.loc.page : 0));
@@ -165,7 +168,8 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, onL
   const aspects = useMemo(() => book.pages.map((a) => (quarter ? 1 / a : a)), [book.pages, quarter]);
   const fitWidth = Math.min(size.w - 48, 1400);
   // "Fit page" sizes pages so a typical (first) page fits the window height.
-  const fitPage = Math.min(fitWidth, (size.h - 2 * GAP) / (aspects[0] ?? 1.414));
+  const fitHeight = (size.h - 2 * GAP) / (aspects[0] ?? 1.414);
+  const fitPage = fit === "height" ? fitHeight : Math.min(fitWidth, fitHeight);
   const width = Math.max(120, (fit === "width" ? fitWidth : fitPage) * zoom);
   const tops = useMemo(() => {
     const t: number[] = [];
@@ -178,13 +182,34 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, onL
     return t;
   }, [aspects, width]);
 
+  const groups = useMemo(() => spreads(aspects), [aspects]);
+  /** Page → index of its group in two-page mode. */
+  const groupOf = useMemo(() => {
+    const m: number[] = [];
+    groups.forEach((g, k) => g.forEach((p) => (m[p] = k)));
+    return m;
+  }, [groups]);
+
   const goto = useCallback(
     (p: number) => {
-      const target = Math.max(0, Math.min(count - 1, p));
+      let target = Math.max(0, Math.min(count - 1, p));
+      // Two pages at a time: the view starts at the first page of the pair.
+      if (layout === "spread") target = groups[groupOf[target] ?? 0]?.[0] ?? target;
       setPage(target);
       if (layout === "continuous" && scroller.current) scroller.current.scrollTop = tops[target] - GAP;
     },
-    [count, layout, tops],
+    [count, layout, tops, groups, groupOf],
+  );
+
+  /** Next (+1) or previous (-1) page, or pair of pages. */
+  const step = useCallback(
+    (dir: 1 | -1) => {
+      const p = pageRef.current;
+      if (layout !== "spread") return goto(p + dir);
+      const g = groups[(groupOf[p] ?? 0) + dir];
+      if (g) goto(g[0]);
+    },
+    [goto, layout, groups, groupOf],
   );
 
   // Only explicit jumps move the view, so `goto` is deliberately not a dependency.
@@ -198,7 +223,8 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, onL
   }, [layout, tops, size.w]);
 
   const [lastVisible, setLastVisible] = useState(page);
-  useEffect(() => onLocation({ kind: "page", page }, layout === "single" ? page : lastVisible), [page, lastVisible, layout, onLocation]);
+  const shownLast = layout === "single" ? page : layout === "spread" ? (groups[groupOf[page] ?? 0]?.at(-1) ?? page) : lastVisible;
+  useEffect(() => onLocation({ kind: "page", page }, shownLast), [page, shownLast, onLocation]);
 
   const onScroll = () => {
     const el = scroller.current;
@@ -228,11 +254,13 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, onL
       if (isTyping(e)) return;
       const el = scroller.current;
       if (!el) return;
-      const single = layout === "single";
+      const single = layout !== "continuous";
       const down = e.key === "PageDown" || (e.key === " " && !e.shiftKey);
       const up = e.key === "PageUp" || (e.key === " " && e.shiftKey);
-      if (e.key === "ArrowRight" || (single && (down || e.key === "ArrowDown"))) goto(pageRef.current + 1);
-      else if (e.key === "ArrowLeft" || (single && (up || e.key === "ArrowUp"))) goto(pageRef.current - 1);
+      // Right to left: the left arrow goes forward.
+      const [forward, back] = rtl ? ["ArrowLeft", "ArrowRight"] : ["ArrowRight", "ArrowLeft"];
+      if (e.key === forward || (single && (down || e.key === "ArrowDown"))) step(1);
+      else if (e.key === back || (single && (up || e.key === "ArrowUp"))) step(-1);
       else if (down) el.scrollBy({ top: el.clientHeight * 0.9 });
       else if (up) el.scrollBy({ top: -el.clientHeight * 0.9 });
       else if (e.key === "ArrowDown") el.scrollBy({ top: 60 });
@@ -244,7 +272,7 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, onL
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [goto, layout, count]);
+  }, [goto, step, layout, count, rtl]);
 
   useEffect(() => {
     const onChange = () => {
@@ -257,21 +285,60 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, onL
 
   if (count === 0) return <div className="center-msg muted">{t("reader.noPages")}</div>;
 
+  // Turn buttons: the left one goes back, or forward when reading right to left.
+  const turnButtons = (atStart: boolean, atEnd: boolean) => (
+    <>
+      <button
+        className="page-turn left"
+        onClick={() => step(rtl ? 1 : -1)}
+        disabled={rtl ? atEnd : atStart}
+        aria-label={rtl ? t("reader.nextPage") : t("reader.prevPage")}
+      >
+        <Icon name="chevronLeft" size={30} />
+      </button>
+      <button
+        className="page-turn right"
+        onClick={() => step(rtl ? -1 : 1)}
+        disabled={rtl ? atStart : atEnd}
+        aria-label={rtl ? t("reader.prevPage") : t("reader.nextPage")}
+      >
+        <Icon name="chevronRight" size={30} />
+      </button>
+    </>
+  );
+
+  if (layout === "spread") {
+    const k = groupOf[page] ?? 0;
+    const group = groups[k] ?? [page];
+    // Pages share one height; their widths add up (plus the gutter).
+    const perHeight = group.reduce((n, p) => n + 1 / (aspects[p] ?? 1.414), 0);
+    const gutter = group.length > 1 ? 4 : 0;
+    const byWidth = (size.w - 32 - gutter) / perHeight;
+    const byHeight = size.h - 32;
+    const h = Math.max(120, fit === "width" ? byWidth : fit === "height" ? byHeight : Math.min(byWidth, byHeight)) * zoom;
+    return (
+      <div className="paged-scroller single" ref={scroller} onMouseUp={checkSelection}>
+        <div className={`single-stage spread${rtl ? " rtl" : ""}`} style={{ minWidth: h * perHeight + gutter + 32, minHeight: h + 32 }}>
+          {size.w > 0 && group.map((p) => <Page key={p} bookId={book.id} index={p} width={h / (aspects[p] ?? 1.414)} height={h} rotation={rotation} load />)}
+        </div>
+        {turnButtons(k === 0, k >= groups.length - 1)}
+        {(groups[k + 1] ?? []).map((p) => (
+          <img key={p} className="prefetch" src={pageUrl(book.id, p, renderWidth(h / (aspects[p] ?? 1.414)), rotation)} alt="" />
+        ))}
+      </div>
+    );
+  }
+
   if (layout === "single") {
     const aspect = aspects[page] ?? 1.414;
-    const base = fit === "width" ? size.w - 32 : Math.min(size.w - 32, (size.h - 32) / aspect);
+    const base = fit === "width" ? size.w - 32 : fit === "height" ? (size.h - 32) / aspect : Math.min(size.w - 32, (size.h - 32) / aspect);
     const w = Math.max(120, base) * zoom;
     return (
       <div className="paged-scroller single" ref={scroller} onMouseUp={checkSelection}>
         <div className="single-stage" style={{ minWidth: w + 32, minHeight: w * aspect + 32 }}>
           {size.w > 0 && <Page key={page} bookId={book.id} index={page} width={w} height={w * aspect} rotation={rotation} load />}
         </div>
-        <button className="page-turn left" onClick={() => goto(page - 1)} disabled={page === 0} aria-label={t("reader.prevPage")}>
-          <Icon name="chevronLeft" size={30} />
-        </button>
-        <button className="page-turn right" onClick={() => goto(page + 1)} disabled={page >= count - 1} aria-label={t("reader.nextPage")}>
-          <Icon name="chevronRight" size={30} />
-        </button>
+        {turnButtons(page === 0, page >= count - 1)}
         {page + 1 < count && <img className="prefetch" src={pageUrl(book.id, page + 1, renderWidth(w), rotation)} alt="" />}
       </div>
     );

@@ -410,6 +410,26 @@ const pt: Messages = {
   "ai.buildIndexTitle": "Indexa este livro com o modelo de embeddings para que as perguntas encontrem trechos pelo significado",
   "ai.indexing": "Indexando {done}/{total}",
   "ai.indexBuilt": "Índice semântico criado: {n} trechos",
+  "error.title": "Algo deu errado",
+  "error.hint": "Não foi possível mostrar esta tela. Recarregar é seguro: seus livros e notas são mantidos.",
+  "error.reload": "Recarregar",
+  "error.backToShelf": "Voltar à estante",
+  "rs.spread": "Duas páginas",
+  "rs.fitHeight": "Ajustar à altura",
+  "rs.comicRtl": "Quadrinhos da direita para a esquerda",
+  "settings.backup": "Backup da biblioteca",
+  "settings.backupData": "Somente dados",
+  "settings.backupAll": "Dados e arquivos dos livros",
+  "settings.backupHint":
+    "Salva um arquivo zip: estante, grupos, progresso, marcadores e notas, caches de IA e capas, e opcionalmente os arquivos dos livros. Para restaurar, descompacte-o em uma pasta de biblioteca vazia.",
+  "settings.backingUp": "Fazendo backup…",
+  "settings.backupDone": "Backup salvo em {path}",
+  "ai.history": "Conversas anteriores",
+  "ai.usage": "{input} → {output} tokens",
+  "rs.customFont": "Fonte personalizada",
+  "rs.customFontNone": "Sem fonte personalizada",
+  "rs.addFont": "Adicionar fonte…",
+  "rs.removeFont": "Remover esta fonte da biblioteca",
 };
 
 export default pt;

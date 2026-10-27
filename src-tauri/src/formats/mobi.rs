@@ -73,6 +73,7 @@ pub fn load(path: &Path) -> Result<Document> {
         title,
         author: book.author(),
         toc: Document::chapter_toc(&chapters),
+        cover: None,
         content: Content::Flow(chapters),
     })
 }

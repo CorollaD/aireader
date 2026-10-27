@@ -1,11 +1,19 @@
 //! `book://` protocol serving binary content to the webview:
 //!
 //! - `/cover/<book id>` — cover thumbnail (JPEG)
+//! - `/font/<file name>` — a reading font the user added
 //! - `/img/<book id>/<image id>` — an image embedded in a reflowable book
-//! - `/page/<book id>/<page>/<width>[/<rotation>]` — a PDF/CBZ page rendered to PNG, `width`
-//!   pixels wide after an optional clockwise rotation of 90/180/270 degrees
+//! - `/page/<book id>/<page>/<width>[/<rotation>]` — a PDF/CBZ page rendered to PNG (JPEG for
+//!   comic pages and scans), `width` pixels wide after an optional clockwise rotation of
+//!   90/180/270 degrees
+//!
+//! Rendered pages are kept in a small in-memory cache, so paging back and forth and window
+//! resizes that come back to an earlier width don't render again.
+
+use std::sync::{Arc, Mutex};
 
 use image::ImageEncoder;
+use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::{CompressionType, FilterType, PngEncoder};
 use tauri::http::{Request, Response, StatusCode, header};
 use tauri::{AppHandle, Manager, Runtime, UriSchemeContext, UriSchemeResponder};
@@ -15,6 +23,47 @@ use crate::formats::percent_decode;
 use crate::model::Content;
 
 const MAX_PAGE_WIDTH: u32 = 4096;
+/// Total size of the encoded pages kept in memory.
+const PAGE_CACHE_BYTES: usize = 128 << 20;
+const JPEG_QUALITY: u8 = 85;
+
+/// Encoded pages by path, most recently used last.
+struct PageCache {
+    entries: Vec<(String, &'static str, Arc<[u8]>)>,
+    bytes: usize,
+}
+
+static PAGES: Mutex<PageCache> = Mutex::new(PageCache {
+    entries: Vec::new(),
+    bytes: 0,
+});
+
+impl PageCache {
+    fn get(&mut self, key: &str) -> Option<(&'static str, Arc<[u8]>)> {
+        let i = self.entries.iter().position(|(k, ..)| k == key)?;
+        let entry = self.entries.remove(i);
+        let found = (entry.1, entry.2.clone());
+        self.entries.push(entry);
+        Some(found)
+    }
+
+    fn put(&mut self, key: String, mime: &'static str, body: Arc<[u8]>) {
+        if body.len() > PAGE_CACHE_BYTES / 4 {
+            return;
+        }
+        self.bytes += body.len();
+        self.entries.push((key, mime, body));
+        while self.bytes > PAGE_CACHE_BYTES && !self.entries.is_empty() {
+            let (_, _, old) = self.entries.remove(0);
+            self.bytes -= old.len();
+        }
+    }
+}
+
+/// Book ids are the first 16 hex digits of the file's SHA-256.
+fn valid_id(id: &str) -> bool {
+    id.len() == 16 && id.bytes().all(|b| b.is_ascii_hexdigit())
+}
 
 pub fn handle<R: Runtime>(
     ctx: UriSchemeContext<'_, R>,
@@ -28,8 +77,7 @@ pub fn handle<R: Runtime>(
             Ok((mime, body, cache)) => Response::builder()
                 .header(header::CONTENT_TYPE, mime)
                 .header(header::CACHE_CONTROL, cache)
-                .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
-                .body(body),
+                .body(body.to_vec()),
             Err(e) => Response::builder()
                 .status(StatusCode::NOT_FOUND)
                 .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
@@ -48,15 +96,36 @@ fn mime_of(bytes: &[u8]) -> &'static str {
 }
 
 /// (MIME type, body, Cache-Control).
-type Served = (&'static str, Vec<u8>, &'static str);
+type Served = (&'static str, Arc<[u8]>, &'static str);
 
 fn serve<R: Runtime>(app: &AppHandle<R>, path: &str) -> anyhow::Result<Served> {
     let state = app.state::<AppState>();
     let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+    if let ["font", name] = parts.as_slice() {
+        let file = state
+            .library()
+            .font_path(name)
+            .ok_or_else(|| anyhow::anyhow!("no such font"))?;
+        let mime = match name
+            .rsplit_once('.')
+            .map(|(_, e)| e.to_lowercase())
+            .as_deref()
+        {
+            Some("otf") => "font/otf",
+            Some("woff") => "font/woff",
+            Some("woff2") => "font/woff2",
+            _ => "font/ttf",
+        };
+        return Ok((mime, std::fs::read(file)?.into(), "max-age=604800"));
+    }
+    if !parts.get(1).is_some_and(|id| valid_id(id)) {
+        anyhow::bail!("unknown path: {path}");
+    }
     match parts.as_slice() {
+        // Cover URLs carry the date the book was added, so a re-added book gets a fresh one.
         ["cover", id] => {
             let file = state.library().cover_path(id);
-            Ok(("image/jpeg", std::fs::read(file)?, "no-cache"))
+            Ok(("image/jpeg", std::fs::read(file)?.into(), "max-age=604800"))
         }
         ["img", id, image] => {
             let book = state.open_book(id)?;
@@ -64,9 +133,12 @@ fn serve<R: Runtime>(app: &AppHandle<R>, path: &str) -> anyhow::Result<Served> {
                 .images
                 .get(&image.parse()?)
                 .ok_or_else(|| anyhow::anyhow!("no such image"))?;
-            Ok((mime_of(bytes), bytes.to_vec(), "max-age=3600"))
+            Ok((mime_of(bytes), bytes.clone(), "max-age=3600"))
         }
         ["page", id, page, width, rest @ ..] => {
+            if let Some((mime, body)) = PAGES.lock().unwrap().get(path) {
+                return Ok((mime, body, "max-age=3600"));
+            }
             let book = state.open_book(id)?;
             let Content::Paged(src) = &book.doc.content else {
                 anyhow::bail!("not a paged document")
@@ -77,19 +149,47 @@ fn serve<R: Runtime>(app: &AppHandle<R>, path: &str) -> anyhow::Result<Served> {
                 [r] => r.parse::<u16>()? % 360,
                 _ => anyhow::bail!("unknown path: {path}"),
             };
-            let img = render_rotated(src.as_ref(), page.parse()?, width, rotation)?;
-            let mut png = Vec::new();
-            PngEncoder::new_with_quality(&mut png, CompressionType::Fast, FilterType::Adaptive)
-                .write_image(
-                    &img.rgba,
-                    img.width,
-                    img.height,
-                    image::ExtendedColorType::Rgba8,
-                )?;
-            Ok(("image/png", png, "max-age=3600"))
+            let page: usize = page.parse()?;
+            let img = render_rotated(src.as_ref(), page, width, rotation)?;
+            let (mime, body) = encode(&img, src.photographic(page))?;
+            PAGES
+                .lock()
+                .unwrap()
+                .put(path.to_owned(), mime, body.clone());
+            Ok((mime, body, "max-age=3600"))
         }
         _ => anyhow::bail!("unknown path: {path}"),
     }
+}
+
+/// Encodes a rendered page: JPEG for pictures (much smaller), PNG for pages of text.
+fn encode(
+    img: &crate::model::PageImage,
+    photographic: bool,
+) -> anyhow::Result<(&'static str, Arc<[u8]>)> {
+    let mut out = Vec::new();
+    if photographic {
+        let rgb = image::DynamicImage::ImageRgba8(
+            image::RgbaImage::from_raw(img.width, img.height, img.rgba.clone())
+                .ok_or_else(|| anyhow::anyhow!("page image has the wrong size"))?,
+        )
+        .to_rgb8();
+        JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY).write_image(
+            &rgb,
+            img.width,
+            img.height,
+            image::ExtendedColorType::Rgb8,
+        )?;
+        return Ok(("image/jpeg", out.into()));
+    }
+    PngEncoder::new_with_quality(&mut out, CompressionType::Fast, FilterType::Adaptive)
+        .write_image(
+            &img.rgba,
+            img.width,
+            img.height,
+            image::ExtendedColorType::Rgba8,
+        )?;
+    Ok(("image/png", out.into()))
 }
 
 /// Renders a page so that, after rotating it clockwise by `rotation` degrees, it is `width`
@@ -153,6 +253,31 @@ mod tests {
                 rgba: img.into_raw(),
             })
         }
+    }
+
+    #[test]
+    fn ids_and_page_cache() {
+        assert!(valid_id("0123456789abcdef"));
+        assert!(!valid_id(".."));
+        assert!(!valid_id("0123456789abcdeg"));
+        let mut cache = PageCache {
+            entries: Vec::new(),
+            bytes: 0,
+        };
+        let big = PAGE_CACHE_BYTES / 4;
+        for i in 0..5 {
+            cache.put(format!("p{i}"), "image/png", vec![0u8; big].into());
+        }
+        assert!(cache.bytes <= PAGE_CACHE_BYTES);
+        assert!(cache.get("p0").is_none(), "oldest page is dropped");
+        assert!(cache.get("p4").is_some());
+    }
+
+    #[test]
+    fn photographic_pages_are_jpeg() {
+        let img = Fake.render(0, 50).unwrap();
+        assert_eq!(encode(&img, true).unwrap().0, "image/jpeg");
+        assert_eq!(encode(&img, false).unwrap().0, "image/png");
     }
 
     #[test]

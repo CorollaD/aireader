@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from "react";
+import { useState, type KeyboardEvent, type MouseEvent } from "react";
 import { coverUrl } from "../api";
 import type { Book } from "../types";
 import { formatDate, formatDuration, t } from "../i18n";
@@ -14,7 +14,7 @@ function hue(text: string): number {
 export function Cover({ book, small }: { book: Book; small?: boolean }) {
   const [failed, setFailed] = useState(false);
   if (book.hasCover && !failed) {
-    return <img className="cover-img" src={coverUrl(book)} alt="" draggable={false} onError={() => setFailed(true)} />;
+    return <img className="cover-img" src={coverUrl(book)} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setFailed(true)} />;
   }
   const h = hue(book.title);
   return (
@@ -39,10 +39,21 @@ interface CardProps {
   onMenu: (e: MouseEvent) => void;
 }
 
+/** Enter/Space activate a card or row like a button (they contain buttons, so they can't be one). */
+const activate = (run: () => void) => (e: KeyboardEvent) => {
+  if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+  e.preventDefault();
+  run();
+};
+
 export function BookCard({ book, selected, selecting, onOpen, onToggle, onMenu }: CardProps) {
   return (
     <div
       className={`book-card${selected ? " selected" : ""}${book.missing ? " missing" : ""}`}
+      role="button"
+      tabIndex={0}
+      aria-label={book.title}
+      onKeyDown={activate(selecting ? onToggle : onOpen)}
       onClick={selecting ? onToggle : onOpen}
       onContextMenu={onMenu}
       title={
@@ -93,7 +104,15 @@ export function BookCard({ book, selected, selecting, onOpen, onToggle, onMenu }
 
 export function BookRow({ book, selected, selecting, onOpen, onToggle, onMenu }: CardProps) {
   return (
-    <div className={`book-row${selected ? " selected" : ""}${book.missing ? " missing" : ""}`} onClick={selecting ? onToggle : onOpen} onContextMenu={onMenu}>
+    <div
+      className={`book-row${selected ? " selected" : ""}${book.missing ? " missing" : ""}`}
+      role="button"
+      tabIndex={0}
+      aria-label={book.title}
+      onKeyDown={activate(selecting ? onToggle : onOpen)}
+      onClick={selecting ? onToggle : onOpen}
+      onContextMenu={onMenu}
+    >
       <button
         className={`check inline${selected ? " on" : ""}`}
         aria-label={t("common.select")}

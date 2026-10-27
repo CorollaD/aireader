@@ -9,7 +9,10 @@ use rig_core::completion::{CompletionRequest, Message};
 use serde::{Deserialize, Serialize};
 
 use super::config::AiConfig;
-use super::provider::{ChatModel, complete_text, estimate_tokens, friendly_error, stream_text};
+use super::provider::{
+    ChatModel, TokenUsage, complete_reply, complete_text, estimate_tokens, friendly_error,
+    is_transient, stream_text,
+};
 use super::retrieval::BookIndex;
 use crate::model::{Content, Document, Location};
 
@@ -113,7 +116,18 @@ pub enum AiEvent {
     Sources {
         sources: Vec<Source>,
     },
+    /// Tokens used by one request of the task (a task may make several).
+    Usage {
+        #[serde(flatten)]
+        usage: TokenUsage,
+    },
 }
+
+/// Pauses before sending a failed request again.
+const RETRY_DELAYS: [std::time::Duration; 2] = [
+    std::time::Duration::from_secs(2),
+    std::time::Duration::from_secs(8),
+];
 
 /// What a task needs: the model, settings, a per-request input budget, and an event sink.
 pub struct Runner<'a> {
@@ -140,10 +154,24 @@ impl Runner<'_> {
             .max_tokens(max_tokens)
     }
 
+    /// One request, sent again after a pause when it fails for a passing reason (see
+    /// [`is_transient`]), so one hiccup doesn't end a long whole-book run.
     async fn complete(&self, prompt: String, max_tokens: u64) -> Result<String> {
-        complete_text(&self.model, self.request(prompt, max_tokens))
-            .await
-            .map_err(|e| anyhow!(friendly_error(&self.cfg, &e)))
+        let mut attempt = 0;
+        loop {
+            match complete_reply(&self.model, self.request(prompt.clone(), max_tokens)).await {
+                Ok((text, usage)) => {
+                    (self.emit)(AiEvent::Usage { usage });
+                    return Ok(text);
+                }
+                Err(e) if attempt < RETRY_DELAYS.len() && is_transient(&e) => {
+                    log::info!("AI request failed ({e}); retrying");
+                    tokio::time::sleep(RETRY_DELAYS[attempt]).await;
+                    attempt += 1;
+                }
+                Err(e) => return Err(anyhow!(friendly_error(&self.cfg, &e))),
+            }
+        }
     }
 
     async fn stream(&self, prompt: String, max_tokens: u64) -> Result<String> {
@@ -151,11 +179,15 @@ impl Runner<'_> {
     }
 
     async fn stream_request(&self, request: CompletionRequest) -> Result<String> {
-        stream_text(&self.model, request, |t| {
+        let (text, usage) = stream_text(&self.model, request, |t| {
             (self.emit)(AiEvent::Delta { text: t.to_owned() })
         })
         .await
-        .map_err(|e| anyhow!(friendly_error(&self.cfg, &e)))
+        .map_err(|e| anyhow!(friendly_error(&self.cfg, &e)))?;
+        if let Some(usage) = usage {
+            (self.emit)(AiEvent::Usage { usage });
+        }
+        Ok(text)
     }
 }
 
@@ -359,11 +391,14 @@ impl SummaryCache {
 
 /// Summarises one unit. Text over the budget is summarised in parts, then merged. With
 /// `stream`, the final answer is streamed as `Delta` events.
+/// Parts of long units are cached under `<unit key>#<part>/<parts>`, so a run that stopped
+/// part-way (cancelled, or an error) picks up where it left off.
 pub async fn summarize_unit(
     r: &Runner<'_>,
     book: &str,
     unit: &Unit,
     stream: bool,
+    mut cache: Option<&mut SummaryCache>,
 ) -> Result<String> {
     if estimate_tokens(&unit.text) <= r.budget {
         let prompt = format!(
@@ -395,7 +430,19 @@ pub async fn summarize_unit(
             i + 1,
             parts.len()
         );
-        partials.push(r.complete(prompt, SUMMARY_TOKENS).await?);
+        let key = format!("{}#{}/{}", unit.key, i + 1, parts.len());
+        let model = r.cfg.model_key();
+        let partial = match cache.as_deref().and_then(|c| c.get(&model, &key)) {
+            Some(s) => s.clone(),
+            None => {
+                let s = r.complete(prompt, SUMMARY_TOKENS).await?;
+                if let Some(c) = cache.as_deref_mut() {
+                    c.put(&model, &key, s.clone())?;
+                }
+                s
+            }
+        };
+        partials.push(partial);
     }
     let joined = partials
         .iter()
@@ -425,7 +472,7 @@ pub async fn summarize_cached(
     if let Some(s) = cache.get(&model, &unit.key) {
         return Ok((s.clone(), true));
     }
-    let s = summarize_unit(r, book, unit, true).await?;
+    let s = summarize_unit(r, book, unit, true, Some(cache)).await?;
     cache.put(&model, &unit.key, s.clone())?;
     Ok((s, false))
 }
@@ -449,7 +496,7 @@ async fn unit_summaries(
         let s = match cache.get(&model, &unit.key) {
             Some(s) => s.clone(),
             None => {
-                let s = summarize_unit(r, book, unit, false).await?;
+                let s = summarize_unit(r, book, unit, false, Some(cache)).await?;
                 cache.put(&model, &unit.key, s.clone())?;
                 s
             }
@@ -664,7 +711,7 @@ async fn unit_material(
         total: 1,
         label: crate::t!("ai_summarizing", title = unit.title),
     });
-    let s = summarize_unit(r, book, unit, false).await?;
+    let s = summarize_unit(r, book, unit, false, Some(&mut *cache)).await?;
     cache.put(&model, &unit.key, s.clone())?;
     Ok(s)
 }
@@ -1145,12 +1192,19 @@ mod tests {
         };
         let (s, cached) = summarize_cached(&r, &mut cache, "书", &unit).await.unwrap();
         assert_eq!((s.as_str(), cached), ("概要", false));
+        let events = std::mem::take(&mut *events.lock().unwrap());
         assert_eq!(
-            *events.lock().unwrap(),
-            vec![
+            events[..2],
+            [
                 AiEvent::Delta { text: "概".into() },
                 AiEvent::Delta { text: "要".into() }
             ]
+        );
+        // The usage of the request, when the service reports it, comes after the text.
+        assert!(
+            events[2..]
+                .iter()
+                .all(|e| matches!(e, AiEvent::Usage { .. }))
         );
         // Second time comes from the database without a request.
         let mut cache = SummaryCache::open(&db, "b");
@@ -1176,7 +1230,7 @@ mod tests {
             title: "长章".into(),
             text: format!("{}\n{}", "字".repeat(280), "文".repeat(280)),
         };
-        let s = summarize_unit(&r, "书", &unit, false).await.unwrap();
+        let s = summarize_unit(&r, "书", &unit, false, None).await.unwrap();
         assert_eq!(s, "合并");
         let requests = model.requests();
         assert_eq!(requests.len(), 3);
@@ -1185,6 +1239,50 @@ mod tests {
             last.contains("甲") && last.contains("乙"),
             "the merge request includes both partial summaries"
         );
+    }
+
+    #[tokio::test]
+    async fn summarised_parts_are_kept_for_the_next_run() {
+        let dir = std::env::temp_dir().join(format!("aireader-parts-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = crate::db::Db::open(&dir.join("t.db")).unwrap();
+        let mut cache = SummaryCache::open(&db, "b");
+        let unit = Unit {
+            key: "ch:1".into(),
+            title: "长章".into(),
+            text: format!("{}\n{}", "字".repeat(280), "文".repeat(280)),
+        };
+        let first = MockCompletionModel::from_turns([
+            MockTurn::text("甲"),
+            MockTurn::text("乙"),
+            MockTurn::text("合并"),
+        ]);
+        let r = Runner {
+            model: first.erase(),
+            cfg: cfg(),
+            budget: 300,
+            emit: &|_| {},
+        };
+        summarize_unit(&r, "书", &unit, false, Some(&mut cache))
+            .await
+            .unwrap();
+        let model = cfg().model_key();
+        assert_eq!(
+            cache.get(&model, "ch:1#2/2").map(String::as_str),
+            Some("乙")
+        );
+        // A later run (e.g. after the merge failed) only sends the merge request.
+        let second = MockCompletionModel::from_turns([MockTurn::text("再合并")]);
+        let r = Runner {
+            model: second.clone().erase(),
+            ..r
+        };
+        let s = summarize_unit(&r, "书", &unit, false, Some(&mut cache))
+            .await
+            .unwrap();
+        assert_eq!(s, "再合并");
+        assert_eq!(second.requests().len(), 1);
     }
 
     #[tokio::test]
@@ -1344,6 +1442,7 @@ mod tests {
             title: "三国".into(),
             author: None,
             toc: Vec::new(),
+            cover: None,
             content: Content::Flow(vec![Chapter {
                 title: "第一回".into(),
                 blocks: vec![Block::Paragraph(vec![Span::plain("桃园结义")])],

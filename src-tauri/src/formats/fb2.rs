@@ -131,6 +131,7 @@ pub fn parse(path: &Path, bytes: &[u8]) -> Result<Document> {
         title,
         author,
         toc,
+        cover: None,
         content: Content::Flow(chapters),
     })
 }

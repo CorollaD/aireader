@@ -12,15 +12,20 @@ use crate::dedupe::{self, DuplicateGroup, ProfileCache};
 use crate::formats;
 use crate::library::{self, Book, BookPatch, Library};
 use crate::model::{Block, Content, Document, Location, TocEntry};
-use crate::search::{self, Hit};
+use crate::search::{Hit, SearchText};
 
 type CmdResult<T> = Result<T, String>;
 
 const MAX_OPEN: usize = 4;
+/// Approximate memory the open books may take together; the least recently used ones are
+/// dropped beyond it (the current book always stays).
+const MAX_OPEN_BYTES: usize = 384 << 20;
 const MAX_HITS: usize = 1000;
 
 fn err(e: impl std::fmt::Display) -> String {
-    format!("{e:#}")
+    let message = format!("{e:#}");
+    log::warn!("{message}");
+    message
 }
 
 /// A parsed book kept in memory while it is being read.
@@ -28,11 +33,18 @@ pub struct OpenBook {
     pub doc: Document,
     /// Image id → encoded bytes, for the `book://` protocol.
     pub images: HashMap<u64, Arc<[u8]>>,
+    /// Characters in each chapter (reflowable books).
+    pub chars: Vec<usize>,
+    /// Built on the first search.
+    search: std::sync::OnceLock<SearchText>,
+    /// Approximate size in memory, for limiting the cache.
+    bytes: usize,
 }
 
 pub struct AppState {
     library: Mutex<Library>,
-    /// File passed on the command line, consumed by `take_startup_book`.
+    /// A file to open: from the command line, a second launch or the OS. Consumed by
+    /// `take_startup_book`.
     startup_file: Mutex<Option<PathBuf>>,
     /// Most recently used last.
     open: Mutex<Vec<(String, Arc<OpenBook>)>>,
@@ -71,18 +83,40 @@ impl AppState {
         }
         let doc = formats::open(&path)?;
         let mut images = HashMap::new();
+        let mut chars = Vec::new();
         if let Content::Flow(chapters) = &doc.content {
             for block in chapters.iter().flat_map(|c| &c.blocks) {
                 if let Block::Image(img) = block {
                     images.insert(img.id, img.bytes.clone());
                 }
             }
+            chars = chapters
+                .iter()
+                .map(|c| c.blocks.iter().map(|b| b.text().chars().count()).sum())
+                .collect();
         }
-        let book = Arc::new(OpenBook { doc, images });
+        // Images plus text (UTF-8 and a lowercased copy for search); a PDF's pages live in
+        // PDFium, roughly the size of the file.
+        let bytes = images.values().map(|b| b.len()).sum::<usize>()
+            + chars.iter().sum::<usize>() * 6
+            + match &doc.content {
+                Content::Paged(_) => std::fs::metadata(&path).map_or(0, |m| m.len() as usize),
+                Content::Flow(_) => 0,
+            };
+        let book = Arc::new(OpenBook {
+            doc,
+            images,
+            chars,
+            search: std::sync::OnceLock::new(),
+            bytes,
+        });
         let mut open = self.open.lock().unwrap();
         open.retain(|(k, _)| k != id);
         open.push((id.to_owned(), book.clone()));
-        if open.len() > MAX_OPEN {
+        while open.len() > 1
+            && (open.len() > MAX_OPEN
+                || open.iter().map(|(_, b)| b.bytes).sum::<usize>() > MAX_OPEN_BYTES)
+        {
             open.remove(0);
         }
         Ok(book)
@@ -95,6 +129,44 @@ impl AppState {
 
 fn state(app: &AppHandle) -> &AppState {
     app.state::<AppState>().inner()
+}
+
+/// Asks the frontend to open `file` (it calls `take_startup_book` on the `open-file` event,
+/// or at startup if the event came too early).
+pub fn request_open(app: &AppHandle, file: PathBuf) {
+    if let Some(st) = app.try_state::<AppState>() {
+        *st.startup_file.lock().unwrap() = Some(file);
+        let _ = app.emit("open-file", ());
+    }
+}
+
+/// Seconds the frontend gets to save before the app quits anyway.
+const CLOSE_GRACE: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// Starts quitting: the frontend is told (`app-closing`) so it can save pending progress and
+/// settings, then calls `exit_app`. Quits after [`CLOSE_GRACE`] if it doesn't.
+pub fn begin_close(app: &AppHandle) {
+    static CLOSING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if CLOSING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+    let _ = app.emit("app-closing", ());
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(CLOSE_GRACE);
+        app.exit(0);
+    });
+}
+
+#[tauri::command]
+pub fn exit_app(app: AppHandle) {
+    app.exit(0);
+}
+
+/// Records an error from the frontend (e.g. a view that failed to render) in the app log.
+#[tauri::command]
+pub fn log_error(message: String) {
+    log::error!("frontend: {message}");
 }
 
 /// Runs blocking work off the main thread.
@@ -150,14 +222,15 @@ fn import_file(
     file: &std::path::Path,
     group: Option<&str>,
 ) -> anyhow::Result<Imported> {
-    let hash = library::hash_file(file)?;
+    let root = state(app).library().root().to_owned();
+    let staged = library::stage(&root, file)?;
+    let hash = staged.sha256.clone();
     if let Some(existing) = state(app).library().find_hash(&hash) {
         return Ok(Imported::Existing(existing.id.clone()));
     }
-    let root = state(app).library().root().to_owned();
-    let prepared = Library::prepare(&root, file, &hash)?;
+    let prepared = Library::prepare(staged)?;
     let mut lib = state(app).library();
-    if lib.add(prepared, group) {
+    if lib.add(prepared, group)? {
         Ok(Imported::Added(hash[..16].to_owned()))
     } else {
         Ok(Imported::Existing(
@@ -349,6 +422,16 @@ pub async fn merge_duplicates(app: AppHandle, merges: Vec<Merge>) -> CmdResult<M
             store.save(&m.keep, &keep_ann).map_err(err)?;
             let ids: Vec<String> = copies.iter().map(|(b, _)| b.id.clone()).collect();
             let mut lib = state(&app).library();
+            // Conversations about a copy stay with the book.
+            for id in &ids {
+                lib.db()
+                    .conn()
+                    .execute(
+                        "UPDATE chats SET book_id = ?1 WHERE book_id = ?2",
+                        rusqlite::params![m.keep, id],
+                    )
+                    .map_err(err)?;
+            }
             lib.absorb(&m.keep, &ids, furthest).map_err(err)?;
             lib.remove(&ids);
             lib.save().map_err(err)?;
@@ -470,10 +553,11 @@ pub async fn open_book(app: AppHandle, id: String) -> CmdResult<OpenedBook> {
             Content::Flow(chs) => (
                 "flow",
                 chs.iter()
-                    .map(|c| ChapterInfo {
+                    .zip(&book.chars)
+                    .map(|(c, &chars)| ChapterInfo {
                         title: c.title.clone(),
                         blocks: c.blocks.len(),
-                        chars: c.blocks.iter().map(|b| b.text().chars().count()).sum(),
+                        chars,
                     })
                     .collect(),
                 Vec::new(),
@@ -521,10 +605,10 @@ pub async fn get_chapter(app: AppHandle, id: String, index: usize) -> CmdResult<
 pub async fn search_book(app: AppHandle, id: String, query: String) -> CmdResult<Vec<Hit>> {
     blocking(move || {
         let book = state(&app).open_book(&id).map_err(err)?;
-        match &book.doc.content {
-            Content::Flow(chs) => Ok(search::search(chs, &query, MAX_HITS)),
-            Content::Paged(_) => Ok(Vec::new()),
-        }
+        let text = book
+            .search
+            .get_or_init(|| SearchText::build(&book.doc.content));
+        Ok(text.search(&query, MAX_HITS))
     })
     .await
 }
@@ -539,7 +623,7 @@ pub async fn save_progress(
     blocking(move || {
         let mut lib = state(&app).library();
         lib.set_progress(&id, position, progress).map_err(err)?;
-        lib.save().map_err(err)
+        lib.save_book(&id).map_err(err)
     })
     .await
 }
@@ -583,6 +667,37 @@ pub async fn save_annotations(
     blocking(move || annotation_store(&app).save(&id, &annotations).map_err(err)).await
 }
 
+#[tauri::command]
+pub async fn list_chats(app: AppHandle, book_id: String) -> CmdResult<Vec<crate::db::ChatRecord>> {
+    blocking(move || {
+        let db = state(&app).library().db().clone();
+        crate::db::list_chats(&db.conn(), &book_id).map_err(err)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn save_chat(
+    app: AppHandle,
+    book_id: String,
+    chat: crate::db::ChatRecord,
+) -> CmdResult<()> {
+    blocking(move || {
+        let db = state(&app).library().db().clone();
+        crate::db::save_chat(&db.conn(), &book_id, &chat).map_err(err)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn delete_chat(app: AppHandle, id: String) -> CmdResult<()> {
+    blocking(move || {
+        let db = state(&app).library().db().clone();
+        crate::db::delete_chat(&db.conn(), &id).map_err(err)
+    })
+    .await
+}
+
 /// Writes the book's highlights and notes as Markdown to a file the user picks.
 /// Returns the chosen path, or `None` if the dialog was cancelled.
 #[tauri::command]
@@ -613,6 +728,62 @@ pub async fn export_notes(app: AppHandle, id: String) -> CmdResult<Option<String
         };
         let path = path.into_path().map_err(err)?;
         std::fs::write(&path, markdown).map_err(err)?;
+        Ok(Some(path.display().to_string()))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn list_fonts(app: AppHandle) -> CmdResult<Vec<String>> {
+    blocking(move || Ok(state(&app).library().fonts())).await
+}
+
+/// Adds a font file the user picks; returns its name, or `None` if the dialog was cancelled.
+#[tauri::command]
+pub async fn import_font(app: AppHandle) -> CmdResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    blocking(move || {
+        let Some(path) = app
+            .dialog()
+            .file()
+            .add_filter(crate::t!("font_filter"), library::FONT_EXTENSIONS)
+            .blocking_pick_file()
+        else {
+            return Ok(None);
+        };
+        let path = path.into_path().map_err(err)?;
+        state(&app).library().add_font(&path).map(Some).map_err(err)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn remove_font(app: AppHandle, name: String) -> CmdResult<()> {
+    blocking(move || state(&app).library().remove_font(&name).map_err(err)).await
+}
+
+/// Backs up the library to a zip the user picks (`books`: include the book files). Returns the
+/// path, or `None` if the dialog was cancelled.
+#[tauri::command]
+pub async fn backup_library(app: AppHandle, books: bool) -> CmdResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    blocking(move || {
+        let Some(path) = app
+            .dialog()
+            .file()
+            .add_filter("ZIP", &["zip"])
+            .set_file_name(format!("AiReader-backup-{}.zip", library::today()))
+            .blocking_save_file()
+        else {
+            return Ok(None);
+        };
+        let path = path.into_path().map_err(err)?;
+        // Not under the library lock: copying book files can take a while. The database
+        // snapshot is consistent on its own.
+        let lib = state(&app).library();
+        let (root, db) = (lib.root().to_owned(), lib.db().clone());
+        drop(lib);
+        Library::backup_at(&root, &db, &path, books).map_err(err)?;
         Ok(Some(path.display().to_string()))
     })
     .await
@@ -658,7 +829,7 @@ pub async fn add_reading_time(
     blocking(move || {
         let mut lib = state(&app).library();
         lib.add_reading_time(&id, seconds, speed).map_err(err)?;
-        lib.save().map_err(err)?;
+        lib.save_book(&id).map_err(err)?;
         lib.get(&id)
             .cloned()
             .ok_or_else(|| crate::t!("book_not_found"))

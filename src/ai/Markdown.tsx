@@ -2,7 +2,7 @@
 // code, and [n] citations. It builds React elements (never raw HTML), so model output cannot
 // inject markup.
 
-import type { ReactNode } from "react";
+import { memo, useMemo, useRef, type ReactNode } from "react";
 
 /** Citation numbers that exist, and what clicking one does. */
 export interface Cite {
@@ -43,7 +43,29 @@ function inline(text: string, cite?: Cite): ReactNode[] {
   return out;
 }
 
+/**
+ * Renders `text`. Parsing happens again only when the text (or the number of citations)
+ * changes, so finished answers cost nothing while a new one streams in.
+ */
 export default function Markdown({ text, cite }: { text: string; cite?: Cite }) {
+  const latest = useRef(cite);
+  latest.current = cite;
+  const count = cite?.count;
+  const stable = useMemo<Cite | undefined>(
+    () =>
+      count === undefined
+        ? undefined
+        : {
+            count,
+            onCite: (n) => latest.current?.onCite(n),
+            title: (n) => latest.current?.title?.(n) ?? "",
+          },
+    [count],
+  );
+  return <MarkdownBody text={text} cite={stable} />;
+}
+
+const MarkdownBody = memo(function MarkdownBody({ text, cite }: { text: string; cite?: Cite }) {
   const span = (t: string) => inline(t, cite);
   const lines = text.replace(/\r/g, "").split("\n");
   const blocks: ReactNode[] = [];
@@ -92,4 +114,4 @@ export default function Markdown({ text, cite }: { text: string; cite?: Cite }) 
     blocks.push(<p key={key++}>{span(para.join("\n"))}</p>);
   }
   return <div className="md">{blocks}</div>;
-}
+});

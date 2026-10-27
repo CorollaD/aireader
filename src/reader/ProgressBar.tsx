@@ -38,11 +38,41 @@ export default function ProgressBar({ book, location, stats, onJump }: Props) {
   const remaining = location ? remainingMinutes(book, location, stats.readingSpeed) : null;
   const shown = drag ?? progress;
 
+  // Arrow keys step a page (paged books) or 1% (text); Page Up/Down 10%; Home/End the ends.
+  const onKey = (e: React.KeyboardEvent) => {
+    const pages = book.pages.length;
+    const step = book.kind === "paged" && pages > 0 ? 1 / pages : 0.01;
+    const moves: Record<string, number> = {
+      ArrowRight: step,
+      ArrowUp: step,
+      ArrowLeft: -step,
+      ArrowDown: -step,
+      PageUp: 0.1,
+      PageDown: -0.1,
+    };
+    let target: number;
+    if (e.key === "Home") target = 0;
+    else if (e.key === "End") target = 1;
+    else if (e.key in moves) target = progress + moves[e.key];
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+    onJump(locationAt(book, Math.max(0, Math.min(1, target))));
+  };
+
   return (
     <div className="progress-bar-area">
       <div
         className={`progress-track${drag !== null ? " dragging" : ""}`}
         ref={track}
+        role="slider"
+        tabIndex={0}
+        aria-label={t("progress.jumpTitle")}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(progress * 100)}
+        aria-valuetext={location ? `${describe(book, location)} · ${Math.round(progress * 100)}%` : undefined}
+        onKeyDown={onKey}
         onPointerDown={(e) => {
           try {
             (e.target as HTMLElement).setPointerCapture(e.pointerId);

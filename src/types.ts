@@ -140,6 +140,8 @@ export interface Span {
   italic?: boolean;
   code?: boolean;
   link?: boolean;
+  /** Where an internal link (e.g. a footnote reference) leads. */
+  target?: Location;
 }
 
 export type Block =
@@ -152,8 +154,7 @@ export type Block =
   | { kind: "rule" };
 
 export interface Hit {
-  chapter: number;
-  block: number;
+  location: Location;
   snippet: string;
 }
 
@@ -202,7 +203,16 @@ export type AiEvent =
   | { type: "progress"; done: number; total: number; label: string }
   | { type: "done"; text: string; cached: boolean }
   | { type: "error"; message: string }
-  | { type: "sources"; sources: Source[] };
+  | { type: "sources"; sources: Source[] }
+  /** Tokens one request of the task used; `cost` in USD when known. */
+  | { type: "usage"; input: number; output: number; cost: number | null };
+
+/** Tokens (and USD cost, when known) used so far by a task. */
+export interface Usage {
+  input: number;
+  output: number;
+  cost: number | null;
+}
 
 /** A passage an answer may cite as [n]. */
 export interface Source {
@@ -213,6 +223,15 @@ export interface Source {
 }
 
 export type ChatAction = "explain" | "translate" | "summarize";
+
+/** A saved conversation about a book; `data` is the AI panel's own record. */
+export interface ChatRecord {
+  id: string;
+  title: string;
+  /** Unix seconds. */
+  updated: number;
+  data: unknown;
+}
 
 export interface ChatTurn {
   role: "user" | "assistant";

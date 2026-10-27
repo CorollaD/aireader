@@ -1,18 +1,55 @@
 // Small shared UI pieces: modal dialog, confirmation, toast.
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { t } from "./i18n";
 import { Icon } from "./icons";
 
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function Modal(props: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; width?: number }) {
+  const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && props.onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [props.onClose]);
+  // Focus moves into the dialog and returns to where it was when the dialog closes.
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null;
+    const el = box.current;
+    if (el && !el.contains(document.activeElement)) {
+      const first = [...el.querySelectorAll<HTMLElement>(FOCUSABLE)].find((f) => !f.closest(".modal-title"));
+      (first ?? el).focus();
+    }
+    return () => before?.focus?.();
+  }, []);
+  // Tab cycles within the dialog.
+  const trap = (e: React.KeyboardEvent) => {
+    if (e.key !== "Tab" || !box.current) return;
+    const items = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((f) => f.offsetParent !== null);
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && props.onClose()}>
-      <div className="modal" style={{ width: props.width ?? 420 }} role="dialog" aria-label={props.title}>
+      <div
+        ref={box}
+        className="modal"
+        style={{ width: props.width ?? 420 }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={props.title}
+        tabIndex={-1}
+        onKeyDown={trap}
+      >
         <div className="modal-title">
           <span className="ellipsis">{props.title}</span>
           <button className="icon" aria-label={t("common.close")} title={t("common.close")} onClick={props.onClose}>

@@ -1,7 +1,20 @@
 // Reflowable text, one chapter at a time, either scrolled vertically or laid out in CSS columns
 // and turned page by page. Renders highlights and reports the visible blocks and selections.
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  forwardRef,
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { api, errorText, imageUrl } from "../api";
 import { isTyping } from "../ui";
 import { t } from "../i18n";
@@ -16,7 +29,11 @@ const END = -1;
 /** Vertical padding of a page in paged mode. */
 const PAGE_PAD = 36;
 
+/** Follows an internal link. */
+const LinkContext = createContext<(loc: Location) => void>(() => {});
+
 function Spans({ spans, marks }: { spans: Span[]; marks?: BlockMark[] }) {
+  const follow = useContext(LinkContext);
   return (
     <>
       {splitSpans(spans, marks).map((p, i) => {
@@ -24,7 +41,21 @@ function Spans({ spans, marks }: { spans: Span[]; marks?: BlockMark[] }) {
         if (p.span.code) node = <code>{node}</code>;
         if (p.span.italic) node = <em>{node}</em>;
         if (p.span.bold) node = <strong>{node}</strong>;
-        if (p.span.link) node = <span className="link">{node}</span>;
+        if (p.span.target) {
+          const target = p.span.target;
+          node = (
+            <a
+              className="link internal"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                follow(target);
+              }}
+            >
+              {node}
+            </a>
+          );
+        } else if (p.span.link) node = <span className="link">{node}</span>;
         if (p.mark) {
           node = (
             <mark className={`hl hl-${p.mark.color}${p.mark.note ? " has-note" : ""}`} data-hl={p.mark.id}>
@@ -38,7 +69,8 @@ function Spans({ spans, marks }: { spans: Span[]; marks?: BlockMark[] }) {
   );
 }
 
-function BlockView({ block, bookId, marks }: { block: Block; bookId: string; marks?: BlockMark[] }) {
+// Memoised: a chapter can have thousands of blocks, and most re-renders change none of them.
+const BlockView = memo(function BlockView({ block, bookId, marks }: { block: Block; bookId: string; marks?: BlockMark[] }) {
   switch (block.kind) {
     case "heading": {
       const Tag = `h${Math.min(Math.max(block.value.level, 1), 6)}` as "h1";
@@ -87,7 +119,7 @@ function BlockView({ block, bookId, marks }: { block: Block; bookId: string; mar
     case "rule":
       return <hr />;
   }
-}
+});
 
 export interface FlowSelection extends SelectionInfo {
   chapter: number;
@@ -111,6 +143,8 @@ interface Props {
   onMarkClick: (id: string, rect: DOMRect) => void;
   /** Highlights whose stored position no longer matched and were found again by their text. */
   onMoved: (moved: (TextRange & { id: string })[]) => void;
+  /** An internal link was clicked. */
+  onLink: (loc: Location) => void;
 }
 
 function useSize(ref: React.RefObject<HTMLElement>) {
@@ -128,7 +162,11 @@ function useSize(ref: React.RefObject<HTMLElement>) {
 }
 
 const FlowView = forwardRef<FlowHandle, Props>(function FlowView(props, ref) {
-  const { book, jump, flash, settings, highlights, onLocation, onSelect, onMarkClick, onMoved } = props;
+  const { book, jump, flash, settings, highlights, onLocation, onSelect, onMarkClick, onMoved, onLink } = props;
+  // Stable for the link context, so following a link re-renders no blocks.
+  const linkRef = useRef(onLink);
+  linkRef.current = onLink;
+  const follow = useCallback((loc: Location) => linkRef.current(loc), []);
   const paged = settings.flowMode === "paged";
   const [chapter, setChapter] = useState(() => (jump?.loc.kind === "flow" ? jump.loc.chapter : 0));
   const [blocks, setBlocks] = useState<{ chapter: number; blocks: Block[] } | null>(null);
@@ -216,8 +254,8 @@ const FlowView = forwardRef<FlowHandle, Props>(function FlowView(props, ref) {
     if (!el || !shown) return;
     const els = blockEls();
     if (els.length === 0) return;
-    let first = 0;
-    let last = 0;
+    let first: number;
+    let last: number;
     if (paged) {
       const pages = els.map(pageOf);
       const startsHere = pages.findIndex((p) => p === page);
@@ -227,8 +265,15 @@ const FlowView = forwardRef<FlowHandle, Props>(function FlowView(props, ref) {
     } else {
       const top = el.scrollTop + 12;
       const bottom = el.scrollTop + el.clientHeight;
-      first = els.findIndex((c) => c.offsetTop + c.offsetHeight > top);
-      if (first < 0) first = els.length - 1;
+      // Blocks are laid out top to bottom: binary search for the first one reaching below `top`.
+      let lo = 0;
+      let hi = els.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (els[mid].offsetTop + els[mid].offsetHeight > top) hi = mid;
+        else lo = mid + 1;
+      }
+      first = lo < els.length ? lo : els.length - 1;
       last = first;
       while (last + 1 < els.length && els[last + 1].offsetTop < bottom) last++;
     }
@@ -369,6 +414,7 @@ const FlowView = forwardRef<FlowHandle, Props>(function FlowView(props, ref) {
 
   const onClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
+    if (target.closest("a.internal")) return;
     const mark = target.closest<HTMLElement>("mark[data-hl]");
     if (mark && window.getSelection()?.isCollapsed) {
       e.stopPropagation();
@@ -412,18 +458,38 @@ const FlowView = forwardRef<FlowHandle, Props>(function FlowView(props, ref) {
       onScroll={onScroll}
       onWheel={onWheel}
       onClick={onClick}
+      onMouseMove={(e) => {
+        if (!paged) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width;
+        e.currentTarget.dataset.zone = e.buttons ? "" : x < 0.3 ? "prev" : x > 0.7 ? "next" : "";
+      }}
+      onMouseLeave={(e) => (e.currentTarget.dataset.zone = "")}
       onMouseUp={() => setTimeout(checkSelection, 0)}
       onKeyUp={(e) => e.shiftKey && checkSelection()}
     >
       {error && <div className="center-msg error">{error}</div>}
       {!shown && !error && <div className="center-msg muted">{t("common.loading")}</div>}
+      {/* Paged mode: the outer thirds turn the page; a faint arrow shows it on hover. */}
+      {paged && shown && (
+        <>
+          <div className="turn-zone prev" aria-hidden>
+            <Icon name="chevronLeft" />
+          </div>
+          <div className="turn-zone next" aria-hidden>
+            <Icon name="chevronRight" />
+          </div>
+        </>
+      )}
       {shown && (
         <article className={classes} ref={article} style={style}>
-          {shown.map((b, i) => (
-            <div key={i} data-block={i} className={i === flashBlock ? "flash" : undefined}>
-              <BlockView block={b} bookId={book.id} marks={resolved?.marks.get(i)} />
-            </div>
-          ))}
+          <LinkContext.Provider value={follow}>
+            {shown.map((b, i) => (
+              <div key={i} data-block={i} className={i === flashBlock ? "flash" : undefined}>
+                <BlockView block={b} bookId={book.id} marks={resolved?.marks.get(i)} />
+              </div>
+            ))}
+          </LinkContext.Provider>
           <nav className="chapter-nav">
             {chapter > 0 ? (
               <button onClick={prev}>

@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { onBeforeExit } from "../lifecycle";
 import type { Location, OpenedBook } from "../types";
 import { unitsAt } from "./locations";
 
@@ -57,7 +58,7 @@ export function useReadingStats(book: OpenedBook | null, location: Location | nu
       a.seconds = 0;
       a.units = 0;
       setStats((s) => ({ ...s, readSeconds: s.readSeconds + seconds }));
-      api
+      return api
         .addReadingTime(book.id, seconds, speed)
         .then((b) => setStats({ readSeconds: b.readSeconds, readingSpeed: b.readingSpeed }))
         .catch(() => {});
@@ -78,9 +79,21 @@ export function useReadingStats(book: OpenedBook | null, location: Location | nu
       if (a.seconds >= FLUSH_SECONDS) flush();
     };
 
-    const timer = window.setInterval(tick, TICK_MS);
+    // On quit, the time since the last tick counts too.
+    let lastTick = Date.now();
+    const interval = window.setInterval(() => {
+      lastTick = Date.now();
+      tick();
+    }, TICK_MS);
+    const unregister = onBeforeExit(() => {
+      const active = document.visibilityState === "visible" && Date.now() - lastActivity.current < IDLE_MS;
+      if (active) a.seconds += (Date.now() - lastTick) / 1000;
+      lastTick = Date.now();
+      return flush();
+    });
     return () => {
-      window.clearInterval(timer);
+      window.clearInterval(interval);
+      unregister();
       flush();
     };
   }, [book]);

@@ -67,7 +67,10 @@ pub fn is_supported(path: &Path) -> bool {
 }
 
 /// Cover image as encoded bytes (EPUB cover, first page, or first image in the text).
-pub fn cover_image(path: &Path, doc: &Document) -> Option<Vec<u8>> {
+pub fn cover_image(doc: &Document) -> Option<Vec<u8>> {
+    if let Some(cover) = &doc.cover {
+        return Some(cover.clone());
+    }
     match &doc.content {
         Content::Paged(src) => {
             let page = src.render(0, 480).ok()?;
@@ -76,23 +79,14 @@ pub fn cover_image(path: &Path, doc: &Document) -> Option<Vec<u8>> {
             img.write_to(&mut out, image::ImageFormat::Png).ok()?;
             Some(out.into_inner())
         }
-        Content::Flow(chapters) => {
-            if detect(path).ok() == Some(Format::Epub)
-                && let Some((bytes, _)) = ::epub::doc::EpubDoc::new(path)
-                    .ok()
-                    .and_then(|mut d| d.get_cover())
-            {
-                return Some(bytes);
-            }
-            chapters
-                .iter()
-                .take(3)
-                .flat_map(|c| &c.blocks)
-                .find_map(|b| match b {
-                    Block::Image(img) => Some(img.bytes.to_vec()),
-                    _ => None,
-                })
-        }
+        Content::Flow(chapters) => chapters
+            .iter()
+            .take(3)
+            .flat_map(|c| &c.blocks)
+            .find_map(|b| match b {
+                Block::Image(img) => Some(img.bytes.to_vec()),
+                _ => None,
+            }),
     }
 }
 

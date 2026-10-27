@@ -410,6 +410,26 @@ const en: Messages = {
   "ai.buildIndexTitle": "Index this book with the embedding model so questions find passages by meaning",
   "ai.indexing": "Indexing {done}/{total}",
   "ai.indexBuilt": "Semantic index built: {n} passages",
+  "error.title": "Something went wrong",
+  "error.hint": "This view couldn't be shown. Reloading is safe: your books and notes are kept.",
+  "error.reload": "Reload",
+  "error.backToShelf": "Back to shelf",
+  "rs.spread": "Two pages",
+  "rs.fitHeight": "Fit height",
+  "rs.comicRtl": "Comics read right to left",
+  "settings.backup": "Back up library",
+  "settings.backupData": "Data only",
+  "settings.backupAll": "Data and book files",
+  "settings.backupHint":
+    "Saves one zip file: shelf, groups, progress, bookmarks and notes, AI caches and covers, and optionally the book files. To restore, unpack it into an empty library folder.",
+  "settings.backingUp": "Backing up…",
+  "settings.backupDone": "Backed up to {path}",
+  "ai.history": "Past conversations",
+  "ai.usage": "{input} → {output} tokens",
+  "rs.customFont": "Custom font",
+  "rs.customFontNone": "No custom font",
+  "rs.addFont": "Add font…",
+  "rs.removeFont": "Remove this font from the library",
 };
 
 export default en;

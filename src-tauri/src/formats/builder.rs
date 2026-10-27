@@ -6,6 +6,8 @@ use crate::model::{Block, Chapter, Location, Span, SpanStyle, TocEntry};
 pub struct Builder {
     pub blocks: Vec<Block>,
     pub style: SpanStyle,
+    /// `href` of the link being read, if any.
+    pub href: Option<String>,
     spans: Vec<Span>,
     pending_space: bool,
     pending_newline: bool,
@@ -27,10 +29,14 @@ impl Builder {
 
     fn push_str(&mut self, s: &str) {
         match self.spans.last_mut() {
-            Some(last) if last.style == self.style => last.text.push_str(s),
+            Some(last) if last.style == self.style && last.href == self.href => {
+                last.text.push_str(s)
+            }
             _ => self.spans.push(Span {
                 text: s.to_owned(),
                 style: self.style,
+                href: self.href.clone(),
+                target: None,
             }),
         }
     }

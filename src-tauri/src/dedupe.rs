@@ -703,6 +703,7 @@ mod tests {
             title: "t".into(),
             author: None,
             toc: Vec::new(),
+            cover: None,
             content: Content::Flow(
                 chapters
                     .into_iter()

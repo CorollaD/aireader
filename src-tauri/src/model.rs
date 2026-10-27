@@ -12,6 +12,13 @@ pub struct Span {
     pub text: String,
     #[serde(flatten)]
     pub style: SpanStyle,
+    /// A link's raw `href` while the book is parsed; formats that can resolve it turn it into
+    /// `target`.
+    #[serde(skip)]
+    pub href: Option<String>,
+    /// Where an internal link (e.g. a footnote reference) leads.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target: Option<Location>,
 }
 
 /// Serialized compactly: only `true` flags are emitted.
@@ -31,7 +38,7 @@ impl Span {
     pub fn plain(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
-            style: SpanStyle::default(),
+            ..Default::default()
         }
     }
 }
@@ -96,6 +103,17 @@ impl Block {
             Block::Image(_) | Block::Rule => String::new(),
         }
     }
+
+    /// The block's styled text, if it has any.
+    pub fn spans_mut(&mut self) -> Option<&mut Vec<Span>> {
+        match self {
+            Block::Heading { spans, .. }
+            | Block::Paragraph(spans)
+            | Block::Quote(spans)
+            | Block::ListItem { spans, .. } => Some(spans),
+            Block::Code(_) | Block::Image(_) | Block::Rule => None,
+        }
+    }
 }
 
 pub fn spans_text(spans: &[Span]) -> String {
@@ -144,6 +162,10 @@ pub trait PageSource: Send + Sync {
     fn image_dpi(&self, _index: usize) -> Option<f32> {
         None
     }
+    /// Whether the page is a picture (a comic page or a scan), served as JPEG rather than PNG.
+    fn photographic(&self, _index: usize) -> bool {
+        false
+    }
 }
 
 /// A run of text on a page. Coordinates are fractions of the unrotated page size, measured
@@ -174,6 +196,8 @@ pub struct Document {
     pub title: String,
     pub author: Option<String>,
     pub toc: Vec<TocEntry>,
+    /// Cover picture declared by the file (EPUB); other formats use their first image or page.
+    pub cover: Option<Vec<u8>>,
     pub content: Content,
 }
 
@@ -221,6 +245,7 @@ mod tests {
                     bold: true,
                     ..Default::default()
                 },
+                ..Default::default()
             }]),
             Block::ListItem {
                 marker: "•".into(),

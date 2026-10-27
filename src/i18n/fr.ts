@@ -412,6 +412,26 @@ const fr: Messages = {
   "ai.buildIndexTitle": "Indexer ce livre avec le modèle d'embeddings pour que les questions trouvent les passages par le sens",
   "ai.indexing": "Indexation {done}/{total}",
   "ai.indexBuilt": "Index sémantique créé : {n} passages",
+  "error.title": "Un problème est survenu",
+  "error.hint": "Cette vue n'a pas pu s'afficher. Vous pouvez recharger : vos livres et notes sont conservés.",
+  "error.reload": "Recharger",
+  "error.backToShelf": "Retour à la bibliothèque",
+  "rs.spread": "Deux pages",
+  "rs.fitHeight": "Ajuster à la hauteur",
+  "rs.comicRtl": "BD de droite à gauche",
+  "settings.backup": "Sauvegarde de la bibliothèque",
+  "settings.backupData": "Données seules",
+  "settings.backupAll": "Données et fichiers des livres",
+  "settings.backupHint":
+    "Enregistre un fichier zip : bibliothèque, groupes, progression, signets et notes, caches IA et couvertures, et en option les fichiers des livres. Pour restaurer, décompressez-le dans un dossier de bibliothèque vide.",
+  "settings.backingUp": "Sauvegarde…",
+  "settings.backupDone": "Sauvegardé dans {path}",
+  "ai.history": "Conversations précédentes",
+  "ai.usage": "{input} → {output} jetons",
+  "rs.customFont": "Police personnalisée",
+  "rs.customFontNone": "Aucune police personnalisée",
+  "rs.addFont": "Ajouter une police…",
+  "rs.removeFont": "Retirer cette police de la bibliothèque",
 };
 
 export default fr;

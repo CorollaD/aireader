@@ -15,8 +15,22 @@ const IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "bmp"];
 pub struct CbzSource {
     zip: Mutex<zip::ZipArchive<File>>,
     names: Vec<String>,
-    /// Aspect ratios, filled in as pages are decoded.
+    /// Aspect ratios read from the image headers when the archive is opened; pages whose
+    /// header couldn't be read get theirs when decoded.
     aspects: Mutex<Vec<Option<f32>>>,
+}
+
+/// Bytes read from the start of an image to find its size in the header.
+const HEADER_BYTES: u64 = 256 << 10;
+
+/// Height/width from an image's header, without decoding the picture.
+fn header_aspect(head: &[u8]) -> Option<f32> {
+    let (w, h) = image::ImageReader::new(std::io::Cursor::new(head))
+        .with_guessed_format()
+        .ok()?
+        .into_dimensions()
+        .ok()?;
+    (w > 0 && h > 0).then(|| h as f32 / w as f32)
 }
 
 impl CbzSource {
@@ -37,6 +51,10 @@ impl PageSource for CbzSource {
     fn page_aspect(&self, index: usize) -> f32 {
         let known = self.aspects.lock().unwrap().get(index).copied().flatten();
         known.unwrap_or(1.5)
+    }
+
+    fn photographic(&self, _index: usize) -> bool {
+        true
     }
 
     fn render(&self, index: usize, width: u32) -> Result<PageImage> {
@@ -62,7 +80,7 @@ impl PageSource for CbzSource {
 }
 
 pub fn open_source(path: &Path) -> Result<CbzSource> {
-    let zip = zip::ZipArchive::new(File::open(path)?)?;
+    let mut zip = zip::ZipArchive::new(File::open(path)?)?;
     let mut names: Vec<String> = zip
         .file_names()
         .filter_map(Result::ok)
@@ -82,7 +100,19 @@ pub fn open_source(path: &Path) -> Result<CbzSource> {
         bail!(crate::t!("archive_no_images"));
     }
     names.sort_by(|a, b| natord::compare_ignore_case(a, b));
-    let aspects = Mutex::new(vec![None; names.len()]);
+    let aspects = names
+        .iter()
+        .map(|name| {
+            let mut head = Vec::new();
+            zip.by_name(name)
+                .ok()?
+                .take(HEADER_BYTES)
+                .read_to_end(&mut head)
+                .ok()?;
+            header_aspect(&head)
+        })
+        .collect();
+    let aspects = Mutex::new(aspects);
     Ok(CbzSource {
         zip: Mutex::new(zip),
         names,
@@ -97,6 +127,7 @@ pub fn load(path: &Path) -> Result<Document> {
         title: Document::file_stem(path),
         author: None,
         toc: Vec::new(),
+        cover: None,
         content: Content::Paged(Arc::new(source)),
     })
 }

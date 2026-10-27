@@ -409,6 +409,26 @@ const ko: Messages = {
   "ai.buildIndexTitle": "벡터 모델로 이 책의 색인을 만들어 질문의 의미로 관련 부분을 찾게 합니다",
   "ai.indexing": "색인 생성 {done}/{total}",
   "ai.indexBuilt": "의미 검색 색인 완료: {n}개 부분",
+  "error.title": "문제가 발생했습니다",
+  "error.hint": "이 화면을 표시할 수 없습니다. 다시 불러와도 책과 메모는 유지됩니다.",
+  "error.reload": "다시 불러오기",
+  "error.backToShelf": "서재로 돌아가기",
+  "rs.spread": "두 쪽",
+  "rs.fitHeight": "높이에 맞춤",
+  "rs.comicRtl": "만화 오른쪽에서 왼쪽으로",
+  "settings.backup": "서재 백업",
+  "settings.backupData": "데이터만",
+  "settings.backupAll": "데이터와 책 파일",
+  "settings.backupHint":
+    "zip 파일 하나로 저장합니다: 서재, 그룹, 진도, 책갈피와 메모, AI 캐시, 표지(선택적으로 책 파일 포함). 복원하려면 빈 서재 폴더에 압축을 푸세요.",
+  "settings.backingUp": "백업 중…",
+  "settings.backupDone": "{path}에 백업했습니다",
+  "ai.history": "이전 대화",
+  "ai.usage": "{input} → {output} 토큰",
+  "rs.customFont": "사용자 글꼴",
+  "rs.customFontNone": "사용자 글꼴 없음",
+  "rs.addFont": "글꼴 추가…",
+  "rs.removeFont": "이 글꼴을 서재에서 삭제",
 };
 
 export default ko;

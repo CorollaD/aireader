@@ -24,6 +24,7 @@ pub fn load(path: &Path) -> Result<Document> {
         title,
         author: doc.author,
         toc: heading_toc(&chapters, 3),
+        cover: None,
         content: Content::Flow(chapters),
     })
 }

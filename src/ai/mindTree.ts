@@ -122,7 +122,8 @@ export const CITE_W = 18;
 
 let ctx: CanvasRenderingContext2D | null = null;
 function measure(text: string, depth: number): number {
-  ctx ??= document.createElement("canvas").getContext("2d");
+  // Without a DOM (tests), text is measured by character count.
+  ctx ??= typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d");
   if (!ctx) return text.length * fontOf(depth).size;
   const f = fontOf(depth);
   ctx.font = `${f.weight} ${f.size}px ${FONT_FAMILY}`;

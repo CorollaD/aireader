@@ -70,7 +70,7 @@ fn epub_spine_toc_and_images() {
     let ch1 = r#"<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml"><body>
         <h1>Chapter One</h1><p>第一段<b>粗体</b></p><img src="../images/pic%201.png" alt="pic"/>
         <h2 id="sec">Section</h2><p>more</p></body></html>"#;
-    let ch2 = r#"<html><body><p>second chapter</p></body></html>"#;
+    let ch2 = r#"<html><body><p>second chapter, <a href="ch1.xhtml#sec">see the section</a>, <a href="https://example.com">web</a></p></body></html>"#;
     let empty = r#"<html><body></body></html>"#;
     let container = r#"<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
       <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>"#;
@@ -94,6 +94,24 @@ fn epub_spine_toc_and_images() {
     assert_eq!(doc.author.as_deref(), Some("作者"));
     let ch = chapters(&doc);
     assert_eq!(ch.len(), 2, "empty spine item is dropped");
+    // Internal links lead to their target block (counted after the empty item is dropped).
+    let Block::Paragraph(spans) = &ch[1].blocks[0] else {
+        panic!("{:?}", ch[1].blocks[0])
+    };
+    let link = spans
+        .iter()
+        .find(|s| s.text.trim() == "see the section")
+        .unwrap();
+    assert!(link.style.link);
+    assert_eq!(
+        link.target,
+        Some(Location::Flow {
+            chapter: 0,
+            block: 3
+        })
+    );
+    let web = spans.iter().find(|s| s.text.trim() == "web").unwrap();
+    assert_eq!(web.target, None, "links outside the book lead nowhere");
     assert_eq!(ch[0].title, "第一章");
     assert!(
         ch[0]
@@ -211,6 +229,11 @@ fn cbz_natural_order_and_render() {
         panic!()
     };
     assert_eq!(src.page_count(), 3);
+    assert!(
+        (src.page_aspect(1) - 2.0).abs() < 1e-3,
+        "sizes come from the image headers before any page is rendered"
+    );
+    assert!(src.photographic(0));
     let img = src.render(2, 5).unwrap();
     assert_eq!(
         (img.width, img.height),

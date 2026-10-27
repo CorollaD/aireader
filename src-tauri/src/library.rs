@@ -1,14 +1,15 @@
 //! The bookshelf: imported books are copied into the library directory, de-duplicated by
-//! content hash, and described in `library.json` together with groups and reader settings.
+//! content hash, and recorded in the library database together with groups and settings.
 //!
 //! Layout under the library root:
-//! - `library.json`
+//! - `aireader.db` (see [`crate::db`])
 //! - `books/<id>/<original file name>`
+//! - `books/.incoming-*/` (files being imported; left-overs are removed on open)
 //! - `covers/<id>.jpg`
-//! - `annotations/<id>.json` (see [`crate::annotations`])
-//! - `ai/<id>/` (AI caches)
+//! - `fonts/<file>` (reading fonts the user added)
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
@@ -20,6 +21,7 @@ use crate::model::Location;
 
 const COVER_WIDTH: u32 = 360;
 const COVER_HEIGHT: u32 = 540;
+const STAGING_PREFIX: &str = ".incoming-";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -105,6 +107,31 @@ pub fn now() -> u64 {
         .unwrap_or(0)
 }
 
+/// Font files the reader can use.
+pub const FONT_EXTENSIONS: &[&str] = &["ttf", "otf", "woff", "woff2"];
+
+fn is_font_file(name: &str) -> bool {
+    !name.starts_with('.')
+        && name
+            .rsplit_once('.')
+            .is_some_and(|(_, ext)| FONT_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
+}
+
+/// Today's date as `YYYY-MM-DD` (UTC), for file names.
+pub fn today() -> String {
+    // Days since 1970-01-01 to a civil date (Howard Hinnant's algorithm).
+    let days = now() as i64 / 86_400 + 719_468;
+    let era = days.div_euclid(146_097);
+    let doe = days - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
 /// Expands folders (recursively) into supported book files; plain files are kept as given.
 pub fn collect_files(paths: &[PathBuf]) -> Vec<PathBuf> {
     fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -138,8 +165,13 @@ pub fn collect_files(paths: &[PathBuf]) -> Vec<PathBuf> {
 }
 
 pub fn hash_file(path: &Path) -> Result<String> {
-    use std::io::Read;
-    let mut file = std::fs::File::open(path)?;
+    copy_hashed(path, None)
+}
+
+/// Hashes `src`, copying it to `dest` on the way when given, so a file is read only once.
+fn copy_hashed(src: &Path, mut dest: Option<&mut std::fs::File>) -> Result<String> {
+    use std::io::{Read, Write};
+    let mut file = std::fs::File::open(src)?;
     let mut hasher = Sha256::new();
     let mut buf = vec![0u8; 1 << 16];
     loop {
@@ -148,12 +180,60 @@ pub fn hash_file(path: &Path) -> Result<String> {
             break;
         }
         hasher.update(&buf[..n]);
+        if let Some(out) = dest.as_mut() {
+            out.write_all(&buf[..n])
+                .with_context(|| crate::t!("copy_failed"))?;
+        }
     }
     Ok(hasher
         .finalize()
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect())
+}
+
+/// A file copied into the library's staging folder. The folder is removed when this is
+/// dropped, unless the book was added.
+pub struct Staged {
+    dir: PathBuf,
+    file_name: String,
+    pub sha256: String,
+}
+
+impl Staged {
+    fn file(&self) -> PathBuf {
+        self.dir.join(&self.file_name)
+    }
+}
+
+impl Drop for Staged {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.dir);
+    }
+}
+
+/// Copies `src` into the staging folder of the library at `root`, hashing it on the way.
+pub fn stage(root: &Path, src: &Path) -> Result<Staged> {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let file_name = src
+        .file_name()
+        .with_context(|| crate::t!("invalid_file_name"))?
+        .to_string_lossy()
+        .into_owned();
+    let dir = root.join("books").join(format!(
+        "{STAGING_PREFIX}{}-{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    std::fs::create_dir_all(&dir)?;
+    let mut staged = Staged {
+        dir,
+        file_name,
+        sha256: String::new(),
+    };
+    let mut out = std::fs::File::create(staged.file()).with_context(|| crate::t!("copy_failed"))?;
+    staged.sha256 = copy_hashed(src, Some(&mut out))?;
+    Ok(staged)
 }
 
 /// Shrinks a cover to fit `COVER_WIDTH`×`COVER_HEIGHT` and encodes it as JPEG.
@@ -167,6 +247,7 @@ fn thumbnail(bytes: &[u8]) -> Result<Vec<u8>> {
 /// A copied and parsed book that is not yet part of the library.
 pub struct Prepared {
     book: Book,
+    staged: Staged,
 }
 
 impl Library {
@@ -176,6 +257,18 @@ impl Library {
         std::fs::create_dir_all(root.join("books"))?;
         std::fs::create_dir_all(root.join("covers"))?;
         let db = crate::db::Db::open(&root.join(crate::db::FILE))?;
+        // Imports interrupted by a crash or quit.
+        if let Ok(entries) = std::fs::read_dir(root.join("books")) {
+            for entry in entries.flatten() {
+                if entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(STAGING_PREFIX)
+                {
+                    let _ = std::fs::remove_dir_all(entry.path());
+                }
+            }
+        }
         let imported = Self::import_legacy(root, &db)?;
         let data = Self::load(&db)?;
         if imported {
@@ -280,6 +373,85 @@ impl Library {
         Ok(())
     }
 
+    /// Writes one book's record, for changes that touch nothing else (progress, reading time).
+    pub fn save_book(&self, id: &str) -> Result<()> {
+        use rusqlite::params;
+        let b = self.get(id).with_context(|| crate::t!("book_not_found"))?;
+        let changed = self.db.conn().execute(
+            "UPDATE books SET sha256 = ?2, title = ?3, grp = ?4, data = ?5 WHERE id = ?1",
+            params![b.id, b.sha256, b.title, b.group, serde_json::to_string(b)?],
+        )?;
+        if changed == 0 {
+            // Not stored yet (added but not saved): write everything.
+            return self.save();
+        }
+        Ok(())
+    }
+
+    /// Writes a backup of the library at `root` as a zip: the database and covers, and with
+    /// `books` the book files too. Restoring is unpacking it into an empty library folder.
+    pub fn backup_at(root: &Path, db: &crate::db::Db, dest: &Path, books: bool) -> Result<()> {
+        use std::io::Write;
+        use zip::write::SimpleFileOptions;
+        let snapshot = root.join(".backup.db");
+        let _ = std::fs::remove_file(&snapshot);
+        crate::db::snapshot(db, &snapshot)?;
+        let result = (|| -> Result<()> {
+            let mut zip = zip::ZipWriter::new(std::fs::File::create(dest)?);
+            let packed = SimpleFileOptions::default().large_file(true);
+            // Book files are mostly compressed already.
+            let stored = packed.compression_method(zip::CompressionMethod::Stored);
+            zip.start_file(crate::db::FILE, packed)?;
+            std::io::copy(&mut std::fs::File::open(&snapshot)?, &mut zip)?;
+            let add_dir = |zip: &mut zip::ZipWriter<std::fs::File>,
+                           dir: &str,
+                           options: SimpleFileOptions|
+             -> Result<()> {
+                let mut files: Vec<PathBuf> = Vec::new();
+                if !root.join(dir).is_dir() {
+                    return Ok(());
+                }
+                let mut stack = vec![root.join(dir)];
+                while let Some(d) = stack.pop() {
+                    for entry in std::fs::read_dir(&d)?.flatten() {
+                        let path = entry.path();
+                        let name = entry.file_name().to_string_lossy().into_owned();
+                        if name.starts_with('.') {
+                            continue; // staging folders, .DS_Store
+                        }
+                        if path.is_dir() {
+                            stack.push(path);
+                        } else {
+                            files.push(path);
+                        }
+                    }
+                }
+                files.sort();
+                for path in files {
+                    let rel = path
+                        .strip_prefix(root)?
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    zip.start_file(rel, options)?;
+                    std::io::copy(&mut std::fs::File::open(&path)?, zip)?;
+                }
+                Ok(())
+            };
+            add_dir(&mut zip, "covers", packed)?;
+            add_dir(&mut zip, "fonts", stored)?;
+            if books {
+                add_dir(&mut zip, "books", stored)?;
+            }
+            zip.finish()?.flush()?;
+            Ok(())
+        })();
+        let _ = std::fs::remove_file(&snapshot);
+        if result.is_err() {
+            let _ = std::fs::remove_file(dest);
+        }
+        result
+    }
+
     /// The library database, shared by annotations, AI caches and the search index.
     pub fn db(&self) -> &crate::db::Db {
         &self.db
@@ -321,6 +493,45 @@ impl Library {
         self.get(id).map(|b| self.book_path(b))
     }
 
+    /// Reading fonts the user added, by file name.
+    pub fn fonts(&self) -> Vec<String> {
+        let mut names: Vec<String> = std::fs::read_dir(self.root.join("fonts"))
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| is_font_file(n))
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// The stored font `name`, if it is one (names never lead outside the fonts folder).
+    pub fn font_path(&self, name: &str) -> Option<PathBuf> {
+        let path = self.root.join("fonts").join(name);
+        (is_font_file(name) && !name.contains(['/', '\\']) && path.is_file()).then_some(path)
+    }
+
+    /// Copies a font file into the library; returns its stored name.
+    pub fn add_font(&self, src: &Path) -> Result<String> {
+        let name = src
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .filter(|n| is_font_file(n))
+            .with_context(|| crate::t!("font_unsupported"))?;
+        let dir = self.root.join("fonts");
+        std::fs::create_dir_all(&dir)?;
+        std::fs::copy(src, dir.join(&name)).with_context(|| crate::t!("copy_failed"))?;
+        Ok(name)
+    }
+
+    pub fn remove_font(&self, name: &str) -> Result<()> {
+        if let Some(path) = self.font_path(name) {
+            std::fs::remove_file(path)?;
+        }
+        Ok(())
+    }
+
     pub fn cover_path(&self, id: &str) -> PathBuf {
         self.root.join("covers").join(format!("{id}.jpg"))
     }
@@ -330,71 +541,63 @@ impl Library {
         self.data.books.iter().find(|b| b.sha256 == sha256)
     }
 
-    /// Copies `src` into the library and parses it. Runs without holding the library lock;
-    /// the result is committed with [`Library::add`]. Fails on unreadable or unsupported files.
-    pub fn prepare(root: &Path, src: &Path, sha256: &str) -> Result<Prepared> {
-        let file_name = src
-            .file_name()
-            .with_context(|| crate::t!("invalid_file_name"))?
-            .to_string_lossy()
-            .into_owned();
-        let id = sha256[..16].to_owned();
-        let dir = root.join("books").join(&id);
-        std::fs::create_dir_all(&dir)?;
-        let dest = dir.join(&file_name);
-        let result = (|| {
-            std::fs::copy(src, &dest).with_context(|| crate::t!("copy_failed"))?;
-            let format = formats::detect(&dest)?.label().to_owned();
+    /// Parses a staged file and makes its cover. Runs without holding the library lock; the
+    /// result is committed with [`Library::add`]. Fails on unsupported or broken files.
+    pub fn prepare(staged: Staged) -> Result<Prepared> {
+        let dest = staged.file();
+        let format = formats::detect(&dest)?.label().to_owned();
+        let (title, author, cover) = {
+            // Dropped before the staged folder is moved (an open PDF can't be moved on Windows).
             let doc = formats::open(&dest)?;
-            let has_cover = formats::cover_image(&dest, &doc)
-                .and_then(|bytes| thumbnail(&bytes).ok())
-                .is_some_and(|jpg| {
-                    std::fs::write(root.join("covers").join(format!("{id}.jpg")), jpg).is_ok()
-                });
-            Ok(Book {
-                id: id.clone(),
-                title: doc.title.clone(),
-                author: doc.author.clone().filter(|a| !a.trim().is_empty()),
-                format,
-                file_name: file_name.clone(),
-                size: std::fs::metadata(&dest)?.len(),
-                sha256: sha256.to_owned(),
-                has_cover,
-                added: now(),
-                last_read: None,
-                progress: 0.0,
-                position: None,
-                group: None,
-                legacy_groups: Vec::new(),
-                read_seconds: 0,
-                reading_speed: None,
-                rotation: 0,
-                missing: false,
-            })
-        })();
-        match result {
-            Ok(book) => Ok(Prepared { book }),
-            Err(e) => {
-                let _ = std::fs::remove_dir_all(&dir);
-                Err(e)
-            }
-        }
+            let cover = formats::cover_image(&doc).and_then(|bytes| thumbnail(&bytes).ok());
+            (doc.title, doc.author, cover)
+        };
+        let has_cover =
+            cover.is_some_and(|jpg| std::fs::write(staged.dir.join(".cover.jpg"), jpg).is_ok());
+        let book = Book {
+            id: staged.sha256[..16].to_owned(),
+            title,
+            author: author.filter(|a| !a.trim().is_empty()),
+            format,
+            file_name: staged.file_name.clone(),
+            size: std::fs::metadata(&dest)?.len(),
+            sha256: staged.sha256.clone(),
+            has_cover,
+            added: now(),
+            last_read: None,
+            progress: 0.0,
+            position: None,
+            group: None,
+            legacy_groups: Vec::new(),
+            read_seconds: 0,
+            reading_speed: None,
+            rotation: 0,
+            missing: false,
+        };
+        Ok(Prepared { book, staged })
     }
 
-    /// Adds a prepared book (into `group`, if given). Returns `false` if a book with the same
-    /// content was added concurrently.
-    pub fn add(&mut self, prepared: Prepared, group: Option<&str>) -> bool {
-        let mut book = prepared.book;
+    /// Moves a prepared book into the library (into `group`, if given). Returns `false` if a
+    /// book with the same content was added concurrently.
+    pub fn add(&mut self, prepared: Prepared, group: Option<&str>) -> Result<bool> {
+        let Prepared { mut book, staged } = prepared;
         if self.find_hash(&book.sha256).is_some() {
-            return false;
+            return Ok(false);
         }
+        if book.has_cover {
+            std::fs::rename(staged.dir.join(".cover.jpg"), self.cover_path(&book.id))?;
+        }
+        let dir = self.root.join("books").join(&book.id);
+        // A folder left by a crash between moving a book in and saving the library.
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::rename(&staged.dir, &dir)?;
         let group = group.map(str::trim).filter(|g| !g.is_empty());
         if let Some(g) = group {
             self.ensure_group(g);
         }
         book.group = group.map(str::to_owned);
         self.data.books.push(book);
-        true
+        Ok(true)
     }
 
     pub fn update(&mut self, id: &str, patch: BookPatch) -> Result<Book> {
@@ -575,12 +778,13 @@ mod tests {
     }
 
     fn import(lib: &mut Library, src: &Path) -> Result<bool> {
-        let hash = hash_file(src)?;
-        if lib.find_hash(&hash).is_some() {
+        let staged = stage(lib.root(), src)?;
+        assert_eq!(staged.sha256, hash_file(src)?);
+        if lib.find_hash(&staged.sha256).is_some() {
             return Ok(false);
         }
-        let prepared = Library::prepare(lib.root(), src, &hash)?;
-        Ok(lib.add(prepared, None))
+        let prepared = Library::prepare(staged)?;
+        lib.add(prepared, None)
     }
 
     #[test]
@@ -813,6 +1017,98 @@ mod tests {
         assert!(import(&mut lib, &bad).is_err());
         assert!(lib.books().is_empty());
         assert_eq!(std::fs::read_dir(root.join("books")).unwrap().count(), 0);
+        // A staging folder left by a crash is removed when the library is opened.
+        std::fs::create_dir_all(root.join("books/.incoming-1-0")).unwrap();
+        drop(lib);
+        Library::open(&root).unwrap();
+        assert_eq!(std::fs::read_dir(root.join("books")).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn backup_holds_database_covers_and_optionally_books() {
+        let dir = temp("backup");
+        std::fs::write(dir.join("a.txt"), "第一章\n甲").unwrap();
+        let root = dir.join("lib");
+        let mut lib = Library::open(&root).unwrap();
+        import(&mut lib, &dir.join("a.txt")).unwrap();
+        lib.save().unwrap();
+        std::fs::write(lib.cover_path("0123456789abcdef"), b"jpg").unwrap();
+        let names = |books: bool| {
+            let dest = dir.join(format!("b-{books}.zip"));
+            Library::backup_at(lib.root(), lib.db(), &dest, books).unwrap();
+            let zip = zip::ZipArchive::new(std::fs::File::open(&dest).unwrap()).unwrap();
+            zip.file_names()
+                .filter_map(|n| n.ok().map(|n| n.into_owned()))
+                .collect::<Vec<_>>()
+        };
+        let small = names(false);
+        assert!(small.contains(&"aireader.db".to_owned()));
+        assert!(small.contains(&"covers/0123456789abcdef.jpg".to_owned()));
+        assert!(!small.iter().any(|n| n.starts_with("books/")));
+        assert!(
+            names(true)
+                .iter()
+                .any(|n| n.starts_with("books/") && n.ends_with("a.txt"))
+        );
+        // The snapshot opens as a library with the book in it.
+        let restored = dir.join("restored");
+        std::fs::create_dir_all(&restored).unwrap();
+        let mut zip =
+            zip::ZipArchive::new(std::fs::File::open(dir.join("b-true.zip")).unwrap()).unwrap();
+        zip.extract(&restored).unwrap();
+        assert_eq!(Library::open(&restored).unwrap().books().len(), 1);
+        assert!(!root.join(".backup.db").exists());
+        assert_eq!(today().len(), 10);
+    }
+
+    #[test]
+    fn fonts_are_stored_listed_and_removed() {
+        let dir = temp("fonts");
+        std::fs::write(dir.join("My Font.TTF"), b"font").unwrap();
+        std::fs::write(dir.join("notes.txt"), b"x").unwrap();
+        let lib = Library::open(&dir.join("lib")).unwrap();
+        assert!(lib.fonts().is_empty());
+        assert_eq!(
+            lib.add_font(&dir.join("My Font.TTF")).unwrap(),
+            "My Font.TTF"
+        );
+        assert!(lib.add_font(&dir.join("notes.txt")).is_err());
+        assert_eq!(lib.fonts(), ["My Font.TTF"]);
+        assert!(lib.font_path("My Font.TTF").is_some());
+        assert!(lib.font_path("../My Font.TTF").is_none());
+        assert!(lib.font_path("missing.ttf").is_none());
+        lib.remove_font("My Font.TTF").unwrap();
+        assert!(lib.fonts().is_empty());
+    }
+
+    #[test]
+    fn saving_one_book_keeps_the_others() {
+        let dir = temp("save-one");
+        std::fs::write(dir.join("a.txt"), "第一章\n甲").unwrap();
+        std::fs::write(dir.join("b.txt"), "第一章\n乙").unwrap();
+        let root = dir.join("lib");
+        let mut lib = Library::open(&root).unwrap();
+        import(&mut lib, &dir.join("a.txt")).unwrap();
+        import(&mut lib, &dir.join("b.txt")).unwrap();
+        lib.save().unwrap();
+        let ids: Vec<String> = lib.books().iter().map(|b| b.id.clone()).collect();
+        lib.set_progress(
+            &ids[1],
+            Location::Flow {
+                chapter: 0,
+                block: 1,
+            },
+            0.7,
+        )
+        .unwrap();
+        lib.save_book(&ids[1]).unwrap();
+        drop(lib);
+        let lib = Library::open(&root).unwrap();
+        let books = lib.books();
+        assert_eq!(books.len(), 2);
+        assert_eq!(books[1].id, ids[1], "order is kept");
+        assert_eq!(books[1].progress, 0.7);
+        assert!(lib.cover_path(&ids[0]).parent().unwrap().exists());
     }
 
     #[test]

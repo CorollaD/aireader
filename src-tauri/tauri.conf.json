@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: blob: book: http://book.localhost; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; img-src 'self' data: blob: book: http://book.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' book: http://book.localhost; connect-src 'self' ipc: http://ipc.localhost"
     }
   },
   "bundle": {
@@ -34,6 +34,67 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "epub"
+        ],
+        "name": "EPUB",
+        "description": "EPUB e-book",
+        "role": "Viewer",
+        "rank": "Default",
+        "mimeType": "application/epub+zip",
+        "contentTypes": [
+          "org.idpf.epub-container"
+        ]
+      },
+      {
+        "ext": [
+          "mobi",
+          "azw",
+          "azw3",
+          "prc"
+        ],
+        "name": "Kindle book",
+        "description": "MOBI / AZW3 e-book",
+        "role": "Viewer",
+        "rank": "Default",
+        "mimeType": "application/x-mobipocket-ebook"
+      },
+      {
+        "ext": [
+          "fb2"
+        ],
+        "name": "FictionBook",
+        "description": "FB2 e-book",
+        "role": "Viewer",
+        "rank": "Default",
+        "mimeType": "application/x-fictionbook+xml"
+      },
+      {
+        "ext": [
+          "cbz"
+        ],
+        "name": "Comic book",
+        "description": "CBZ comic archive",
+        "role": "Viewer",
+        "rank": "Default",
+        "mimeType": "application/vnd.comicbook+zip"
+      },
+      {
+        "ext": [
+          "pdf"
+        ],
+        "name": "PDF",
+        "description": "PDF document",
+        "role": "Viewer",
+        "rank": "Alternate",
+        "mimeType": "application/pdf",
+        "contentTypes": [
+          "com.adobe.pdf"
+        ]
+      }
     ]
   }
 }

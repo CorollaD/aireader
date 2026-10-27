@@ -18,6 +18,7 @@ epub = "2.1.5"
 futures-util = "0.3.34"
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
 keyring = "4.2"
+log = "0.4.34"
 mobi = "0.8.0"
 natord = "1.0.9"
 pdfium-render = { version = "0.9.4", default-features = false, features = ["pdfium_latest", "thread_safe"] }
@@ -37,6 +38,9 @@ sha2 = "0.11.1"
 sqlite-vec = "0.1"
 tauri = { version = "2.12.5", features = [] }
 tauri-plugin-dialog = "2.8.3"
+tauri-plugin-log = "2.10.1"
+tauri-plugin-single-instance = "2.5.4"
+tauri-plugin-window-state = "2.5.0"
 tokio = { version = "1.54.1", features = ["sync", "rt", "macros", "time"] }
 tokio-rusqlite = { version = "0.6", default-features = false, features = ["bundled"] }
 zip = { version = "9.0.5", default-features = false, features = ["deflate"] }

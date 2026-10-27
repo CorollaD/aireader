@@ -20,6 +20,8 @@ const PATHS = {
   plus: "M12 5v14M5 12h14",
   minus: "M5 12h14",
   rotate: "M21 12a9 9 0 1 1-2.64-6.36L21 8M21 3v5h-5",
+  spread: "M3 5h7a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H3zM21 5h-7a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h7z",
+  fitHeight: "M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4",
   fitWidth: "M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4",
   fitPage: "M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3",
   maximize: "M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7",

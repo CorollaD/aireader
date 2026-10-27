@@ -2,7 +2,7 @@
 // (`npm run dev`, then open http://localhost:1420). Never included in production builds.
 
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { AiConfig, AiEvent, AiTask, Annotations, Block, Book, Location, Source } from "../types";
+import type { AiConfig, AiEvent, AiTask, Annotations, Block, Book, ChatRecord, Location, Source } from "../types";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -78,9 +78,11 @@ export function installMock() {
     if (sources) setTimeout(() => send({ type: "sources", sources }), (t += 80));
     if (progress) [0, 1, 2].forEach((i) => setTimeout(() => send({ type: "progress", done: i, total: 3, label: `正在总结「第${i + 1}回」` }), (t += 150)));
     pieces.forEach((p) => setTimeout(() => send({ type: "delta", text: p }), (t += 40)));
+    setTimeout(() => send({ type: "usage", input: 1834, output: text.length, cost: 0.0021 }), (t += 20));
     setTimeout(() => send({ type: "done", text, cached: false }), (t += 60));
   };
   let nextId = 6;
+  const chats = new Map<string, ChatRecord[]>();
 
   mockIPC(
     (cmd, args) => {
@@ -119,6 +121,28 @@ export function installMock() {
             passages: db.indexed.has(a.bookId as string) ? 120 : 0,
             stale: false,
           };
+        case "list_chats":
+          return chats.get(a.bookId as string) ?? [];
+        case "save_chat": {
+          const list = (chats.get(a.bookId as string) ?? []).filter((c) => c.id !== (a.chat as ChatRecord).id);
+          chats.set(a.bookId as string, [a.chat as ChatRecord, ...list]);
+          return null;
+        }
+        case "delete_chat":
+          for (const [k, list] of chats)
+            chats.set(
+              k,
+              list.filter((c) => c.id !== a.id),
+            );
+          return null;
+        case "list_fonts":
+          return ["LXGW WenKai.ttf"];
+        case "import_font":
+          return "LXGW WenKai.ttf";
+        case "remove_font":
+          return null;
+        case "backup_library":
+          return `/Users/me/AiReader-backup${a.books ? "-full" : ""}.zip`;
         case "find_duplicates":
           return [];
         case "merge_duplicates":
@@ -172,7 +196,7 @@ export function installMock() {
         case "get_chapter":
           return chapter(a.index as number);
         case "search_book":
-          return [0, 1, 2].map((c) => ({ chapter: c, block: 3, snippet: `…${String(a.query)}…示例片段` }));
+          return [0, 1, 2].map((c) => ({ location: { kind: "flow", chapter: c, block: 3 }, snippet: `…${String(a.query)}…示例片段` }));
         case "save_progress": {
           const b = find(a.id);
           b.position = a.position as Location;

@@ -67,7 +67,7 @@ let current: Lang = systemLanguage();
 
 export function setLanguage(lang: Lang) {
   current = lang;
-  document.documentElement.lang = lang;
+  if (typeof document !== "undefined") document.documentElement.lang = lang;
 }
 
 export function language(): Lang {

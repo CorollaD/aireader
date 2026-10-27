@@ -64,6 +64,14 @@ CREATE TABLE IF NOT EXISTS ai_cache (
     PRIMARY KEY (book_id, model, unit)
 );
 CREATE TABLE IF NOT EXISTS profiles (sha256 TEXT PRIMARY KEY, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS chats (
+    id TEXT PRIMARY KEY,
+    book_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    data TEXT NOT NULL,
+    updated INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS chats_book ON chats (book_id);
 CREATE TABLE IF NOT EXISTS semantic_books (
     book_id TEXT PRIMARY KEY,
     model TEXT NOT NULL,
@@ -147,13 +155,83 @@ pub fn kv_set<T: Serialize>(conn: &Connection, key: &str, value: &T) -> Result<(
 
 /// Removes everything stored about a book (its record is handled by the library).
 pub fn delete_book_data(conn: &Connection, book_id: &str) -> Result<()> {
-    for table in ["bookmarks", "highlights", "ai_cache", "semantic_books"] {
+    for table in [
+        "bookmarks",
+        "highlights",
+        "ai_cache",
+        "chats",
+        "semantic_books",
+    ] {
         conn.execute(
             &format!("DELETE FROM {table} WHERE book_id = ?1"),
             params![book_id],
         )?;
     }
     crate::ai::semantic::delete_book_passages(conn, book_id)?;
+    Ok(())
+}
+
+/// Writes a consistent copy of the database to `dest` (which must not exist), even while it is
+/// in use.
+pub fn snapshot(db: &Db, dest: &Path) -> Result<()> {
+    db.conn()
+        .execute("VACUUM INTO ?1", params![dest.to_string_lossy()])?;
+    Ok(())
+}
+
+/// A saved AI conversation about a book. `data` is the frontend's own record (turns, quote).
+#[derive(Debug, Serialize, serde::Deserialize, PartialEq)]
+pub struct ChatRecord {
+    pub id: String,
+    pub title: String,
+    pub updated: u64,
+    pub data: serde_json::Value,
+}
+
+/// A book's conversations, most recent first.
+pub fn list_chats(conn: &Connection, book_id: &str) -> Result<Vec<ChatRecord>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, title, updated, data FROM chats WHERE book_id = ?1 ORDER BY updated DESC",
+    )?;
+    let rows = stmt.query_map(params![book_id], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, String>(1)?,
+            r.get::<_, i64>(2)?,
+            r.get::<_, String>(3)?,
+        ))
+    })?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (id, title, updated, data) = row?;
+        out.push(ChatRecord {
+            id,
+            title,
+            updated: updated as u64,
+            data: serde_json::from_str(&data).unwrap_or_default(),
+        });
+    }
+    Ok(out)
+}
+
+pub fn save_chat(conn: &Connection, book_id: &str, chat: &ChatRecord) -> Result<()> {
+    conn.execute(
+        "INSERT INTO chats (id, book_id, title, data, updated) VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(id) DO UPDATE SET title = excluded.title, data = excluded.data,
+           updated = excluded.updated",
+        params![
+            chat.id,
+            book_id,
+            chat.title,
+            chat.data.to_string(),
+            chat.updated as i64
+        ],
+    )?;
+    Ok(())
+}
+
+pub fn delete_chat(conn: &Connection, id: &str) -> Result<()> {
+    conn.execute("DELETE FROM chats WHERE id = ?1", params![id])?;
     Ok(())
 }
 
@@ -233,4 +311,42 @@ pub fn archive_legacy(root: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn chats_are_saved_listed_and_removed_with_the_book() {
+        let dir = std::env::temp_dir().join(format!("aireader-chats-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Db::open(&dir.join("t.db")).unwrap();
+        let conn = db.conn();
+        let chat = |id: &str, updated: u64| ChatRecord {
+            id: id.into(),
+            title: format!("chat {id}"),
+            updated,
+            data: serde_json::json!({ "turns": [{ "role": "user", "text": id }] }),
+        };
+        save_chat(&conn, "b", &chat("old", 1)).unwrap();
+        save_chat(&conn, "b", &chat("new", 2)).unwrap();
+        save_chat(&conn, "other", &chat("x", 3)).unwrap();
+        let mut updated = chat("old", 5);
+        updated.title = "renamed".into();
+        save_chat(&conn, "b", &updated).unwrap();
+        let list = list_chats(&conn, "b").unwrap();
+        assert_eq!(
+            list.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(),
+            ["old", "new"]
+        );
+        assert_eq!(list[0], updated);
+        delete_chat(&conn, "new").unwrap();
+        assert_eq!(list_chats(&conn, "b").unwrap().len(), 1);
+        drop(conn);
+        delete_book_data(&db.conn(), "b").unwrap();
+        assert!(list_chats(&db.conn(), "b").unwrap().is_empty());
+        assert_eq!(list_chats(&db.conn(), "other").unwrap().len(), 1);
+    }
 }

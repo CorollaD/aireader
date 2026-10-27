@@ -27,6 +27,7 @@ pub fn load(path: &Path) -> Result<Document> {
         title: Document::file_stem(path),
         author: None,
         toc: Document::chapter_toc(&chapters),
+        cover: None,
         content: Content::Flow(chapters),
     })
 }

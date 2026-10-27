@@ -146,7 +146,27 @@ pub fn pricing(model: &ChatModel) -> Option<(f64, f64)> {
     model.spec()?.pricing.as_ref().map(|p| (p.input, p.output))
 }
 
-/// Streams a reply, calling `on_text` with each fragment; returns the whole text.
+/// Tokens a request used, and its price in USD when known (reported by the service, or from
+/// the model catalog's list price).
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize)]
+pub struct TokenUsage {
+    pub input: u64,
+    pub output: u64,
+    pub cost: Option<f64>,
+}
+
+impl From<&rig_core::completion::Usage> for TokenUsage {
+    fn from(u: &rig_core::completion::Usage) -> Self {
+        Self {
+            input: u.input_tokens.unwrap_or(0),
+            output: u.output_tokens.unwrap_or(0),
+            cost: u.cost.as_ref().map(|c| c.total),
+        }
+    }
+}
+
+/// Streams a reply, calling `on_text` with each fragment; returns the whole text and, when the
+/// service reported it, the usage.
 #[allow(
     clippy::result_large_err,
     reason = "rig's error type; callers convert it right away"
@@ -155,7 +175,7 @@ pub async fn stream_text(
     model: &ChatModel,
     request: CompletionRequest,
     mut on_text: impl FnMut(&str),
-) -> Result<String, ProviderError> {
+) -> Result<(String, Option<TokenUsage>), ProviderError> {
     let mut stream = model.stream(request)?;
     let mut text = String::new();
     while let Some(item) = stream.next().await {
@@ -164,7 +184,13 @@ pub async fn stream_text(
             text.push_str(&fragment);
         }
     }
-    Ok(text)
+    // The finished reply carries the usage; the text is complete either way.
+    let usage = stream
+        .finish()
+        .await
+        .ok()
+        .map(|r| TokenUsage::from(&r.usage));
+    Ok((text, usage))
 }
 
 /// One complete reply as text.
@@ -176,7 +202,33 @@ pub async fn complete_text(
     model: &ChatModel,
     request: CompletionRequest,
 ) -> Result<String, ProviderError> {
-    Ok(model.call(request).await?.text())
+    Ok(complete_reply(model, request).await?.0)
+}
+
+/// One complete reply as text, with the tokens it used.
+#[allow(
+    clippy::result_large_err,
+    reason = "rig's error type; callers convert it right away"
+)]
+pub async fn complete_reply(
+    model: &ChatModel,
+    request: CompletionRequest,
+) -> Result<(String, TokenUsage), ProviderError> {
+    let response = model.call(request).await?;
+    Ok((response.text(), TokenUsage::from(&response.usage)))
+}
+
+/// Whether a failed request may succeed when sent again: network trouble, rate limits and an
+/// overloaded or briefly failing service. Bad keys, unknown models and over-long input are not.
+pub fn is_transient(error: &ProviderError) -> bool {
+    let status = error
+        .provider_response()
+        .and_then(|r| r.status)
+        .map(|s| s.as_u16());
+    let body = error.provider_response_body().unwrap_or("").to_lowercase();
+    matches!(error, ProviderError::Http(_))
+        || matches!(status, Some(408 | 429 | 500 | 502 | 503 | 504 | 529))
+        || body.contains("overloaded")
 }
 
 /// A message for the user, without provider JSON noise.

@@ -145,6 +145,10 @@ impl PageSource for PdfSource {
             .map(|(_, dpi)| dpi)
     }
 
+    fn photographic(&self, index: usize) -> bool {
+        self.page_text(index).is_none() && self.image_dpi(index).is_some()
+    }
+
     fn render(&self, index: usize, width: u32) -> Result<PageImage> {
         let page = self.doc.pages().get(index as PdfPageIndex)?;
         let config = PdfRenderConfig::new()
@@ -201,6 +205,7 @@ pub fn load(path: &Path) -> Result<Document> {
         title,
         author,
         toc,
+        cover: None,
         content: Content::Paged(Arc::new(source)),
     })
 }

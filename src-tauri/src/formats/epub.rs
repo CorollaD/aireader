@@ -7,7 +7,7 @@ use anyhow::{Result, anyhow};
 use epub::doc::{EpubDoc, NavPoint};
 
 use super::builder::first_heading;
-use super::{html, parent_dir, resolve_path};
+use super::{html, parent_dir, percent_decode, resolve_path};
 use crate::model::{Block, Chapter, Content, Document, ImageRef, Location, TocEntry};
 
 fn path_str(p: &Path) -> String {
@@ -34,6 +34,8 @@ pub fn load(path: &Path) -> Result<Document> {
     let mut chapters: Vec<Chapter> = Vec::new();
     // Archive path → (chapter index, anchors).
     let mut files: HashMap<String, (usize, HashMap<String, usize>)> = HashMap::new();
+    // Archive path of each chapter.
+    let mut chapter_files: Vec<String> = Vec::new();
 
     for (file, mime) in &spine {
         let mut load_image = |doc: &mut EpubDoc<_>, p: String| -> Option<ImageRef> {
@@ -66,7 +68,22 @@ pub fn load(path: &Path) -> Result<Document> {
         };
         let title = first_heading(&blocks).unwrap_or_default();
         files.insert(file.clone(), (chapters.len(), anchors));
+        chapter_files.push(file.clone());
         chapters.push(Chapter { title, blocks });
+    }
+
+    // Links between the book's files (notes, cross-references) lead to a chapter and block.
+    for (chapter, file) in chapters.iter_mut().zip(&chapter_files) {
+        for span in chapter
+            .blocks
+            .iter_mut()
+            .filter_map(Block::spans_mut)
+            .flatten()
+        {
+            if let Some(href) = span.href.take() {
+                span.target = link_target(&href, file, &files);
+            }
+        }
     }
 
     let mut toc = Vec::new();
@@ -89,11 +106,13 @@ pub fn load(path: &Path) -> Result<Document> {
     if chapters.is_empty() {
         return Err(anyhow!(crate::t!("no_content", format = "EPUB")));
     }
+    let cover = doc.get_cover().map(|(bytes, _)| bytes);
     Ok(Document {
         path: path.to_owned(),
         title,
         author,
         toc,
+        cover,
         content: Content::Flow(chapters),
     })
 }
@@ -124,6 +143,34 @@ fn collect_toc(
 }
 
 /// Removes chapters without blocks and remaps TOC targets to the next kept chapter.
+/// The chapter and block an `href` in `file` points to; `None` for links outside the book.
+fn link_target(
+    href: &str,
+    file: &str,
+    files: &HashMap<String, (usize, HashMap<String, usize>)>,
+) -> Option<Location> {
+    if href.contains(':') {
+        return None; // http:, mailto: and the like
+    }
+    let (path, fragment) = match href.split_once('#') {
+        Some((p, f)) => (p, Some(f)),
+        None => (href, None),
+    };
+    let path = if path.is_empty() {
+        file.to_owned()
+    } else {
+        resolve_path(parent_dir(file), path)
+    };
+    let (chapter, anchors) = files.get(&path)?;
+    let block = fragment
+        .and_then(|f| anchors.get(&percent_decode(f)).copied())
+        .unwrap_or(0);
+    Some(Location::Flow {
+        chapter: *chapter,
+        block,
+    })
+}
+
 fn drop_empty(chapters: Vec<Chapter>, toc: Vec<TocEntry>) -> (Vec<Chapter>, Vec<TocEntry>) {
     // Old index → (new index, whether the chapter itself was kept).
     let mut map = Vec::with_capacity(chapters.len());
@@ -135,18 +182,30 @@ fn drop_empty(chapters: Vec<Chapter>, toc: Vec<TocEntry>) -> (Vec<Chapter>, Vec<
         }
     }
     let last = kept.len().saturating_sub(1);
+    let remap = |loc: Location| match loc {
+        Location::Flow { chapter, block } => {
+            let (new, was_kept) = map[chapter];
+            Location::Flow {
+                chapter: new.min(last),
+                block: if was_kept { block } else { 0 },
+            }
+        }
+        page => page,
+    };
     let toc = toc
         .into_iter()
         .map(|mut e| {
-            if let Location::Flow { chapter, block } = e.location {
-                let (new, was_kept) = map[chapter];
-                e.location = Location::Flow {
-                    chapter: new.min(last),
-                    block: if was_kept { block } else { 0 },
-                };
-            }
+            e.location = remap(e.location);
             e
         })
         .collect();
+    for span in kept
+        .iter_mut()
+        .flat_map(|c| &mut c.blocks)
+        .filter_map(Block::spans_mut)
+        .flatten()
+    {
+        span.target = span.target.map(remap);
+    }
     (kept, toc)
 }

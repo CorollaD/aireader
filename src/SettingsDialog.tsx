@@ -1,7 +1,8 @@
 // The Settings dialog (⌘/Ctrl+,): interface language and size, reading appearance, AI service,
 // and the shortcut list.
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, useState } from "react";
+import { api, errorText } from "./api";
 import type { UpdateSettings } from "./App";
 import AiSettingsForm from "./ai/AiSettingsForm";
 import { useAi } from "./ai/AiContext";
@@ -72,6 +73,7 @@ export default function SettingsDialog(props: {
                 </div>
                 <p className="muted small hint">{t("settings.uiScaleHint")}</p>
               </div>
+              <Backup />
             </>
           )}
           {tab === "reading" && <ReadingSettings settings={settings} update={update} text paged />}
@@ -94,5 +96,38 @@ export default function SettingsDialog(props: {
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** Backing up the library (database and covers, optionally the book files) to a zip. */
+function Backup() {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const run = async (books: boolean) => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const path = await api.backupLibrary(books);
+      if (path) setMessage({ ok: true, text: t("settings.backupDone", { path }) });
+    } catch (e) {
+      setMessage({ ok: false, text: errorText(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="panel-section">
+      <div className="panel-label">{t("settings.backup")}</div>
+      <div className="inline-add">
+        <button disabled={busy} onClick={() => run(false)}>
+          {t("settings.backupData")}
+        </button>
+        <button disabled={busy} onClick={() => run(true)}>
+          {t("settings.backupAll")}
+        </button>
+      </div>
+      <p className="muted small hint">{busy ? t("settings.backingUp") : t("settings.backupHint")}</p>
+      {message && <p className={message.ok ? "ok-text small" : "error small"}>{message.text}</p>}
+    </div>
   );
 }
