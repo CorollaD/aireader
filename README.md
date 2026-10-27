@@ -2,18 +2,18 @@
 
 跨平台桌面阅读器。界面用 [Tauri 2](https://tauri.app) + React，文档解析与渲染用 Rust。
 
-**下载**：在 [Releases](https://github.com/CorollaD/aireader/releases) 页面下载 macOS（Apple 芯片 / Intel）、Windows 和 Linux 的安装包，`SHA256SUMS.txt` 可用来校验文件。首次打开的方法见 Release 说明，签名情况见下文「代码签名」。
+**下载**：在 [Releases](https://github.com/CorollaD/aireader/releases)（最新版本 [v0.5.0](https://github.com/CorollaD/aireader/releases/tag/v0.5.0)）页面下载 macOS（Apple 芯片 / Intel）、Windows 和 Linux 的安装包，`SHA256SUMS.txt` 可用来校验文件。首次打开的方法见 Release 说明，签名情况见下文「代码签名」。
 
 | 格式 | 支持情况 |
 | --- | --- |
-| EPUB 2/3 | 按 spine 顺序读取章节；NCX/nav 目录（含锚点跳转）；内嵌图片与封面 |
-| PDF | 使用 PDFium 渲染；书签目录；连续滚动 / 单页两种模式；可缩放 |
+| EPUB 2/3 | 按 spine 顺序读取章节；NCX/nav 目录（含锚点跳转）；书内链接与脚注可点击跳转；内嵌图片与封面 |
+| PDF | 使用 PDFium 渲染；书签目录；连续 / 单页 / 双页；可缩放、旋转；可选中文字、全文搜索（文字层） |
 | TXT | 自动识别编码（UTF-8/UTF-16/GBK/Big5 等）；自动识别「第X章」「Chapter N」等章节标题 |
 | Markdown | 标题、列表、引用、代码块、表格、本地图片 |
 | MOBI / AZW / AZW3 | MOBI6 与 KF8 尽量支持；**不支持 DRM 加密的书** |
 | FB2 / FB2.ZIP | 章节嵌套、诗歌、题记、内嵌图片、windows-1251 编码 |
 | DOCX | 标题样式或字号推断标题、粗体/斜体、列表、表格（按行显示）、图片 |
-| CBZ | 漫画压缩包，图片按文件名自然排序 |
+| CBZ | 漫画压缩包，图片按文件名自然排序；双页显示、从右往左翻页 |
 
 ## 功能
 
@@ -35,10 +35,10 @@
 - 专注模式（F）、全屏、快捷键帮助（?）
 - 阅读时长统计、本章与全书剩余时间估算（按你的实际阅读速度）
 - PDF 与漫画：连续 / 单页 / 双页（封面单独、横向跨页单独显示），适应宽度 / 整页 / 高度，页面旋转；漫画可设为从右往左翻页
-- 全文搜索也支持 PDF（按页搜索文字层）；EPUB 中的脚注、交叉引用链接可以点击跳转
+- EPUB 中的脚注、交叉引用链接可以点击跳转
 - 12 种预设背景色（纯白、米白、羊皮纸、护眼绿、薄荷、天青、樱粉、浅灰、深灰、夜间、深蓝、墨黑），也可以用取色器自定义；文字颜色可以自动匹配，也可以自定义；整个界面跟随背景色变化
 - 字体（黑体/宋体/楷体，也可以导入自己的 TTF/OTF/WOFF 字体）、字号、行距、版心宽度可调
-- 目录侧栏、全文搜索（结果高亮）、自动保存阅读位置
+- 目录侧栏、全文搜索（结果高亮）、自动保存阅读位置（关闭窗口或退出前也会保存）
 
 **AI（基于 [rig](https://github.com/0xPlaygrounds/rig)）**
 - 支持 Claude、OpenAI、DeepSeek、Kimi、智谱、Gemini、OpenRouter，本地的 Ollama、llama.cpp，以及任意 OpenAI 兼容服务（通义、硅基流动、LM Studio 等）
@@ -55,10 +55,11 @@
 - 界面语言：简体中文、繁體中文、English、Español、Italiano、Français、Deutsch、日本語、한국어、Português；默认跟随系统，可以随时切换
 - 界面大小：小 / 标准 / 大 / 特大（书架中也可以用 ⌘/Ctrl +、-、0 调整）；正文字号单独设置，不受影响
 - 设置窗口（⌘/Ctrl+,）：通用、阅读、AI、快捷键
+- 记住窗口大小和位置；支持键盘操作（书架卡片、进度条、对话框）
 
 ## 开发
 
-需要 Rust（1.85 及以上）和 Node.js。
+需要 Rust（1.97.1 及以上，rig 0.45 的要求）和 Node.js（20 及以上）。
 
 ```bash
 npm install
@@ -81,7 +82,7 @@ npm run tauri build                   # 打包安装程序
 
 每次推送和 Pull Request 都会运行 `.github/workflows/check.yml`：前端 lint、测试和构建，`cargo fmt`、`clippy`（警告视为错误）和 `cargo test`。
 
-推送 `v*` 标签（版本号与 `tauri.conf.json` 一致，例如 `v0.2.0`）会触发 `.github/workflows/release.yml`：在 GitHub Actions 上分别构建 macOS（Apple 芯片、Intel）、Linux 和 Windows 安装包，全部成功后发布为 GitHub Release；也可以在 Actions 页面手动运行。
+推送 `v*` 标签（版本号与 `package.json`、`Cargo.toml`、`tauri.conf.json` 一致，例如 `v0.5.0`）会触发 `.github/workflows/release.yml`：在 GitHub Actions 上分别构建 macOS（Apple 芯片、Intel）、Linux 和 Windows 安装包，全部成功后发布为 GitHub Release，并附上 `SHA256SUMS.txt`；也可以在 Actions 页面手动运行。Release 的说明取自 `.github/release-notes.md`，发版前更新其中的「更新内容」一节。
 
 ### 数据位置
 
@@ -113,25 +114,31 @@ cargo run --example inspect -- book.epub a.pdf  # 打印解析结果：目录、
 
 ```
 src/                      React 前端
-  shelf/                  书架：网格/列表、分组侧栏、编辑对话框
-  reader/                 阅读：文字类视图（滚动/分页、高亮）、PDF 视图、侧栏、进度条、设置面板
-  ai/                     AI 设置、AI 面板、书架整理对话框
-  i18n/                   界面翻译：zh-CN.ts 定义全部文案的键，其他语言必须逐一提供（TypeScript 检查）
+  shelf/                  书架：网格/列表、分组侧栏、编辑对话框、查找重复
+  reader/                 阅读：文字类视图（滚动/分页、高亮）、PDF/漫画视图（连续/单页/双页）、侧栏、进度条、设置面板
+  ai/                     AI 设置、AI 面板（对话/总结/思维导图）、书架整理对话框
+  i18n/                   界面翻译：zh-CN.ts 定义全部文案的键，其他语言必须逐一提供（TypeScript 检查 + 测试）
+  dev/mock.ts             浏览器调试用的模拟后端
   SettingsDialog.tsx      设置窗口；icons.tsx 图标；zoom.ts 界面缩放
   settings.ts             阅读设置与配色方案（背景色预设、根据背景自动计算文字颜色）
+  lifecycle.ts            退出前需要保存的内容；ErrorBoundary.tsx 界面出错时的兜底
   api.ts / types.ts       调用 Tauri 命令的封装，以及与 Rust 对应的数据类型
+  **/*.test.ts            前端单元测试（vitest）
 src-tauri/                Rust 后端
   src/formats/            各格式解析器（html.rs 由 EPUB 与 MOBI 共用）
   src/model.rs            与格式无关的文档模型：可重排章节，或按页渲染的文档
-  src/library.rs          书库：导入、去重、封面、分组、进度（不依赖 Tauri，便于测试）
+  src/db.rs               SQLite 书库数据库：表结构、旧版 JSON 数据导入、对话记录
+  src/library.rs          书库：导入、去重、封面、分组、进度、字体、备份（不依赖 Tauri，便于测试）
   src/annotations.rs      书签与高亮笔记的存储、导出 Markdown
-  src/ai/                 AI：rig 连接与错误处理、设置与钥匙串、总结/划词/整理任务
+  src/dedupe.rs           查找重复：内容相似度、版本质量评分、笔记迁移
+  src/search.rs           书内全文搜索（文字书按段落，PDF 按页）
+  src/ai/                 AI：rig 连接与错误处理、设置与钥匙串、检索与语义索引、总结/问答/导图/整理任务
   src/i18n.rs             后端文案（错误信息、生成的章节名、导出笔记）的多语言目录
-  src/commands.rs         提供给前端调用的命令
-  src/protocol.rs         book:// 协议，用于加载封面、书中图片和 PDF/CBZ 页面
+  src/commands.rs         提供给前端调用的命令，以及退出、单实例打开文件的处理
+  src/protocol.rs         book:// 协议：封面、书中图片、PDF/CBZ 页面（带缓存）、自定义字体
 ```
 
-键盘快捷键：← / → 上一章或上一页、下一章或下一页；空格 / PgDn 翻一屏（读到章节末尾时进入下一章）；Home / End 跳到开头或末尾；Ctrl/⌘ +/- 调整字号（PDF 为缩放）；Ctrl/⌘ F 搜索；T 显示或隐藏目录；F 专注模式；? 快捷键帮助；⌘/Ctrl+, 设置；Esc 关闭面板，或返回书架。
+键盘快捷键：← / → 上一章或上一页、下一章或下一页（漫画设为从右往左时方向相反）；空格 / PgDn 翻一屏（读到章节末尾时进入下一章）；Home / End 跳到开头或末尾；Ctrl/⌘ +/- 调整字号（PDF 为缩放）；Ctrl/⌘ F 搜索（含 PDF）；Ctrl/⌘ D 书签；Ctrl/⌘ Shift A 打开或关闭 AI 面板；Alt+← / → 后退、前进；T 显示或隐藏目录；F 专注模式；? 快捷键帮助；⌘/Ctrl+, 设置；Esc 关闭面板，或返回书架。
 
 ## 代码签名 / Code signing policy
 
