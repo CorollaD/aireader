@@ -1,3 +1,15 @@
+## What's new in 0.5.0 / 更新内容
+
+- **Library in SQLite** / 书库改用 SQLite：books, notes and AI caches are kept in `aireader.db`; optional semantic search with an embedding model. / 书籍、笔记和 AI 缓存存进 `aireader.db`；可选语义检索。
+- **Safer saving** / 更安全的保存：progress is saved when you close or quit; opening a book while AiReader runs uses the open window. / 关闭或退出前先保存进度；程序运行时再打开书会在当前窗口打开。
+- **PDF & comics** / PDF 与漫画：two-page view, fit height, right-to-left comics, search in PDFs, faster page loading. / 双页、适应高度、漫画从右往左、PDF 全文搜索、翻页更快。
+- **Reading** / 阅读：clickable EPUB footnotes and links, your own fonts (TTF/OTF/WOFF). / EPUB 脚注和链接可点击跳转，可导入自己的字体。
+- **AI**：conversations saved per book, switch models in the panel, token usage and cost per answer, automatic retries. / 对话按书保存、面板内切换模型、显示用量和费用、出错自动重试。
+- **Backup** / 备份：Settings → General → Back up library. / 设置 → 通用 → 备份书库。
+- Open EPUB, MOBI/AZW3, FB2 and CBZ files with AiReader from your file manager. / 可在文件管理器中用 AiReader 打开电子书文件。
+
+**Upgrading** / 升级说明：on first launch your library is moved into the database and the old JSON files go to `library/backup-json/`. To go back to 0.4, move them back into `library/` and delete `aireader.db`. / 第一次打开时会把书库导入数据库，旧的 JSON 文件移到 `library/backup-json/`。如需退回 0.4，把它们移回 `library/` 并删除 `aireader.db`。
+
 ## Downloads / 下载
 
 | System / 系统 | File / 文件 |

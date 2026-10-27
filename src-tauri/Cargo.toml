@@ -1,6 +1,6 @@
 [package]
 name = "aireader"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 description = "A desktop reader for EPUB, PDF, TXT, Markdown, MOBI/AZW3, FB2, DOCX and CBZ"
 
