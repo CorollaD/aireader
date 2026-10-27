@@ -223,7 +223,8 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, rtl
   }, [layout, tops, size.w]);
 
   const [lastVisible, setLastVisible] = useState(page);
-  const shownLast = layout === "single" ? page : layout === "spread" ? (groups[groupOf[page] ?? 0]?.at(-1) ?? page) : lastVisible;
+  const current = groups[groupOf[page] ?? 0];
+  const shownLast = layout === "single" ? page : layout === "spread" ? (current?.[current.length - 1] ?? page) : lastVisible;
   useEffect(() => onLocation({ kind: "page", page }, shownLast), [page, shownLast, onLocation]);
 
   const onScroll = () => {
