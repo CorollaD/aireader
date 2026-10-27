@@ -13,6 +13,10 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-22.04
+    env:
+      # Faster CI builds: no debug info. Dependencies are also built unoptimised (Cargo.toml
+      # optimises them for local development), with the --config flags below.
+      CARGO_PROFILE_DEV_DEBUG: 0
     steps:
       - uses: actions/checkout@v4
 
@@ -56,8 +60,8 @@ jobs:
 
       - name: Clippy
         working-directory: src-tauri
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets --config 'profile.dev.package."*".opt-level=0' -- -D warnings
 
       - name: Rust tests
         working-directory: src-tauri
-        run: cargo test
+        run: cargo test --config 'profile.dev.package."*".opt-level=0'
