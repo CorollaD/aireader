@@ -3,7 +3,6 @@
 //! with rig's mock models.
 
 use std::collections::{BTreeMap, HashMap};
-use std::path::PathBuf;
 
 use anyhow::{Result, anyhow, bail};
 use rig_core::completion::{CompletionRequest, Message};
@@ -72,6 +71,9 @@ pub enum AiTask {
         #[serde(default)]
         refresh: bool,
     },
+    /// Builds the book's semantic index with the configured embedding model.
+    #[serde(rename_all = "camelCase")]
+    BuildIndex { book_id: String },
     #[serde(rename_all = "camelCase")]
     Ask {
         book_id: String,
@@ -305,18 +307,35 @@ pub fn split_by_budget(text: &str, budget: usize) -> Vec<String> {
 
 /// Summaries per model and unit, in `ai/<book>/summaries.json`.
 pub struct SummaryCache {
-    file: PathBuf,
+    db: crate::db::Db,
+    book_id: String,
     data: BTreeMap<String, BTreeMap<String, String>>,
 }
 
 impl SummaryCache {
-    pub fn open(dir: PathBuf) -> Self {
-        let file = dir.join("summaries.json");
-        let data = std::fs::read(&file)
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default();
-        Self { file, data }
+    /// The cached summaries (and mind maps) of one book, by model and unit.
+    pub fn open(db: &crate::db::Db, book_id: &str) -> Self {
+        let mut data: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
+        if let Ok(mut stmt) = db
+            .conn()
+            .prepare("SELECT model, unit, text FROM ai_cache WHERE book_id = ?1")
+        {
+            let rows = stmt.query_map([book_id], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                ))
+            });
+            for (model, unit, text) in rows.into_iter().flatten().flatten() {
+                data.entry(model).or_default().insert(unit, text);
+            }
+        }
+        Self {
+            db: db.clone(),
+            book_id: book_id.to_owned(),
+            data,
+        }
     }
 
     pub fn get(&self, model: &str, unit: &str) -> Option<&String> {
@@ -324,16 +343,14 @@ impl SummaryCache {
     }
 
     pub fn put(&mut self, model: &str, unit: &str, summary: String) -> Result<()> {
+        self.db.conn().execute(
+            "INSERT OR REPLACE INTO ai_cache (book_id, model, unit, text) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![self.book_id, model, unit, summary],
+        )?;
         self.data
             .entry(model.into())
             .or_default()
             .insert(unit.into(), summary);
-        if let Some(dir) = self.file.parent() {
-            std::fs::create_dir_all(dir)?;
-        }
-        let tmp = self.file.with_extension("json.tmp");
-        std::fs::write(&tmp, serde_json::to_vec_pretty(&self.data)?)?;
-        std::fs::rename(tmp, &self.file)?;
         Ok(())
     }
 }
@@ -754,10 +771,29 @@ const EXCERPT_CHARS: usize = 90;
 
 /// Picks passages for a question: the ones around the reader's position, then the best keyword
 /// matches, within `budget` tokens. Returned in reading order.
+/// Merges ranked lists of passage indices (reciprocal rank fusion): passages ranked high in
+/// either list, or fairly high in both, come first.
+pub fn fuse(lists: &[&[usize]]) -> Vec<usize> {
+    const K: f64 = 60.0;
+    let mut scores: HashMap<usize, f64> = HashMap::new();
+    for list in lists {
+        for (rank, &i) in list.iter().enumerate() {
+            *scores.entry(i).or_default() += 1.0 / (K + rank as f64 + 1.0);
+        }
+    }
+    let mut ranked: Vec<(usize, f64)> = scores.into_iter().collect();
+    ranked.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+    ranked.into_iter().map(|(i, _)| i).collect()
+}
+
+/// Picks passages for a question: the ones around the reader's position, then the best
+/// matches — keyword search fused with `semantic` (passages ranked by meaning, if the book has
+/// a semantic index) — within `budget` tokens. Returned in reading order.
 pub fn select_passages(
     index: &BookIndex,
     location: Option<Location>,
     query: &str,
+    semantic: &[usize],
     budget: usize,
 ) -> Vec<usize> {
     let mut chosen: Vec<usize> = Vec::new();
@@ -790,7 +826,13 @@ pub fn select_passages(
             }
         }
     }
-    for i in index.search(query, MAX_SOURCES * 2) {
+    let keyword = index.search(query, MAX_SOURCES * 2);
+    let semantic: Vec<usize> = semantic
+        .iter()
+        .copied()
+        .filter(|&i| i < index.passages.len())
+        .collect();
+    for i in fuse(&[&keyword, &semantic]) {
         if !take(i, budget, &mut chosen) {
             break;
         }
@@ -805,6 +847,7 @@ pub async fn ask(
     index: &BookIndex,
     location: Option<Location>,
     history: &[ChatTurn],
+    semantic: &[usize],
 ) -> Result<String> {
     let Some(last) = history.iter().rev().find(|t| t.role != "assistant") else {
         bail!(crate::t!("ai_no_question"))
@@ -818,7 +861,7 @@ pub async fn ask(
         .map(|t| t.text.as_str())
         .collect::<Vec<_>>()
         .join(" ");
-    let picked = select_passages(index, location, &query, r.budget);
+    let picked = select_passages(index, location, &query, semantic, r.budget);
     let sources: Vec<Source> = picked
         .iter()
         .enumerate()
@@ -1092,7 +1135,9 @@ mod tests {
         };
         let dir = std::env::temp_dir().join(format!("aireader-ai-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        let mut cache = SummaryCache::open(dir.clone());
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = crate::db::Db::open(&dir.join("t.db")).unwrap();
+        let mut cache = SummaryCache::open(&db, "b");
         let unit = Unit {
             key: "ch:0".into(),
             title: "第一章".into(),
@@ -1107,8 +1152,8 @@ mod tests {
                 AiEvent::Delta { text: "要".into() }
             ]
         );
-        // Second time comes from disk without a request.
-        let mut cache = SummaryCache::open(dir);
+        // Second time comes from the database without a request.
+        let mut cache = SummaryCache::open(&db, "b");
         let (s, cached) = summarize_cached(&r, &mut cache, "书", &unit).await.unwrap();
         assert_eq!((s.as_str(), cached), ("概要", true));
     }
@@ -1214,13 +1259,27 @@ mod tests {
                 block: 0,
             }),
             "桃园",
+            &[],
             10_000,
         );
         assert_eq!(picked[0], 0);
         assert!(picked.contains(&3) && picked.contains(&2));
         assert!(picked.windows(2).all(|w| w[0] < w[1]));
         // A tiny budget still returns the best match and nothing over budget.
-        assert_eq!(select_passages(&index, None, "曹操", 20), [1]);
+        assert_eq!(select_passages(&index, None, "曹操", &[], 20), [1]);
+        // Semantic matches join keyword ones: "the battle by the river" shares no keyword with
+        // passage 3 (赤壁之战), but the semantic ranking found it.
+        assert_eq!(
+            select_passages(&index, None, "江上的那场大战", &[3], 10_000),
+            [3]
+        );
+        assert_eq!(select_passages(&index, None, "曹操", &[3], 10_000), [1, 3]);
+    }
+
+    #[test]
+    fn fusion_favours_passages_both_lists_agree_on() {
+        assert_eq!(fuse(&[&[1, 2, 3], &[3, 2, 9]]), [3, 2, 1, 9]);
+        assert_eq!(fuse(&[&[5], &[]]), [5]);
     }
 
     #[tokio::test]
@@ -1238,7 +1297,9 @@ mod tests {
             role: "user".into(),
             text: "谁在桃园结义？".into(),
         }];
-        let s = ask(&r, "三国演义", &index(), None, &history).await.unwrap();
+        let s = ask(&r, "三国演义", &index(), None, &history, &[])
+            .await
+            .unwrap();
         assert_eq!(s, "见 [1]");
         let events = events.lock().unwrap().clone();
         let AiEvent::Sources { sources } = &events[0] else {
@@ -1251,7 +1312,7 @@ mod tests {
             .unwrap()
             .to_owned();
         assert!(system.contains("[1] (第一回)\n刘备在桃园"));
-        assert!(ask(&r, "书", &index(), None, &[]).await.is_err());
+        assert!(ask(&r, "书", &index(), None, &[], &[]).await.is_err());
     }
 
     #[test]
@@ -1279,7 +1340,7 @@ mod tests {
             emit: &|_| {},
         };
         let doc = Document {
-            path: PathBuf::new(),
+            path: std::path::PathBuf::new(),
             title: "三国".into(),
             author: None,
             toc: Vec::new(),
@@ -1290,7 +1351,9 @@ mod tests {
         };
         let dir = std::env::temp_dir().join(format!("aireader-mm-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        let mut cache = SummaryCache::open(dir.clone());
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = crate::db::Db::open(&dir.join("t.db")).unwrap();
+        let mut cache = SummaryCache::open(&db, "b");
         let scope = || MindMapScope::Chapter { chapter: 0 };
         let first = mind_map(&r, &mut cache, &doc, "三国", scope(), false)
             .await

@@ -6,7 +6,6 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::hash::{Hash, Hasher};
-use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -243,24 +242,28 @@ pub fn profile(doc: &Document) -> Profile {
     p
 }
 
-/// Profiles of already analysed files (`profiles.json` in the library), by content hash.
+/// Profiles of already analysed files (the `profiles` table), by content hash.
 pub struct ProfileCache {
-    file: PathBuf,
+    db: crate::db::Db,
     profiles: HashMap<String, Profile>,
-    changed: bool,
+    changed: Vec<String>,
 }
 
 impl ProfileCache {
-    pub fn open(library_root: &Path) -> Self {
-        let file = library_root.join("profiles.json");
-        let profiles = std::fs::read(&file)
-            .ok()
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-            .unwrap_or_default();
+    pub fn open(db: &crate::db::Db) -> Self {
+        let mut profiles = HashMap::new();
+        if let Ok(mut stmt) = db.conn().prepare("SELECT sha256, data FROM profiles") {
+            let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)));
+            for (sha, data) in rows.into_iter().flatten().flatten() {
+                if let Ok(p) = serde_json::from_str(&data) {
+                    profiles.insert(sha, p);
+                }
+            }
+        }
         Self {
-            file,
+            db: db.clone(),
             profiles,
-            changed: false,
+            changed: Vec::new(),
         }
     }
 
@@ -272,19 +275,32 @@ impl ProfileCache {
 
     pub fn put(&mut self, sha256: &str, profile: Profile) {
         self.profiles.insert(sha256.to_owned(), profile);
-        self.changed = true;
+        self.changed.push(sha256.to_owned());
     }
 
-    /// Drops profiles of files no longer in the library, then writes the cache if it changed.
+    /// Writes new profiles and drops those of files no longer in the library.
     pub fn save(&mut self, keep: &[String]) -> anyhow::Result<()> {
-        let before = self.profiles.len();
-        self.profiles.retain(|sha, _| keep.contains(sha));
-        if !self.changed && before == self.profiles.len() {
-            return Ok(());
+        let mut conn = self.db.conn();
+        let tx = conn.transaction()?;
+        for sha in self.changed.drain(..) {
+            if let Some(p) = self.profiles.get(&sha) {
+                tx.execute(
+                    "INSERT OR REPLACE INTO profiles (sha256, data) VALUES (?1, ?2)",
+                    rusqlite::params![sha, serde_json::to_string(p)?],
+                )?;
+            }
         }
-        let tmp = self.file.with_extension("json.tmp");
-        std::fs::write(&tmp, serde_json::to_vec(&self.profiles)?)?;
-        std::fs::rename(tmp, &self.file)?;
+        let stale: Vec<String> = self
+            .profiles
+            .keys()
+            .filter(|sha| !keep.contains(sha))
+            .cloned()
+            .collect();
+        for sha in stale {
+            tx.execute("DELETE FROM profiles WHERE sha256 = ?1", [&sha])?;
+            self.profiles.remove(&sha);
+        }
+        tx.commit()?;
         Ok(())
     }
 }

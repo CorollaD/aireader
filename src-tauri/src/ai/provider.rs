@@ -15,6 +15,48 @@ use super::config::{AiConfig, CUSTOM};
 
 pub type ChatModel = DynModel<Completion>;
 
+/// Builds the configured embedding model (for semantic search).
+pub fn connect_embedding(
+    cfg: &super::config::EmbeddingConfig,
+    key: Option<String>,
+) -> Result<rig_core::DynModel<rig_core::operation::Embedding>> {
+    if !cfg.is_configured() {
+        bail!(crate::t!("ai_embedding_not_configured"));
+    }
+    let key = key.map(|k| k.trim().to_owned()).filter(|k| !k.is_empty());
+    match cfg.provider.as_str() {
+        "ollama" => {
+            use rig_core::providers::ollama::OllamaConfig;
+            let mut config = OllamaConfig::new();
+            if let Some(url) = &cfg.base_url {
+                config = config.with_base_url(url);
+            }
+            let client = if cfg.is_local() {
+                config.connect(direct_http())
+            } else {
+                config.client()
+            };
+            Ok(client.embedding(cfg.model.clone(), None).erase())
+        }
+        _ => {
+            use rig_core::providers::openai::OpenAIConfig;
+            if cfg.provider == "openai" && key.is_none() {
+                bail!(crate::t!("ai_missing_key"));
+            }
+            let mut config = OpenAIConfig::new(key.unwrap_or_else(|| "not-needed".into()));
+            if let Some(url) = &cfg.base_url {
+                config = config.with_base_url(url.clone());
+            }
+            let client = if cfg.is_local() {
+                config.connect(direct_http())
+            } else {
+                config.client()
+            };
+            Ok(client.embedding(cfg.model.clone(), None).erase())
+        }
+    }
+}
+
 /// Builds the configured chat model. Nothing is sent until a request is made.
 pub fn connect(cfg: &AiConfig, key: Option<String>) -> Result<ChatModel> {
     if !cfg.is_configured() {

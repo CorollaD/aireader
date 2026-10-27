@@ -325,8 +325,6 @@ const ja: Messages = {
   "ai.suggestPage": "このページの内容は？",
   "ai.suggestTerms": "ここの重要な概念を挙げて",
   "ai.retry": "再試行",
-  "ai.basis": "根拠：本全体を検索",
-  "ai.basisAt": "根拠：本全体を検索 · 現在「{place}」",
   "ai.askBookPlaceholder": "この本について質問…",
   "ai.askSelectionPlaceholder": "この箇所について質問…",
   "ai.enterHint": "Enter で送信 · Shift+Enter で改行",
@@ -392,6 +390,19 @@ const ja: Messages = {
   "reader.collapseAi": "AI パネルを隠す",
   "reader.resizeHint": "ドラッグで幅を変更、ダブルクリックで元に戻す",
   "sc.aiPanel": "AI パネルの表示 / 非表示",
+
+  "ai.embedTitle": "意味検索（ベクトルモデル）",
+  "ai.embedHint": "質問の意味から関連する箇所を探せるようにします（言い回しが違っても見つかります）。意味検索のインデックスを作った本でのみ使います。DeepSeek と Claude にはベクトル API がないため、このパソコンの Ollama か OpenAI 互換サービスを使ってください。",
+  "ai.embedNone": "使わない",
+  "ai.basisKeyword": "キーワード検索",
+  "ai.basisHybrid": "キーワード + 意味検索",
+  "ai.basedOn": "根拠：{how}",
+  "ai.basedOnAt": "根拠：{how} · 現在「{place}」",
+  "ai.buildIndex": "意味検索のインデックスを作成",
+  "ai.rebuildIndex": "モデルが変わりました：インデックスを作り直す",
+  "ai.buildIndexTitle": "ベクトルモデルでこの本のインデックスを作り、質問の意味から箇所を探せるようにします",
+  "ai.indexing": "インデックス作成 {done}/{total}",
+  "ai.indexBuilt": "意味検索のインデックスを作成しました：{n} 箇所",
 };
 
 export default ja;

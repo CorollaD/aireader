@@ -54,12 +54,14 @@ export function installMock() {
     groups: ["小说", "技术"],
     settings: {} as unknown,
     annotations: new Map<string, Annotations>(),
-    ai: { provider: "", model: "", baseUrl: null, language: "auto", consented: false } as AiConfig,
+    ai: { provider: "", model: "", baseUrl: null, language: "auto", consented: false, embedding: { provider: "", model: "", baseUrl: null } } as AiConfig,
     aiKey: false,
+    indexed: new Set<string>(),
   };
   const aiStatus = () => ({
     config: db.ai,
     hasKey: db.aiKey,
+    hasEmbeddingKey: false,
     local: db.ai.provider === "ollama",
     configured: !!db.ai.provider && !!db.ai.model,
   });
@@ -110,6 +112,8 @@ export function installMock() {
           }
           return b;
         }
+        case "ai_semantic_status":
+          return { available: !!db.ai.embedding?.provider, local: db.ai.embedding?.provider === "ollama", passages: db.indexed.has(a.bookId as string) ? 120 : 0, stale: false };
         case "find_duplicates":
           return [];
         case "merge_duplicates":
@@ -206,6 +210,22 @@ export function installMock() {
           return null;
         case "ai_run": {
           const task = a.task as AiTask;
+          if (task.kind === "buildIndex") {
+            let index = 0;
+            const send = (message: AiEvent) =>
+              (window as unknown as { __TAURI_INTERNALS__: { runCallback: (id: number, d: unknown) => void } }).__TAURI_INTERNALS__.runCallback(
+                (a.onEvent as { id: number }).id,
+                { index: index++, message },
+              );
+            [0, 32, 64, 96, 120].forEach((done, i) =>
+              setTimeout(() => send({ type: "progress", done, total: 120, label: "" }), 200 * (i + 1)),
+            );
+            setTimeout(() => {
+              db.indexed.add(task.bookId);
+              send({ type: "done", text: "120", cached: false });
+            }, 1300);
+            return null;
+          }
           if (task.kind === "mindMap") {
             const outline =
               "- 第一回 宴桃园豪杰三结义\n  - 背景\n    - 天下大势 分久必合 合久必分\n    - 黄巾起义\n  - 人物\n    - 刘备：汉室宗亲\n    - 关羽：红脸长髯\n    - 张飞：豹头环眼\n  - 事件\n    - 桃园结义\n    - 招募乡勇\n    - 破黄巾初立战功\n  - 主旨\n    - 忠义\n    - 乱世英雄";

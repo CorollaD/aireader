@@ -26,15 +26,19 @@ regex = "1.13.1"
 reqwest = { version = "0.13", default-features = false }
 rig-core = { version = "0.45", features = ["reqwest"] }
 rig-reqwest = "0.45"
+rig-sqlite = "0.45.0"
 roxmltree = "0.21.1"
+rusqlite = { version = "0.32", features = ["bundled"] }
 schemars = "1"
 scraper = "0.29.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
+sqlite-vec = "0.1"
 tauri = { version = "2.12.5", features = [] }
 tauri-plugin-dialog = "2.8.3"
 tokio = { version = "1.54.1", features = ["sync", "rt", "macros", "time"] }
+tokio-rusqlite = { version = "0.6", default-features = false, features = ["bundled"] }
 zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
 
 [profile.dev.package."*"]

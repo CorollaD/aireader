@@ -9,7 +9,13 @@ use serde::Serialize;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager};
 
-use super::config::{AiConfig, KeyringStore, SecretStore};
+use super::config::{AiConfig, EmbeddingConfig, KeyringStore, SecretStore};
+use super::semantic;
+use rig_core::DynModel;
+use rig_core::operation::Embedding as EmbeddingOp;
+
+/// Passages semantic search contributes to a question's candidates.
+const SEMANTIC_HITS: usize = 24;
 use super::provider::{self, ChatModel};
 use super::retrieval::BookIndex;
 use super::tasks::{
@@ -78,6 +84,7 @@ pub struct AiStatus {
     has_key: bool,
     local: bool,
     configured: bool,
+    has_embedding_key: bool,
 }
 
 fn status(app: &AppHandle) -> AiStatus {
@@ -86,6 +93,10 @@ fn status(app: &AppHandle) -> AiStatus {
         has_key: ai_state(app).secrets.get(&config.key_name()).is_some(),
         local: config.is_local(),
         configured: config.is_configured(),
+        has_embedding_key: ai_state(app)
+            .secrets
+            .get(&config.embedding.key_name())
+            .is_some(),
         config,
     }
 }
@@ -103,16 +114,23 @@ pub async fn ai_set_config(
     app: AppHandle,
     config: AiConfig,
     api_key: Option<String>,
+    embedding_key: Option<String>,
 ) -> CmdResult<AiStatus> {
     tauri::async_runtime::spawn_blocking(move || {
         let config = config.cleaned();
-        if let Some(key) = api_key {
-            let secrets = &ai_state(&app).secrets;
+        let secrets = &ai_state(&app).secrets;
+        for (name, key) in [
+            (config.key_name(), api_key),
+            (config.embedding.key_name(), embedding_key),
+        ] {
+            let Some(key) = key else {
+                continue;
+            };
             if key.trim().is_empty() {
-                secrets.delete(&config.key_name()).map_err(err)?;
+                secrets.delete(&name).map_err(err)?;
             } else {
                 secrets
-                    .set(&config.key_name(), key.trim())
+                    .set(&name, key.trim())
                     .map_err(|e| crate::t!("ai_keychain_failed", error = format!("{e:#}")))?;
             }
         }
@@ -188,7 +206,7 @@ async fn book_index(app: &AppHandle, id: &str) -> Result<Arc<BookIndex>> {
 }
 
 fn cache(app: &AppHandle, id: &str) -> SummaryCache {
-    SummaryCache::open(app_state(app).library().ai_dir(id))
+    SummaryCache::open(app_state(app).library().db(), id)
 }
 
 #[tauri::command]
@@ -205,11 +223,85 @@ pub async fn ai_estimate_book(app: AppHandle, book_id: String) -> CmdResult<Book
     ))
 }
 
+/// The embedding model, refusing a cloud service the user has not agreed to send text to.
+fn embedding_model(app: &AppHandle) -> Result<(DynModel<EmbeddingOp>, EmbeddingConfig)> {
+    let cfg = config(app);
+    let e = cfg.embedding.clone();
+    if e.is_configured() && !e.is_local() && !cfg.consented {
+        bail!(crate::t!("ai_consent_required"));
+    }
+    let key = ai_state(app).secrets.get(&e.key_name());
+    Ok((provider::connect_embedding(&e, key)?, e))
+}
+
+/// Passages ranked by meaning for `query`, when the book has a semantic index for the current
+/// embedding model; empty otherwise (keyword search still works).
+async fn semantic_hits(app: &AppHandle, book_id: &str, query: &str) -> Vec<usize> {
+    let Ok((model, cfg)) = embedding_model(app) else {
+        return Vec::new();
+    };
+    let db = app_state(app).library().db().clone();
+    semantic::search(&db, book_id, query, &model, &cfg.model_key(), SEMANTIC_HITS)
+        .await
+        .unwrap_or_else(|e| {
+            // Keyword search still answers the question.
+            eprintln!("semantic search failed: {e:#}");
+            Vec::new()
+        })
+}
+
+/// The book's semantic index state, and whether one can be built (an embedding model is set).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SemanticStatus {
+    available: bool,
+    local: bool,
+    #[serde(flatten)]
+    status: semantic::Status,
+}
+
+#[tauri::command]
+pub async fn ai_semantic_status(app: AppHandle, book_id: String) -> CmdResult<SemanticStatus> {
+    let cfg = config(&app).embedding;
+    let db = app_state(&app).library().db().clone();
+    let available = cfg.is_configured();
+    let status = semantic::status(&db, &book_id, available.then(|| cfg.model_key()).as_deref())
+        .map_err(err)?;
+    Ok(SemanticStatus {
+        available,
+        local: cfg.is_local(),
+        status,
+    })
+}
+
 async fn run_task(
     app: &AppHandle,
     task: AiTask,
     emit: &(dyn Fn(AiEvent) + Send + Sync),
 ) -> Result<(String, bool)> {
+    // Building an index needs only the embedding model, not the chat model.
+    if let AiTask::BuildIndex { book_id } = &task {
+        let (model, cfg) = embedding_model(app)?;
+        let index = book_index(app, book_id).await?;
+        let db = app_state(app).library().db().clone();
+        let progress = |done: usize, total: usize| {
+            emit(AiEvent::Progress {
+                done,
+                total,
+                label: crate::t!("ai_indexing"),
+            });
+        };
+        let n = semantic::build(
+            &db,
+            book_id,
+            &index.passages,
+            &model,
+            &cfg.model_key(),
+            &progress,
+        )
+        .await?;
+        return Ok((n.to_string(), false));
+    }
     let (model, cfg) = model(app)?;
     let budget = provider::input_budget(&cfg, &model);
     let runner = Runner {
@@ -254,6 +346,7 @@ async fn run_task(
             let mut cache = cache(app, &book_id);
             tasks::mind_map(&runner, &mut cache, &book.doc, &title, scope, refresh).await
         }
+        AiTask::BuildIndex { .. } => unreachable!("handled above"),
         AiTask::Ask {
             book_id,
             location,
@@ -265,7 +358,14 @@ async fn run_task(
                 .get(&book_id)
                 .map(|b| b.title.clone())
                 .unwrap_or_default();
-            let text = tasks::ask(&runner, &title, &index, location, &history).await?;
+            let query = history
+                .iter()
+                .rev()
+                .find(|t| t.role != "assistant")
+                .map(|t| t.text.clone())
+                .unwrap_or_default();
+            let semantic = semantic_hits(app, &book_id, &query).await;
+            let text = tasks::ask(&runner, &title, &index, location, &history, &semantic).await?;
             Ok((text, false))
         }
     }

@@ -1,10 +1,10 @@
-//! Per-book bookmarks and highlights/notes, stored as `annotations/<book id>.json` under the
-//! library root.
-
-use std::path::{Path, PathBuf};
+//! Per-book bookmarks and highlights/notes, stored in the library database.
 
 use anyhow::Result;
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
+
+use crate::db::Db;
 
 use crate::model::Location;
 
@@ -49,44 +49,114 @@ pub struct Annotations {
 }
 
 pub struct AnnotationStore {
-    dir: PathBuf,
+    db: Db,
 }
 
 impl AnnotationStore {
-    pub fn new(library_root: &Path) -> Self {
-        Self {
-            dir: library_root.join("annotations"),
-        }
-    }
-
-    fn file(&self, book_id: &str) -> PathBuf {
-        self.dir.join(format!("{book_id}.json"))
+    pub fn new(db: &Db) -> Self {
+        Self { db: db.clone() }
     }
 
     pub fn load(&self, book_id: &str) -> Result<Annotations> {
-        match std::fs::read(self.file(book_id)) {
-            Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Annotations::default()),
-            Err(e) => Err(e.into()),
-        }
+        read(&self.db.conn(), book_id)
     }
 
+    /// Replaces the book's annotations.
     pub fn save(&self, book_id: &str, annotations: &Annotations) -> Result<()> {
-        std::fs::create_dir_all(&self.dir)?;
-        let file = self.file(book_id);
-        if annotations.bookmarks.is_empty() && annotations.highlights.is_empty() {
-            let _ = std::fs::remove_file(file);
-            return Ok(());
-        }
-        let tmp = file.with_extension("json.tmp");
-        std::fs::write(&tmp, serde_json::to_vec_pretty(annotations)?)?;
-        std::fs::rename(tmp, file)?;
+        let mut conn = self.db.conn();
+        let tx = conn.transaction()?;
+        write(&tx, book_id, annotations)?;
+        tx.commit()?;
         Ok(())
     }
 
     pub fn delete(&self, book_id: &str) {
-        let _ = std::fs::remove_file(self.file(book_id));
+        let _ = write(&self.db.conn(), book_id, &Annotations::default());
     }
+}
+
+pub fn read(conn: &Connection, book_id: &str) -> Result<Annotations> {
+    let mut ann = Annotations::default();
+    let mut stmt = conn.prepare(
+        "SELECT id, location, title, excerpt, created FROM bookmarks WHERE book_id = ?1 ORDER BY rowid",
+    )?;
+    for row in stmt.query_map(params![book_id], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, String>(1)?,
+            r.get(2)?,
+            r.get(3)?,
+            r.get(4)?,
+        ))
+    })? {
+        let (id, location, title, excerpt, created) = row?;
+        ann.bookmarks.push(Bookmark {
+            id,
+            location: serde_json::from_str(&location)?,
+            title,
+            excerpt,
+            created,
+        });
+    }
+    let mut stmt = conn.prepare(
+        "SELECT id, chapter, start_block, start_offset, end_block, end_offset, text, color, note, created, updated
+         FROM highlights WHERE book_id = ?1 ORDER BY rowid",
+    )?;
+    for row in stmt.query_map(params![book_id], |r| {
+        Ok(Highlight {
+            id: r.get(0)?,
+            chapter: r.get::<_, i64>(1)? as usize,
+            start_block: r.get::<_, i64>(2)? as usize,
+            start: r.get::<_, i64>(3)? as usize,
+            end_block: r.get::<_, i64>(4)? as usize,
+            end: r.get::<_, i64>(5)? as usize,
+            text: r.get(6)?,
+            color: r.get(7)?,
+            note: r.get(8)?,
+            created: r.get(9)?,
+            updated: r.get(10)?,
+        })
+    })? {
+        ann.highlights.push(row?);
+    }
+    Ok(ann)
+}
+
+/// Replaces a book's annotations (call inside a transaction).
+pub fn write(conn: &Connection, book_id: &str, ann: &Annotations) -> Result<()> {
+    conn.execute("DELETE FROM bookmarks WHERE book_id = ?1", params![book_id])?;
+    conn.execute(
+        "DELETE FROM highlights WHERE book_id = ?1",
+        params![book_id],
+    )?;
+    for b in &ann.bookmarks {
+        conn.execute(
+            "INSERT OR REPLACE INTO bookmarks (id, book_id, location, title, excerpt, created) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![b.id, book_id, serde_json::to_string(&b.location)?, b.title, b.excerpt, b.created],
+        )?;
+    }
+    for h in &ann.highlights {
+        conn.execute(
+            "INSERT OR REPLACE INTO highlights
+             (id, book_id, chapter, start_block, start_offset, end_block, end_offset, text, color, note, created, updated)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            params![
+                h.id,
+                book_id,
+                h.chapter as i64,
+                h.start_block as i64,
+                h.start as i64,
+                h.end_block as i64,
+                h.end as i64,
+                h.text,
+                h.color,
+                h.note,
+                h.created,
+                h.updated
+            ],
+        )?;
+    }
+    Ok(())
 }
 
 /// Renders highlights and notes as Markdown, grouped by chapter in reading order.
@@ -159,7 +229,9 @@ mod tests {
     fn save_load_delete_round_trip() {
         let dir = std::env::temp_dir().join(format!("aireader-ann-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        let store = AnnotationStore::new(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Db::open(&dir.join("t.db")).unwrap();
+        let store = AnnotationStore::new(&db);
         assert_eq!(
             store.load("b1").unwrap(),
             Annotations::default(),
@@ -177,11 +249,10 @@ mod tests {
         };
         store.save("b1", &ann).unwrap();
         assert_eq!(store.load("b1").unwrap(), ann);
+        store.save("b2", &ann).unwrap();
         store.save("b1", &Annotations::default()).unwrap();
-        assert!(
-            !dir.join("annotations/b1.json").exists(),
-            "empty annotations remove the file"
-        );
+        assert_eq!(store.load("b1").unwrap(), Annotations::default());
+        assert_eq!(store.load("b2").unwrap(), ann, "books are kept apart");
         store.save("b1", &ann).unwrap();
         store.delete("b1");
         assert_eq!(store.load("b1").unwrap(), Annotations::default());

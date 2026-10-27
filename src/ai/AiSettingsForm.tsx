@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import { api, errorText } from "../api";
 import { t } from "../i18n";
-import type { AiConfig, AiStatus } from "../types";
+import type { AiConfig, AiStatus, EmbeddingConfig } from "../types";
+
+/** Suggested embedding models; bge-m3 handles Chinese and other languages well. */
+const EMBED_MODELS: Record<string, string[]> = {
+  ollama: ["bge-m3", "nomic-embed-text", "mxbai-embed-large"],
+  openai: ["text-embedding-3-small", "text-embedding-3-large"],
+  custom: ["BAAI/bge-m3", "text-embedding-v3"],
+};
 import { ANSWER_LANGUAGES, PROVIDERS, baseUrlPlaceholder, presetOf, providerLabel } from "./presets";
 
 export default function AiSettingsForm(props: { status: AiStatus; onSaved: (s: AiStatus) => void }) {
@@ -17,6 +24,9 @@ export default function AiSettingsForm(props: { status: AiStatus; onSaved: (s: A
   const [hasKey, setHasKey] = useState(props.status.hasKey);
   const [savedProvider, setSavedProvider] = useState(props.status.config.provider);
   const [localModels, setLocalModels] = useState<string[]>([]);
+  // undefined: keep the stored key; "": remove it.
+  const [embedKey, setEmbedKey] = useState<string | undefined>(undefined);
+  const [hasEmbedKey, setHasEmbedKey] = useState(props.status.hasEmbeddingKey);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -51,9 +61,11 @@ export default function AiSettingsForm(props: { status: AiStatus; onSaved: (s: A
   };
 
   const save = async () => {
-    const saved = await api.aiSetConfig(config, apiKey);
+    const saved = await api.aiSetConfig(config, apiKey, embedKey);
     props.onSaved(saved);
     setHasKey(saved.hasKey);
+    setHasEmbedKey(saved.hasEmbeddingKey);
+    setEmbedKey(undefined);
     setSavedProvider(saved.config.provider);
     setApiKey(undefined);
     return saved;
@@ -76,7 +88,10 @@ export default function AiSettingsForm(props: { status: AiStatus; onSaved: (s: A
 
   const needsKey = preset?.needsKey ?? false;
   const needsUrl = config.provider === "custom";
-  const canSave = !!config.provider && !!config.model.trim() && (!needsUrl || !!config.baseUrl?.trim());
+  const embed = config.embedding;
+  const setEmbed = (patch: Partial<EmbeddingConfig>) => setConfig((c) => ({ ...c, embedding: { ...c.embedding, ...patch } }));
+  const embedOk = !embed.provider || (!!embed.model.trim() && (embed.provider !== "custom" || !!embed.baseUrl?.trim()));
+  const canSave = !!config.provider && !!config.model.trim() && (!needsUrl || !!config.baseUrl?.trim()) && embedOk;
 
   return (
     <div className="settings-form">
@@ -154,6 +169,74 @@ export default function AiSettingsForm(props: { status: AiStatus; onSaved: (s: A
         </select>
       </label>
       <p className="muted small">{preset?.local ? t("ai.localNote") : t("ai.cloudNote")}</p>
+
+      <div className="panel-heading">{t("ai.embedTitle")}</div>
+      <p className="muted small hint">{t("ai.embedHint")}</p>
+      <label className="field">
+        <span>{t("ai.provider")}</span>
+        <select
+          value={embed.provider}
+          onChange={(e) => {
+            const provider = e.target.value;
+            setEmbed({ provider, model: EMBED_MODELS[provider]?.[0] ?? "", baseUrl: null });
+            setEmbedKey(undefined);
+          }}
+        >
+          <option value="">{t("ai.embedNone")}</option>
+          <option value="ollama">{t("ai.local", { name: "Ollama" })}</option>
+          <option value="openai">OpenAI</option>
+          <option value="custom">{t("ai.custom")}</option>
+        </select>
+      </label>
+      {embed.provider && (
+        <>
+          <label className="field">
+            <span>{t("ai.model")}</span>
+            <input list="embed-models" value={embed.model} placeholder={t("ai.modelPlaceholder")} onChange={(e) => setEmbed({ model: e.target.value })} />
+            <datalist id="embed-models">
+              {(EMBED_MODELS[embed.provider] ?? []).map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+          </label>
+          {embed.provider !== "openai" && (
+            <label className="field">
+              <span>
+                {t("ai.baseUrl")}
+                {embed.provider !== "custom" && t("common.optional")}
+              </span>
+              <input
+                value={embed.baseUrl ?? ""}
+                placeholder={embed.provider === "ollama" ? "http://localhost:11434" : t("ai.customUrlHint", { url: "https://api.siliconflow.cn/v1" })}
+                onChange={(e) => setEmbed({ baseUrl: e.target.value || null })}
+              />
+            </label>
+          )}
+          {embed.provider !== "ollama" && (
+            <label className="field">
+              <span>
+                {t("ai.apiKey")}
+                {embed.provider === "custom" && t("common.optional")}
+                {hasEmbedKey && embedKey === undefined && <span className="key-saved">{t("ai.keySaved")}</span>}
+              </span>
+              <div className="inline-add">
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={embedKey ?? ""}
+                  placeholder={hasEmbedKey ? t("ai.keyKeep") : embed.provider === "openai" ? "sk-…" : ""}
+                  onChange={(e) => setEmbedKey(e.target.value)}
+                />
+                {hasEmbedKey && (
+                  <button onClick={() => (setEmbedKey(""), setHasEmbedKey(false))} title={t("ai.keyClear")}>
+                    {t("common.clear")}
+                  </button>
+                )}
+              </div>
+            </label>
+          )}
+        </>
+      )}
       <div className="form-actions">
         {message && <span className={message.ok ? "ok-text small" : "error small"}>{message.text}</span>}
         <span className="spacer" />

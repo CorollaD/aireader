@@ -39,6 +39,7 @@
 
 **AI（基于 [rig](https://github.com/0xPlaygrounds/rig)）**
 - 支持 Claude、OpenAI、DeepSeek、Kimi、智谱、Gemini、OpenRouter，本地的 Ollama、llama.cpp，以及任意 OpenAI 兼容服务（通义、硅基流动、LM Studio 等）
+- 语义检索（可选）：在 AI 设置中选择向量模型（本地 Ollama 如 bge-m3，或 OpenAI / OpenAI 兼容服务），在书中手动建立语义索引后，「问问这本书」会同时按关键词和意思查找相关段落
 - 总结本章 / 本页 / 全书（长文自动分段；每章总结按模型缓存；全书总结前显示用量和费用估算）
 - 选中文字后让 AI 解释或翻译，可以继续追问，答案可存为笔记
 - 书架「AI 整理」：AI 为每本书建议一个分组和缺失的作者，逐条确认后才写入（已有分组的书默认不移动）
@@ -79,11 +80,12 @@ npm run tauri build                   # 打包安装程序
 
 书库保存在系统应用数据目录下的 `library/` 中（macOS：`~/Library/Application Support/com.aireader.reader/library/`）：
 
-- `library.json`：书籍信息、分组、阅读进度、阅读时长、阅读设置和 AI 设置（不含 API Key）
-- `annotations/<id>.json`：书签、高亮与笔记
-- `ai/<id>/summaries.json`：AI 总结缓存
+- `aireader.db`（SQLite）：书籍信息、分组、阅读进度与时长、阅读设置和 AI 设置（不含 API Key）、书签高亮与笔记、AI 总结与导图缓存、查重分析缓存，以及语义检索的向量（rig-sqlite + sqlite-vec）
 - `books/<id>/`：导入书籍的副本
 - `covers/<id>.jpg`：封面缩略图
+- `backup-json/`：旧版本的 JSON 数据。新版第一次打开时会把它们导入数据库，原文件移到这里保留
+
+API Key（包括向量模型的 Key）只保存在系统钥匙串中。
 
 ### 测试
 

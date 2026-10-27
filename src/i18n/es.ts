@@ -325,8 +325,6 @@ const es: Messages = {
   "ai.suggestPage": "¿De qué trata esta página?",
   "ai.suggestTerms": "Enumera los conceptos clave de aquí",
   "ai.retry": "Reintentar",
-  "ai.basis": "Basado en: búsqueda en todo el libro",
-  "ai.basisAt": "Basado en: búsqueda en todo el libro · ahora en «{place}»",
   "ai.askBookPlaceholder": "Pregunta sobre este libro…",
   "ai.askSelectionPlaceholder": "Pregunta sobre este pasaje…",
   "ai.enterHint": "Intro para enviar · Mayús+Intro para nueva línea",
@@ -392,6 +390,19 @@ const es: Messages = {
   "reader.collapseAi": "Ocultar panel de IA",
   "reader.resizeHint": "Arrastra para cambiar el ancho; doble clic para restablecer",
   "sc.aiPanel": "Mostrar / ocultar el panel de IA",
+
+  "ai.embedTitle": "Búsqueda semántica (modelo de embeddings)",
+  "ai.embedHint": "Permite que las preguntas encuentren pasajes por su significado, aunque estén redactadas de otro modo. Solo se usa en los libros con índice semántico. DeepSeek y Claude no ofrecen embeddings; usa Ollama en este ordenador o un servicio compatible con OpenAI.",
+  "ai.embedNone": "No usar",
+  "ai.basisKeyword": "búsqueda por palabras clave",
+  "ai.basisHybrid": "búsqueda por palabras clave + semántica",
+  "ai.basedOn": "Basado en: {how}",
+  "ai.basedOnAt": "Basado en: {how} · ahora en «{place}»",
+  "ai.buildIndex": "Crear índice semántico",
+  "ai.rebuildIndex": "Cambió el modelo: recrear índice",
+  "ai.buildIndexTitle": "Indexa este libro con el modelo de embeddings para que las preguntas encuentren pasajes por su significado",
+  "ai.indexing": "Indexando {done}/{total}",
+  "ai.indexBuilt": "Índice semántico creado: {n} pasajes",
 };
 
 export default es;

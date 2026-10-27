@@ -852,6 +852,36 @@ const MESSAGES: &[(&str, [&str; 10])] = &[
             "Não há pergunta para enviar",
         ],
     ),
+    (
+        "ai_embedding_not_configured",
+        [
+            "还没有设置向量模型，请在「AI 设置」中选择",
+            "還沒有設定向量模型，請在「AI 設定」中選擇",
+            "No embedding model is set up. Choose one in AI settings.",
+            "No hay ningún modelo de embeddings configurado. Elige uno en los ajustes de IA.",
+            "Nessun modello di embedding configurato. Sceglilo nelle impostazioni IA.",
+            "Aucun modèle d'embeddings n'est configuré. Choisissez-en un dans les réglages IA.",
+            "Kein Embedding-Modell eingerichtet. Wähle eines in den KI-Einstellungen.",
+            "ベクトルモデルが設定されていません。AI 設定で選んでください",
+            "벡터 모델이 설정되지 않았습니다. AI 설정에서 선택하세요",
+            "Nenhum modelo de embeddings configurado. Escolha um nas configurações de IA.",
+        ],
+    ),
+    (
+        "ai_indexing",
+        [
+            "正在建立语义索引",
+            "正在建立語意索引",
+            "Building the semantic index",
+            "Creando el índice semántico",
+            "Creazione dell'indice semantico",
+            "Création de l'index sémantique",
+            "Semantischer Index wird erstellt",
+            "意味検索のインデックスを作成中",
+            "의미 검색 색인 만드는 중",
+            "Criando o índice semântico",
+        ],
+    ),
 ];
 
 #[cfg(test)]

@@ -17,6 +17,7 @@ import type {
   Location,
   MergeReport,
   OpenedBook,
+  SemanticStatus,
   Shelf,
   Suggestion,
   TextRun,
@@ -60,7 +61,10 @@ export const api = {
     invoke<Book>("add_reading_time", { id, seconds, speed }),
   aiGetConfig: () => invoke<AiStatus>("ai_get_config"),
   /** `apiKey`: undefined keeps the stored key, "" removes it. */
-  aiSetConfig: (config: AiConfig, apiKey?: string) => invoke<AiStatus>("ai_set_config", { config, apiKey }),
+  /** Keys: undefined keeps the stored one, "" removes it. */
+  aiSetConfig: (config: AiConfig, apiKey?: string, embeddingKey?: string) =>
+    invoke<AiStatus>("ai_set_config", { config, apiKey, embeddingKey }),
+  aiSemanticStatus: (bookId: string) => invoke<SemanticStatus>("ai_semantic_status", { bookId }),
   aiTest: () => invoke<string>("ai_test"),
   aiListModels: (config: AiConfig) => invoke<string[]>("ai_list_models", { config }),
   aiEstimateBook: (bookId: string) => invoke<BookEstimate>("ai_estimate_book", { bookId }),

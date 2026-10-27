@@ -3,6 +3,7 @@
 pub mod ai;
 pub mod annotations;
 pub mod commands;
+pub mod db;
 pub mod dedupe;
 pub mod formats;
 pub mod i18n;
@@ -67,6 +68,7 @@ pub fn run() {
             ai::commands::ai_estimate_book,
             ai::commands::ai_run,
             ai::commands::ai_cancel,
+            ai::commands::ai_semantic_status,
             ai::commands::ai_organize,
         ])
         .run(tauri::generate_context!())

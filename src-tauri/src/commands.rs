@@ -240,9 +240,9 @@ pub async fn find_duplicates(
     only: Option<Vec<String>>,
 ) -> CmdResult<Vec<DuplicateGroup>> {
     blocking(move || {
-        let (books, root) = {
+        let (books, db) = {
             let lib = state(&app).library();
-            (lib.books(), lib.root().to_owned())
+            (lib.books(), lib.db().clone())
         };
         let mut wanted: Vec<usize> = dedupe::candidate_groups(&books)
             .into_iter()
@@ -254,7 +254,7 @@ pub async fn find_duplicates(
             .filter(|&i| !books[i].missing)
             .collect();
         wanted.sort_unstable();
-        let mut cache = ProfileCache::open(&root);
+        let mut cache = ProfileCache::open(&db);
         let mut profiles = HashMap::new();
         for (k, &i) in wanted.iter().enumerate() {
             let book = &books[i];
@@ -566,7 +566,7 @@ pub async fn set_settings(app: AppHandle, settings: serde_json::Value) -> CmdRes
 }
 
 fn annotation_store(app: &AppHandle) -> AnnotationStore {
-    AnnotationStore::new(state(app).library().root())
+    AnnotationStore::new(state(app).library().db())
 }
 
 #[tauri::command]

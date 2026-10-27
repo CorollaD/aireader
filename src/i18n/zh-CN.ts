@@ -325,8 +325,6 @@ const zhCN = {
   "ai.suggestPage": "这一页讲了什么？",
   "ai.suggestTerms": "列出这里的关键概念",
   "ai.retry": "重试",
-  "ai.basis": "依据：全书检索",
-  "ai.basisAt": "依据：全书检索 · 当前在「{place}」",
   "ai.askBookPlaceholder": "问问这本书…",
   "ai.askSelectionPlaceholder": "就这段文字提问…",
   "ai.enterHint": "Enter 发送 · Shift+Enter 换行",
@@ -392,6 +390,19 @@ const zhCN = {
   "reader.collapseAi": "收起 AI 面板",
   "reader.resizeHint": "拖动调整宽度，双击恢复默认",
   "sc.aiPanel": "显示 / 隐藏 AI 面板",
+
+  "ai.embedTitle": "语义检索（向量模型）",
+  "ai.embedHint": "让「问问这本书」按意思找到相关段落，换种说法也能找到。只用于你手动建立了语义索引的书。DeepSeek 和 Claude 没有向量接口，可以用本机的 Ollama 或 OpenAI 兼容服务。",
+  "ai.embedNone": "不使用",
+  "ai.basisKeyword": "关键词检索",
+  "ai.basisHybrid": "关键词 + 语义检索",
+  "ai.basedOn": "依据：{how}",
+  "ai.basedOnAt": "依据：{how} · 当前在「{place}」",
+  "ai.buildIndex": "建立语义索引",
+  "ai.rebuildIndex": "向量模型已更换，重建索引",
+  "ai.buildIndexTitle": "用向量模型为这本书建立索引，提问时就能按意思找到相关段落",
+  "ai.indexing": "建立索引 {done}/{total}",
+  "ai.indexBuilt": "语义索引已建立：{n} 段",
 };
 
 export default zhCN;

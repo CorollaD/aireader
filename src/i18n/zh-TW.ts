@@ -325,8 +325,6 @@ const zhTW: Messages = {
   "ai.suggestPage": "這一頁講了什麼？",
   "ai.suggestTerms": "列出這裡的關鍵概念",
   "ai.retry": "重試",
-  "ai.basis": "依據：全書檢索",
-  "ai.basisAt": "依據：全書檢索 · 目前在「{place}」",
   "ai.askBookPlaceholder": "問問這本書…",
   "ai.askSelectionPlaceholder": "就這段文字提問…",
   "ai.enterHint": "Enter 送出 · Shift+Enter 換行",
@@ -392,6 +390,19 @@ const zhTW: Messages = {
   "reader.collapseAi": "收合 AI 面板",
   "reader.resizeHint": "拖曳調整寬度，按兩下恢復預設",
   "sc.aiPanel": "顯示 / 隱藏 AI 面板",
+
+  "ai.embedTitle": "語意檢索（向量模型）",
+  "ai.embedHint": "讓「問問這本書」依意思找到相關段落，換種說法也能找到。只用於你手動建立了語意索引的書。DeepSeek 和 Claude 沒有向量介面，可以用本機的 Ollama 或 OpenAI 相容服務。",
+  "ai.embedNone": "不使用",
+  "ai.basisKeyword": "關鍵字檢索",
+  "ai.basisHybrid": "關鍵字 + 語意檢索",
+  "ai.basedOn": "依據：{how}",
+  "ai.basedOnAt": "依據：{how} · 目前在「{place}」",
+  "ai.buildIndex": "建立語意索引",
+  "ai.rebuildIndex": "向量模型已更換，重建索引",
+  "ai.buildIndexTitle": "用向量模型為這本書建立索引，提問時就能依意思找到相關段落",
+  "ai.indexing": "建立索引 {done}/{total}",
+  "ai.indexBuilt": "語意索引已建立：{n} 段",
 };
 
 export default zhTW;

@@ -325,8 +325,6 @@ const pt: Messages = {
   "ai.suggestPage": "Sobre o que é esta página?",
   "ai.suggestTerms": "Liste os conceitos-chave daqui",
   "ai.retry": "Tentar de novo",
-  "ai.basis": "Baseado em: busca no livro inteiro",
-  "ai.basisAt": "Baseado em: busca no livro inteiro · agora em “{place}”",
   "ai.askBookPlaceholder": "Pergunte sobre este livro…",
   "ai.askSelectionPlaceholder": "Pergunte sobre este trecho…",
   "ai.enterHint": "Enter para enviar · Shift+Enter para nova linha",
@@ -392,6 +390,19 @@ const pt: Messages = {
   "reader.collapseAi": "Ocultar painel de IA",
   "reader.resizeHint": "Arraste para ajustar a largura; clique duas vezes para restaurar",
   "sc.aiPanel": "Mostrar / ocultar o painel de IA",
+
+  "ai.embedTitle": "Busca semântica (modelo de embeddings)",
+  "ai.embedHint": "Permite que as perguntas encontrem trechos pelo significado, mesmo com outras palavras. Usado só nos livros com índice semântico. DeepSeek e Claude não têm API de embeddings; use o Ollama neste computador ou um serviço compatível com OpenAI.",
+  "ai.embedNone": "Não usar",
+  "ai.basisKeyword": "busca por palavras-chave",
+  "ai.basisHybrid": "busca por palavras-chave + semântica",
+  "ai.basedOn": "Baseado em: {how}",
+  "ai.basedOnAt": "Baseado em: {how} · agora em “{place}”",
+  "ai.buildIndex": "Criar índice semântico",
+  "ai.rebuildIndex": "Modelo alterado: recriar índice",
+  "ai.buildIndexTitle": "Indexa este livro com o modelo de embeddings para que as perguntas encontrem trechos pelo significado",
+  "ai.indexing": "Indexando {done}/{total}",
+  "ai.indexBuilt": "Índice semântico criado: {n} trechos",
 };
 
 export default pt;

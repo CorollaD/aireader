@@ -325,8 +325,6 @@ const ko: Messages = {
   "ai.suggestPage": "이 쪽은 무엇에 관한 내용인가요?",
   "ai.suggestTerms": "여기 나오는 핵심 개념을 정리해 줘",
   "ai.retry": "다시 시도",
-  "ai.basis": "근거: 책 전체 검색",
-  "ai.basisAt": "근거: 책 전체 검색 · 현재 '{place}'",
   "ai.askBookPlaceholder": "이 책에 대해 질문하기…",
   "ai.askSelectionPlaceholder": "이 부분에 대해 질문하기…",
   "ai.enterHint": "Enter로 보내기 · Shift+Enter로 줄바꿈",
@@ -392,6 +390,19 @@ const ko: Messages = {
   "reader.collapseAi": "AI 패널 숨기기",
   "reader.resizeHint": "드래그해 너비 조절, 두 번 클릭하면 기본값",
   "sc.aiPanel": "AI 패널 보이기 / 숨기기",
+
+  "ai.embedTitle": "의미 검색(벡터 모델)",
+  "ai.embedHint": "질문의 의미로 관련 부분을 찾게 해 줍니다(표현이 달라도 찾을 수 있음). 의미 검색 색인을 만든 책에만 쓰입니다. DeepSeek와 Claude는 벡터 API가 없으니 이 컴퓨터의 Ollama나 OpenAI 호환 서비스를 쓰세요.",
+  "ai.embedNone": "사용 안 함",
+  "ai.basisKeyword": "키워드 검색",
+  "ai.basisHybrid": "키워드 + 의미 검색",
+  "ai.basedOn": "근거: {how}",
+  "ai.basedOnAt": "근거: {how} · 현재 '{place}'",
+  "ai.buildIndex": "의미 검색 색인 만들기",
+  "ai.rebuildIndex": "모델이 바뀜: 색인 다시 만들기",
+  "ai.buildIndexTitle": "벡터 모델로 이 책의 색인을 만들어 질문의 의미로 관련 부분을 찾게 합니다",
+  "ai.indexing": "색인 생성 {done}/{total}",
+  "ai.indexBuilt": "의미 검색 색인 완료: {n}개 부분",
 };
 
 export default ko;

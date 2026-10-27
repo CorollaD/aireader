@@ -325,8 +325,6 @@ const en: Messages = {
   "ai.suggestPage": "What is this page about?",
   "ai.suggestTerms": "List the key concepts here",
   "ai.retry": "Retry",
-  "ai.basis": "Based on: search across the book",
-  "ai.basisAt": "Based on: search across the book · now at “{place}”",
   "ai.askBookPlaceholder": "Ask about this book…",
   "ai.askSelectionPlaceholder": "Ask about this passage…",
   "ai.enterHint": "Enter to send · Shift+Enter for a new line",
@@ -392,6 +390,19 @@ const en: Messages = {
   "reader.collapseAi": "Hide AI panel",
   "reader.resizeHint": "Drag to resize; double-click to reset",
   "sc.aiPanel": "Show / hide the AI panel",
+
+  "ai.embedTitle": "Semantic search (embedding model)",
+  "ai.embedHint": "Lets questions about a book find passages by meaning, even when worded differently. Used only for books you build a semantic index for. DeepSeek and Claude have no embedding API; use Ollama on this computer or an OpenAI-compatible service.",
+  "ai.embedNone": "Don't use",
+  "ai.basisKeyword": "keyword search",
+  "ai.basisHybrid": "keyword + semantic search",
+  "ai.basedOn": "Based on: {how}",
+  "ai.basedOnAt": "Based on: {how} · now at “{place}”",
+  "ai.buildIndex": "Build semantic index",
+  "ai.rebuildIndex": "Embedding model changed: rebuild index",
+  "ai.buildIndexTitle": "Index this book with the embedding model so questions find passages by meaning",
+  "ai.indexing": "Indexing {done}/{total}",
+  "ai.indexBuilt": "Semantic index built: {n} passages",
 };
 
 export default en;

@@ -325,8 +325,6 @@ const it: Messages = {
   "ai.suggestPage": "Di cosa parla questa pagina?",
   "ai.suggestTerms": "Elenca i concetti chiave qui",
   "ai.retry": "Riprova",
-  "ai.basis": "In base a: ricerca in tutto il libro",
-  "ai.basisAt": "In base a: ricerca in tutto il libro · ora in «{place}»",
   "ai.askBookPlaceholder": "Chiedi qualcosa su questo libro…",
   "ai.askSelectionPlaceholder": "Chiedi qualcosa su questo passo…",
   "ai.enterHint": "Invio per inviare · Maiusc+Invio per andare a capo",
@@ -392,6 +390,19 @@ const it: Messages = {
   "reader.collapseAi": "Nascondi pannello IA",
   "reader.resizeHint": "Trascina per ridimensionare; doppio clic per ripristinare",
   "sc.aiPanel": "Mostra / nascondi il pannello IA",
+
+  "ai.embedTitle": "Ricerca semantica (modello di embedding)",
+  "ai.embedHint": "Permette alle domande di trovare i passi per significato, anche se formulate diversamente. Si usa solo per i libri con indice semantico. DeepSeek e Claude non offrono embedding: usa Ollama su questo computer o un servizio compatibile con OpenAI.",
+  "ai.embedNone": "Non usare",
+  "ai.basisKeyword": "ricerca per parole chiave",
+  "ai.basisHybrid": "ricerca per parole chiave + semantica",
+  "ai.basedOn": "In base a: {how}",
+  "ai.basedOnAt": "In base a: {how} · ora in «{place}»",
+  "ai.buildIndex": "Crea indice semantico",
+  "ai.rebuildIndex": "Modello cambiato: ricrea l'indice",
+  "ai.buildIndexTitle": "Indicizza questo libro con il modello di embedding, così le domande trovano i passi per significato",
+  "ai.indexing": "Indicizzazione {done}/{total}",
+  "ai.indexBuilt": "Indice semantico creato: {n} passi",
 };
 
 export default it;

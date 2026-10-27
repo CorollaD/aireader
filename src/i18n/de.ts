@@ -325,8 +325,6 @@ const de: Messages = {
   "ai.suggestPage": "Worum geht es auf dieser Seite?",
   "ai.suggestTerms": "Nenne die Schlüsselbegriffe hier",
   "ai.retry": "Erneut versuchen",
-  "ai.basis": "Grundlage: Suche im ganzen Buch",
-  "ai.basisAt": "Grundlage: Suche im ganzen Buch · gerade bei „{place}“",
   "ai.askBookPlaceholder": "Frag etwas zu diesem Buch …",
   "ai.askSelectionPlaceholder": "Frag etwas zu dieser Stelle …",
   "ai.enterHint": "Eingabe zum Senden · Umschalt+Eingabe für neue Zeile",
@@ -392,6 +390,19 @@ const de: Messages = {
   "reader.collapseAi": "KI-Bereich ausblenden",
   "reader.resizeHint": "Ziehen ändert die Breite, Doppelklick setzt sie zurück",
   "sc.aiPanel": "KI-Bereich ein- / ausblenden",
+
+  "ai.embedTitle": "Semantische Suche (Embedding-Modell)",
+  "ai.embedHint": "Lässt Fragen passende Stellen nach ihrer Bedeutung finden, auch bei anderer Formulierung. Nur für Bücher mit semantischem Index. DeepSeek und Claude haben keine Embedding-API; nutze Ollama auf diesem Computer oder einen OpenAI-kompatiblen Dienst.",
+  "ai.embedNone": "Nicht verwenden",
+  "ai.basisKeyword": "Stichwortsuche",
+  "ai.basisHybrid": "Stichwort- + semantische Suche",
+  "ai.basedOn": "Grundlage: {how}",
+  "ai.basedOnAt": "Grundlage: {how} · gerade bei „{place}“",
+  "ai.buildIndex": "Semantischen Index erstellen",
+  "ai.rebuildIndex": "Modell geändert: Index neu erstellen",
+  "ai.buildIndexTitle": "Dieses Buch mit dem Embedding-Modell indizieren, damit Fragen Stellen nach Bedeutung finden",
+  "ai.indexing": "Indizierung {done}/{total}",
+  "ai.indexBuilt": "Semantischer Index erstellt: {n} Abschnitte",
 };
 
 export default de;

@@ -168,6 +168,15 @@ export interface AiConfig {
   baseUrl: string | null;
   language: string;
   consented: boolean;
+  /** The model for semantic search; provider "" = none. */
+  embedding: EmbeddingConfig;
+}
+
+export interface EmbeddingConfig {
+  /** "", "ollama", "openai" or "custom" (any OpenAI-compatible URL). */
+  provider: string;
+  model: string;
+  baseUrl: string | null;
 }
 
 export interface AiStatus {
@@ -175,6 +184,19 @@ export interface AiStatus {
   hasKey: boolean;
   local: boolean;
   configured: boolean;
+  hasEmbeddingKey: boolean;
+}
+
+/** A book's semantic index. */
+export interface SemanticStatus {
+  /** An embedding model is set up, so an index can be built. */
+  available: boolean;
+  /** The embedding model runs locally (no consent needed). */
+  local: boolean;
+  /** Passages indexed with the current model; 0 = not built. */
+  passages: number;
+  /** An index exists but was built with another model. */
+  stale: boolean;
 }
 
 export type AiEvent =
@@ -212,6 +234,7 @@ export type AiTask =
       history: ChatTurn[];
     }
   | { kind: "ask"; bookId: string; location: Location | null; history: ChatTurn[] }
+  | { kind: "buildIndex"; bookId: string }
   | { kind: "mindMap"; bookId: string; scope: MindMapScope; refresh?: boolean };
 
 export type MindMapScope =

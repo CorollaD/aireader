@@ -94,6 +94,7 @@ where
 
 pub struct Library {
     root: PathBuf,
+    db: crate::db::Db,
     data: LibraryData,
 }
 
@@ -169,16 +170,38 @@ pub struct Prepared {
 }
 
 impl Library {
+    /// Opens the library at `root`, creating its database; a JSON-era library is imported on
+    /// first open and its files moved to `backup-json/`.
     pub fn open(root: &Path) -> Result<Self> {
         std::fs::create_dir_all(root.join("books"))?;
         std::fs::create_dir_all(root.join("covers"))?;
-        let file = root.join("library.json");
-        let mut data: LibraryData = match std::fs::read(&file) {
-            Ok(bytes) => {
-                serde_json::from_slice(&bytes).with_context(|| crate::t!("library_corrupt"))?
-            }
-            Err(_) => LibraryData::default(),
-        };
+        let db = crate::db::Db::open(&root.join(crate::db::FILE))?;
+        let imported = Self::import_legacy(root, &db)?;
+        let data = Self::load(&db)?;
+        if imported {
+            crate::db::archive_legacy(root)?;
+        }
+        Ok(Self {
+            root: root.to_owned(),
+            db,
+            data,
+        })
+    }
+
+    /// Imports `library.json` and the other JSON files into an empty database.
+    fn import_legacy(root: &Path, db: &crate::db::Db) -> Result<bool> {
+        let mut conn = db.conn();
+        let empty: bool = conn.query_row(
+            "SELECT NOT EXISTS (SELECT 1 FROM books) AND NOT EXISTS (SELECT 1 FROM kv)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !empty || !crate::db::has_legacy(root) {
+            return Ok(false);
+        }
+        let bytes = std::fs::read(root.join("library.json"))?;
+        let mut data: LibraryData =
+            serde_json::from_slice(&bytes).with_context(|| crate::t!("library_corrupt"))?;
         // Books that were in several groups keep the first one.
         for b in &mut data.books {
             let legacy = std::mem::take(&mut b.legacy_groups);
@@ -186,18 +209,80 @@ impl Library {
                 b.group = legacy.into_iter().find(|g| !g.trim().is_empty());
             }
         }
-        Ok(Self {
-            root: root.to_owned(),
-            data,
+        let tx = conn.transaction()?;
+        Self::write(&tx, &data)?;
+        crate::db::import_legacy_extras(&tx, root)?;
+        tx.commit()?;
+        Ok(true)
+    }
+
+    fn load(db: &crate::db::Db) -> Result<LibraryData> {
+        let conn = db.conn();
+        let mut books = Vec::new();
+        let mut stmt = conn.prepare("SELECT data FROM books ORDER BY position")?;
+        for row in stmt.query_map([], |r| r.get::<_, String>(0))? {
+            books.push(serde_json::from_str(&row?).with_context(|| crate::t!("library_corrupt"))?);
+        }
+        let mut stmt = conn.prepare("SELECT name FROM groups ORDER BY position")?;
+        let groups = stmt
+            .query_map([], |r| r.get(0))?
+            .collect::<rusqlite::Result<Vec<String>>>()?;
+        Ok(LibraryData {
+            books,
+            groups,
+            settings: crate::db::kv_get(&conn, "settings")?.unwrap_or_default(),
+            ai: crate::db::kv_get(&conn, "ai")?.unwrap_or_default(),
         })
     }
 
-    pub fn save(&self) -> Result<()> {
-        let file = self.root.join("library.json");
-        let tmp = file.with_extension("json.tmp");
-        std::fs::write(&tmp, serde_json::to_vec_pretty(&self.data)?)?;
-        std::fs::rename(tmp, file)?;
+    fn write(conn: &rusqlite::Connection, data: &LibraryData) -> Result<()> {
+        use rusqlite::params;
+        let ids: Vec<&str> = data.books.iter().map(|b| b.id.as_str()).collect();
+        let mut stale = Vec::new();
+        {
+            let mut stmt = conn.prepare("SELECT id FROM books")?;
+            for id in stmt.query_map([], |r| r.get::<_, String>(0))? {
+                let id = id?;
+                if !ids.contains(&id.as_str()) {
+                    stale.push(id);
+                }
+            }
+        }
+        for id in stale {
+            conn.execute("DELETE FROM books WHERE id = ?1", params![id])?;
+        }
+        for (position, b) in data.books.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO books (id, position, sha256, title, grp, data) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                 ON CONFLICT(id) DO UPDATE SET position = excluded.position, sha256 = excluded.sha256,
+                   title = excluded.title, grp = excluded.grp, data = excluded.data",
+                params![b.id, position as i64, b.sha256, b.title, b.group, serde_json::to_string(b)?],
+            )?;
+        }
+        conn.execute("DELETE FROM groups", [])?;
+        for (position, g) in data.groups.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO groups (name, position) VALUES (?1, ?2)",
+                params![g, position as i64],
+            )?;
+        }
+        crate::db::kv_set(conn, "settings", &data.settings)?;
+        crate::db::kv_set(conn, "ai", &data.ai)?;
         Ok(())
+    }
+
+    /// Writes the library's records to the database in one transaction.
+    pub fn save(&self) -> Result<()> {
+        let mut conn = self.db.conn();
+        let tx = conn.transaction()?;
+        Self::write(&tx, &self.data)?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// The library database, shared by annotations, AI caches and the search index.
+    pub fn db(&self) -> &crate::db::Db {
+        &self.db
     }
 
     pub fn root(&self) -> &Path {
@@ -342,12 +427,10 @@ impl Library {
     /// Removes books from the shelf and deletes their stored copies, covers, annotations and
     /// AI caches.
     pub fn remove(&mut self, ids: &[String]) {
-        let annotations = crate::annotations::AnnotationStore::new(&self.root);
         for id in ids {
             let _ = std::fs::remove_dir_all(self.root.join("books").join(id));
             let _ = std::fs::remove_file(self.cover_path(id));
-            let _ = std::fs::remove_dir_all(self.ai_dir(id));
-            annotations.delete(id);
+            let _ = crate::db::delete_book_data(&self.db.conn(), id);
         }
         self.data.books.retain(|b| !ids.contains(&b.id));
     }
@@ -392,11 +475,6 @@ impl Library {
             book.progress = progress.clamp(0.0, 1.0);
         }
         Ok(())
-    }
-
-    /// Directory for a book's AI caches.
-    pub fn ai_dir(&self, id: &str) -> PathBuf {
-        self.root.join("ai").join(id)
     }
 
     /// Adds active reading time; `speed` is a measured reading speed sample (characters or
@@ -639,10 +717,40 @@ mod tests {
             "a missing field changes nothing"
         );
         lib.save().unwrap();
-        let saved = std::fs::read_to_string(root.join("library.json")).unwrap();
-        let saved: serde_json::Value = serde_json::from_str(&saved).unwrap();
-        let first = &saved["books"][0];
-        assert!(first.get("group").is_some() && first.get("groups").is_none());
+        drop(lib);
+        // The JSON was imported into the database and moved aside; reopening reads the database.
+        assert!(!root.join("library.json").exists());
+        assert!(root.join("backup-json/library.json").exists());
+        let lib = Library::open(&root).unwrap();
+        assert_eq!(lib.get("a").unwrap().title, "u");
+        assert_eq!(lib.get("a").unwrap().group, None);
+        assert_eq!(lib.groups(), ["小说", "历史"]);
+    }
+
+    #[test]
+    fn legacy_annotations_and_caches_are_imported() {
+        let root = temp("legacy-extras");
+        std::fs::write(root.join("library.json"), r#"{"books":[],"groups":["g"]}"#).unwrap();
+        std::fs::create_dir_all(root.join("annotations")).unwrap();
+        std::fs::write(
+            root.join("annotations/b1.json"),
+            r#"{"bookmarks":[{"id":"m","location":{"kind":"page","page":2},"title":"t","excerpt":"","created":1}],"highlights":[]}"#,
+        )
+        .unwrap();
+        std::fs::create_dir_all(root.join("ai/b1")).unwrap();
+        std::fs::write(
+            root.join("ai/b1/summaries.json"),
+            r#"{"x/m":{"ch:0":"概要"}}"#,
+        )
+        .unwrap();
+        let lib = Library::open(&root).unwrap();
+        let ann = crate::annotations::AnnotationStore::new(lib.db())
+            .load("b1")
+            .unwrap();
+        assert_eq!(ann.bookmarks[0].location, Location::Page { page: 2 });
+        let cache = crate::ai::tasks::SummaryCache::open(lib.db(), "b1");
+        assert_eq!(cache.get("x/m", "ch:0").map(String::as_str), Some("概要"));
+        assert!(root.join("backup-json/annotations/b1.json").exists() && !root.join("ai").exists());
     }
 
     #[test]

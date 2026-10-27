@@ -24,6 +24,57 @@ pub struct AiConfig {
     pub language: String,
     /// The user accepted that book text is sent to a cloud service.
     pub consented: bool,
+    /// The model that turns passages into vectors for semantic search (optional).
+    pub embedding: EmbeddingConfig,
+}
+
+/// An embedding service: `provider` is "" (none), "ollama", "openai" or [`CUSTOM`].
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct EmbeddingConfig {
+    pub provider: String,
+    pub model: String,
+    pub base_url: Option<String>,
+}
+
+impl EmbeddingConfig {
+    pub fn is_configured(&self) -> bool {
+        !self.provider.is_empty()
+            && !self.model.trim().is_empty()
+            && (self.provider != CUSTOM || self.base_url.is_some())
+    }
+
+    pub fn is_local(&self) -> bool {
+        match self.provider.as_str() {
+            "ollama" => self.base_url.as_deref().is_none_or(is_local_url),
+            _ => self.base_url.as_deref().is_some_and(is_local_url),
+        }
+    }
+
+    /// Keychain account for this service's key (separate from the chat service's).
+    pub fn key_name(&self) -> String {
+        format!("embed:{}", self.provider)
+    }
+
+    /// Identifies the vectors' model, so an index built with another one is not reused.
+    pub fn model_key(&self) -> String {
+        format!(
+            "{}/{}@{}",
+            self.provider,
+            self.model,
+            self.base_url.as_deref().unwrap_or("")
+        )
+    }
+
+    fn cleaned(mut self) -> Self {
+        self.provider = self.provider.trim().to_owned();
+        self.model = self.model.trim().to_owned();
+        self.base_url = self
+            .base_url
+            .map(|u| u.trim().trim_end_matches('/').to_owned())
+            .filter(|u| !u.is_empty());
+        self
+    }
 }
 
 impl Default for AiConfig {
@@ -34,6 +85,7 @@ impl Default for AiConfig {
             base_url: None,
             language: AUTO_LANGUAGE.into(),
             consented: false,
+            embedding: EmbeddingConfig::default(),
         }
     }
 }
@@ -90,6 +142,7 @@ impl AiConfig {
             .base_url
             .map(|u| u.trim().trim_end_matches('/').to_owned())
             .filter(|u| !u.is_empty());
+        self.embedding = self.embedding.cleaned();
         if self.language.trim().is_empty() {
             self.language = AUTO_LANGUAGE.into();
         }
@@ -177,6 +230,7 @@ mod tests {
             base_url: Some(" http://localhost:1234/v1/ ".into()),
             language: " ".into(),
             consented: false,
+            embedding: EmbeddingConfig::default(),
         }
         .cleaned();
         assert_eq!(

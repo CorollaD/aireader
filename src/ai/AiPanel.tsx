@@ -5,7 +5,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, errorText, runAiTask } from "../api";
-import type { AiEvent, AiTask, BookEstimate, ChatAction, Location, MindMapScope, OpenedBook, Source } from "../types";
+import type { AiEvent, AiTask, BookEstimate, ChatAction, Location, MindMapScope, OpenedBook, SemanticStatus, Source } from "../types";
 import { Modal } from "../ui";
 import type { TextRange } from "../reader/anchors";
 import { formatNumber, t, type MessageKey } from "../i18n";
@@ -113,6 +113,38 @@ export default function AiPanel(props: {
   const input = useRef<HTMLTextAreaElement>(null);
   const mapSvg = useRef<SVGSVGElement>(null);
   const nextMapId = useRef(1);
+  const [semantic, setSemantic] = useState<SemanticStatus | null>(null);
+  const [indexing, setIndexing] = useState<{ done: number; total: number; taskId: string } | null>(null);
+
+  // The book's semantic index state; refreshed when the AI settings change.
+  const refreshSemantic = () => api.aiSemanticStatus(book.id).then(setSemantic, () => setSemantic(null));
+  useEffect(() => {
+    refreshSemantic();
+  }, [book.id, ai.status]);
+
+  /** Embeds the book's passages with the configured embedding model (only when asked). */
+  const buildIndex = async () => {
+    if (indexing || !semantic?.available) return;
+    if (!semantic.local && !(await ai.ensureConsent())) return;
+    const taskId = runAiTask({ kind: "buildIndex", bookId: book.id }, (e: AiEvent) => {
+      switch (e.type) {
+        case "progress":
+          setIndexing((x) => (x && x.taskId === taskId ? { ...x, done: e.done, total: e.total } : x));
+          break;
+        case "done":
+          setIndexing(null);
+          setNotice(t("ai.indexBuilt", { n: e.text }));
+          refreshSemantic();
+          break;
+        case "error":
+          setIndexing(null);
+          setNotice(e.message);
+          refreshSemantic();
+          break;
+      }
+    });
+    setIndexing({ done: 0, total: 0, taskId });
+  };
 
   const flow = book.kind === "flow";
   const here = location ? describe(book, location) : null;
@@ -471,7 +503,30 @@ export default function AiPanel(props: {
             {!chat.quote && (
               <div className="ai-basis muted">
                 <Icon name="search" size={12} />
-                <span className="ellipsis">{here ? t("ai.basisAt", { place: here }) : t("ai.basis")}</span>
+                <span className="ellipsis">
+                  {(() => {
+                    const how = semantic && semantic.passages > 0 ? t("ai.basisHybrid") : t("ai.basisKeyword");
+                    return here ? t("ai.basedOnAt", { how, place: here }) : t("ai.basedOn", { how });
+                  })()}
+                </span>
+                <span className="spacer" />
+                {indexing ? (
+                  <>
+                    <span className="index-progress">
+                      {t("ai.indexing", { done: indexing.done, total: indexing.total || "…" })}
+                    </span>
+                    <button className="link-button" onClick={() => (stop(indexing.taskId), setIndexing(null))}>
+                      {t("common.stop")}
+                    </button>
+                  </>
+                ) : (
+                  semantic?.available &&
+                  semantic.passages === 0 && (
+                    <button className="link-button" title={t("ai.buildIndexTitle")} onClick={buildIndex}>
+                      {semantic.stale ? t("ai.rebuildIndex") : t("ai.buildIndex")}
+                    </button>
+                  )
+                )}
               </div>
             )}
             <div className="ai-input">

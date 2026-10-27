@@ -325,8 +325,6 @@ const fr: Messages = {
   "ai.suggestPage": "De quoi parle cette page ?",
   "ai.suggestTerms": "Listez les notions clés ici",
   "ai.retry": "Réessayer",
-  "ai.basis": "Basé sur : recherche dans tout le livre",
-  "ai.basisAt": "Basé sur : recherche dans tout le livre · actuellement « {place} »",
   "ai.askBookPlaceholder": "Posez une question sur ce livre…",
   "ai.askSelectionPlaceholder": "Posez une question sur ce passage…",
   "ai.enterHint": "Entrée pour envoyer · Maj+Entrée pour aller à la ligne",
@@ -392,6 +390,19 @@ const fr: Messages = {
   "reader.collapseAi": "Masquer le panneau IA",
   "reader.resizeHint": "Faites glisser pour redimensionner ; double-cliquez pour réinitialiser",
   "sc.aiPanel": "Afficher / masquer le panneau IA",
+
+  "ai.embedTitle": "Recherche sémantique (modèle d'embeddings)",
+  "ai.embedHint": "Permet aux questions de trouver les passages par le sens, même formulées autrement. Utilisé seulement pour les livres dotés d'un index sémantique. DeepSeek et Claude n'ont pas d'API d'embeddings : utilisez Ollama sur cet ordinateur ou un service compatible OpenAI.",
+  "ai.embedNone": "Ne pas utiliser",
+  "ai.basisKeyword": "recherche par mots-clés",
+  "ai.basisHybrid": "recherche par mots-clés + sémantique",
+  "ai.basedOn": "Basé sur : {how}",
+  "ai.basedOnAt": "Basé sur : {how} · actuellement « {place} »",
+  "ai.buildIndex": "Créer l'index sémantique",
+  "ai.rebuildIndex": "Modèle changé : recréer l'index",
+  "ai.buildIndexTitle": "Indexer ce livre avec le modèle d'embeddings pour que les questions trouvent les passages par le sens",
+  "ai.indexing": "Indexation {done}/{total}",
+  "ai.indexBuilt": "Index sémantique créé : {n} passages",
 };
 
 export default fr;

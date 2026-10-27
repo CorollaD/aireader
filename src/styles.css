@@ -2546,3 +2546,17 @@ body.resizing * {
 .side-tabs .tab-icon:hover {
   color: var(--fg);
 }
+
+/* Semantic index status in the AI composer */
+.ai-basis .link-button {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.index-progress {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.settings-form .hint {
+  margin-bottom: 12px;
+}
