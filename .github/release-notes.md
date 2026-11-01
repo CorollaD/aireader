@@ -1,19 +1,13 @@
-## What's new in 0.6.0 / 更新内容
+## What's new in 0.6.1 / 更新内容
 
-- **Sync between devices** / 多设备同步：shelf, reading position, bookmarks, highlights, AI conversations, flashcards and reading time, through WebDAV or a cloud-drive folder. Book files are optional. Data is not encrypted. / 通过 WebDAV 或网盘文件夹同步书架、进度、书签、高亮、AI 对话、闪卡和阅读时长，书籍文件可选。数据不加密。
-- **Text recognition for scanned PDFs** / 扫描版 PDF 文字识别：runs on your device and makes pages searchable, selectable and readable aloud. The first use downloads about 31 MB of models. / 在本机识别，识别后可搜索、选中和朗读。首次使用下载约 31MB 模型。
-- **Reading papers** / 论文阅读：import by DOI, arXiv id, link or title (open copies only), look up details, click `[12]` to see a reference, and get an AI brief. Lookups run only when you ask. / 用 DOI、arXiv 号、链接或标题导入（仅开放版本），查询文献信息，点 `[12]` 查看参考文献，AI 论文速读。联网查询只在你操作时进行。
-- **Citations** / 引用导出：GB/T 7714, APA, MLA, Chicago, IEEE, BibTeX, RIS and CSL-JSON. / 支持以上格式，可复制或存为文件。
-- **Search the whole library** / 全库搜索：find words inside every book on your shelf. / 在书架上所有书的正文里搜索。
-- **Read aloud** / 朗读：with your system's voices. / 使用系统语音。
-- **Flashcards and dictionaries** / 闪卡与词典：spaced review, your own MDict and StarDict dictionaries, AI-made cards and quizzes. / 间隔复习，可导入自己的词典，AI 生成卡片和测验。
-- **Reading stats and daily highlights** / 阅读统计与每日回顾。
-- **Online catalogs** / 在线书库：browse and download from OPDS catalogs. / 浏览并下载 OPDS 书源里的书。
-- **AI and notes** / AI 与笔记：spoiler-free questions, and notes export to Markdown, Obsidian, CSV and JSON. / 防剧透提问；笔记可导出为 Markdown、Obsidian、CSV 和 JSON。
+- **OPDS 2** / 支持 OPDS 2：catalogs in the JSON format work alongside OPDS 1, and catalogs can log in with Digest (used by some Calibre servers). / JSON 格式的书源和 OPDS 1 一样可用，并支持 Digest 登录（部分 Calibre 服务器使用）。
+- **Open sources** / 开放书源：add catalogs in one click from Online catalogs → Open sources: Project Gutenberg, Internet Archive, OpenEdition and more. / 在「在线书库 → 开放书源」里一键添加 Project Gutenberg、Internet Archive、OpenEdition 等。
+- **Wikisource** / 维基文库：search seven languages, including Chinese classics, and download as EPUB. Very long works may export only their contents page; you'll be told. / 搜索七种语言，含中文古籍，并下载为 EPUB。大部头可能只导出目录，届时会有提示。
+- **Gutenberg by language** / Gutenberg 分语言：browse Chinese, German, French, Spanish and Italian books. / 浏览中、德、法、西、意语的书。
+- **Library websites** / 图书馆网站：21 libraries without an app interface open in your browser, such as CBETA, Gallica and Aozora Bunko. / 21 个没有应用接口的图书馆可在浏览器打开，如 CBETA、Gallica、青空文库。
+- **New formats** / 新格式：DjVu (including text recognition for scans), ODT, RTF and saved HTML pages. / DjVu（扫描件可做文字识别）、ODT、RTF 和保存的 HTML 网页。
 
-**Upgrading** / 升级说明：your library is updated automatically on first launch. We suggest backing it up first under Settings → General. / 首次打开时书库会自动升级，建议先在「设置 → 通用」里备份。
-
-**Known limits** / 已知限制：new features have had little testing on Windows and Linux; text recognition has only been run on an Intel Mac. / 新功能在 Windows 和 Linux 上测试较少；文字识别只在 Intel Mac 上实际运行过。
+**Known limits** / 已知限制：the new formats have had limited testing with real-world files. Internet Archive downloads can be slow or fail on some networks, and its search mostly lists books for loan; use its Open Access section. Text recognition has only been run on an Intel Mac. / 新格式用真实文件测试得还不多。Internet Archive 在部分网络下可能很慢或下载失败，搜索结果多为借阅书，请从 Open Access 分组进入。文字识别只在 Intel Mac 上实际运行过。
 
 ## Downloads / 下载
 
