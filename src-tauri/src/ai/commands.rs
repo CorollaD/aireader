@@ -359,6 +359,10 @@ async fn run_task(
             let units = tasks::book_units(&book.doc, budget)?;
             tasks::summarize_book(&runner, &mut cache(app, &book_id), &title, &units).await
         }
+        AiTask::PaperBrief { book_id } => {
+            let (book, title) = open_book(app, &book_id).await?;
+            tasks::paper_brief(&runner, &mut cache(app, &book_id), &title, &book.doc).await
+        }
         AiTask::Chat {
             book_title,
             selection,

@@ -28,6 +28,8 @@
 - 显示每本书的阅读进度和最近阅读时间
 - 在线书库（OPDS 1.x）：添加 Calibre 或其他书源，浏览、搜索并下载到书架；需要登录的书源支持 Basic 认证，密码存在系统钥匙串
 - 扫描版 PDF 文字识别：在本机用 PP-OCRv6 识别没有文字层的页面（首次使用下载约 31MB 模型），后台运行，可停止，下次接着做；结果用于搜索、选中文字、朗读和 AI
+- 论文阅读：输入 DOI、arXiv 号、链接或标题导入开放获取的论文，查询并保存文献信息；点正文里的 `[12]` 查看参考文献，AI 论文速读（问题、方法、结果、局限）。联网查询都由手动触发，只发送输入的内容或那一条参考文献
+- 引用导出：BibTeX、RIS、CSL-JSON，以及 GB/T 7714、APA、MLA、Chicago、IEEE 格式的文字引用，可复制或批量保存为文件
 - 多设备同步：通过 WebDAV（坚果云、Nextcloud、群晖等）或网盘文件夹（iCloud Drive、Dropbox、OneDrive 等）同步书架、进度、书签、高亮、AI 对话、闪卡和阅读时长；书籍文件可选同步，未下载的书在打开时下载。设置和 API Key 不同步；数据不加密，同一条记录以较新的修改为准
 - 备份书库（设置 → 通用）：导出一个 zip，含数据库和封面，可选包含书籍文件
 - 安装后可以在文件管理器中用 AiReader 打开 EPUB、MOBI/AZW3、FB2、CBZ（以及 PDF）；程序已在运行时会在当前窗口打开，不会再启动一个
@@ -134,6 +136,7 @@ src/                      React 前端
   study/                  查词、记忆卡复习、词典设置
   stats/                  阅读统计页
   opds/                   在线书库
+  paper/                  论文：文献信息、引用卡片、引用导出
   ocr/                    扫描版 PDF 文字识别：识别任务、阅读顺序、运行 PaddleOCR.js 的 Worker
   SyncSettings.tsx        同步设置
   dev/mock.ts             浏览器调试用的模拟后端
@@ -155,6 +158,8 @@ src-tauri/                Rust 后端
   src/stats.rs            按天的阅读时长和统计
   src/recall.rs           每日划线回顾
   src/opds.rs             OPDS 书源解析
+  src/paper.rs            论文标识解析、Crossref/arXiv/OpenAlex 查询、参考文献解析
+  src/citation.rs         引用导出（hayagriva）
   src/ocr.rs              识别结果的保存、叠加到书上，模型下载
   src/sync/               同步：导出与合并、WebDAV 和文件夹存储、命令
   src/dictionary.rs       StarDict / MDict 词典（opendict-rs）

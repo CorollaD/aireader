@@ -244,6 +244,8 @@ fn index_pending(app: &AppHandle) -> anyhow::Result<()> {
 }
 
 /// Seconds the frontend gets to save before the app quits anyway.
+/// Longer PDFs count as books, unless their details say otherwise.
+const MAX_PAPER_PAGES: usize = 80;
 const CLOSE_GRACE: std::time::Duration = std::time::Duration::from_secs(3);
 /// With sync on, a last sync runs before quitting, with the window already gone.
 const CLOSE_GRACE_SYNC: std::time::Duration = std::time::Duration::from_secs(8);
@@ -1524,6 +1526,150 @@ pub async fn reading_report(app: AppHandle, today: String, year: i32) -> CmdResu
 }
 
 /// Text runs of a PDF page for the selectable text layer (empty for scans and comics).
+/// The identifier printed in a PDF. Reads the book on this device only.
+#[tauri::command]
+pub async fn paper_detect(app: AppHandle, id: String) -> CmdResult<Option<String>> {
+    blocking(move || {
+        let book = state(&app).open_book(&id).map_err(err)?;
+        let Content::Paged(src) = &book.doc.content else {
+            return Ok(None);
+        };
+        Ok(crate::paper::detect_id(src.as_ref()).map(|id| id.to_string()))
+    })
+    .await
+}
+
+/// Looks up a DOI, arXiv id or title. Only what was typed leaves this device.
+#[tauri::command]
+pub async fn paper_lookup(query: String) -> CmdResult<crate::paper::PaperInfo> {
+    crate::paper::lookup(&query).await.map_err(err)
+}
+
+/// Finds the work one reference cites.
+#[tauri::command]
+pub async fn paper_lookup_reference(text: String) -> CmdResult<Option<crate::paper::PaperInfo>> {
+    crate::paper::lookup_reference(&text).await.map_err(err)
+}
+
+/// Keeps a book's bibliographic details.
+#[tauri::command]
+pub async fn paper_save(
+    app: AppHandle,
+    id: String,
+    info: crate::paper::PaperInfo,
+) -> CmdResult<Book> {
+    blocking(move || {
+        let mut lib = state(&app).library();
+        let book = lib.set_paper(&id, info).map_err(err)?;
+        lib.save_book(&id).map_err(err)?;
+        Ok(book)
+    })
+    .await
+}
+
+/// Downloads a paper's open copy and adds it to the shelf with its details.
+#[tauri::command]
+pub async fn paper_import(
+    app: AppHandle,
+    info: crate::paper::PaperInfo,
+) -> CmdResult<DownloadedBook> {
+    let url = info
+        .pdf_url
+        .clone()
+        .ok_or_else(|| crate::t!("paper_no_open_copy"))?;
+    let dir = std::env::temp_dir().join(format!("aireader-paper-{:x}", library::now_millis()));
+    std::fs::create_dir_all(&dir).map_err(err)?;
+    let file = dir.join(export::file_name(&info.title, "pdf", &mut HashSet::new()));
+    let imported = match crate::paper::download_pdf(&url, &file).await {
+        Ok(()) => {
+            let path = file.clone();
+            let app = app.clone();
+            blocking(move || {
+                let imported = import_file(&app, &path, None).map_err(err)?;
+                let id = match &imported {
+                    Imported::Added(id) | Imported::Existing(id) => id.clone(),
+                };
+                let mut lib = state(&app).library();
+                lib.set_paper(&id, info).map_err(err)?;
+                lib.save().map_err(err)?;
+                drop(lib);
+                start_indexing(&app);
+                Ok(imported)
+            })
+            .await
+        }
+        Err(e) => Err(err(e)),
+    };
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(match imported? {
+        Imported::Added(id) => DownloadedBook { id, added: true },
+        Imported::Existing(id) => DownloadedBook { id, added: false },
+    })
+}
+
+/// The numbered reference list of a paper. Long books are left out: their numbering restarts
+/// from chapter to chapter, and links would lead to the wrong entry.
+#[tauri::command]
+pub async fn paper_references(
+    app: AppHandle,
+    id: String,
+) -> CmdResult<Vec<crate::paper::Reference>> {
+    blocking(move || {
+        let st = state(&app);
+        let known_paper = st.library().get(&id).is_some_and(|b| b.paper.is_some());
+        let book = st.open_book(&id).map_err(err)?;
+        let Content::Paged(src) = &book.doc.content else {
+            return Ok(Vec::new());
+        };
+        if !known_paper && src.page_count() > MAX_PAPER_PAGES {
+            return Ok(Vec::new());
+        }
+        Ok(crate::paper::references(src.as_ref()))
+    })
+    .await
+}
+
+fn books_of(app: &AppHandle, ids: &[String]) -> Vec<library::Book> {
+    let lib = state(app).library();
+    ids.iter().filter_map(|id| lib.get(id).cloned()).collect()
+}
+
+#[tauri::command]
+pub async fn citation_text(
+    app: AppHandle,
+    ids: Vec<String>,
+    format: crate::citation::CitationFormat,
+) -> CmdResult<String> {
+    blocking(move || crate::citation::cite(&books_of(&app, &ids), format).map_err(err)).await
+}
+
+/// Saves citations to a file the user picks; returns its path.
+#[tauri::command]
+pub async fn citation_export(
+    app: AppHandle,
+    ids: Vec<String>,
+    format: crate::citation::CitationFormat,
+) -> CmdResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    blocking(move || {
+        let text = crate::citation::cite(&books_of(&app, &ids), format).map_err(err)?;
+        let ext = format.extension();
+        let Some(dest) = app
+            .dialog()
+            .file()
+            .add_filter(ext.to_uppercase(), &[ext])
+            .set_file_name(format!("references.{ext}"))
+            .blocking_save_file()
+        else {
+            return Ok(None);
+        };
+        let dest = dest.into_path().map_err(err)?;
+        std::fs::write(&dest, text).map_err(err)?;
+        Ok(Some(dest.display().to_string()))
+    })
+    .await
+}
+
 /// What is left to recognise in a book.
 #[derive(Serialize)]
 pub struct OcrStatus {

@@ -17,6 +17,7 @@ ego-tree = "0.11"
 encoding_rs = "0.8.42"
 epub = "2.1.5"
 futures-util = "0.3.34"
+hayagriva = { version = "0.10.1", default-features = false, features = ["archive"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
 keyring = "4.2"
 log = "0.4.34"

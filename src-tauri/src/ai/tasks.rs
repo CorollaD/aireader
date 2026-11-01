@@ -55,6 +55,9 @@ pub enum AiTask {
     },
     #[serde(rename_all = "camelCase")]
     SummarizeBook { book_id: String },
+    /// A structured reading of a paper.
+    #[serde(rename_all = "camelCase")]
+    PaperBrief { book_id: String },
     /// A conversation about a selected passage. `action` produces the first question; later
     /// turns are in `history` (ending with the user's newest message).
     #[serde(rename_all = "camelCase")]
@@ -487,6 +490,38 @@ pub async fn summarize_unit(
     } else {
         r.complete(prompt, MERGE_TOKENS).await
     }
+}
+
+/// Reads a paper for its question, method, results and limits, with caching. A paper too long for
+/// the model is cut short: its reference list and appendices are what goes.
+pub async fn paper_brief(
+    r: &Runner<'_>,
+    cache: &mut SummaryCache,
+    title: &str,
+    doc: &Document,
+) -> Result<(String, bool)> {
+    const KEY: &str = "paper-brief";
+    let model = r.cfg.model_key();
+    if let Some(s) = cache.get(&model, KEY) {
+        return Ok((s.clone(), true));
+    }
+    let Content::Paged(src) = &doc.content else {
+        bail!(crate::t!("not_paged_book"))
+    };
+    let unit = pages_unit(doc, 0, src.page_count().saturating_sub(1))?;
+    let text = split_by_budget(&unit.text, r.budget)
+        .into_iter()
+        .next()
+        .unwrap_or_default();
+    let prompt = format!(
+        "Below is the paper \"{title}\". Give a structured reading of it under four headings, in this order: \
+         the problem it addresses and why that matters; the method or approach; the main results, with the \
+         figures the paper reports; the limitations, including any the authors do not state. Use only what the \
+         paper says, and say so when it doesn't cover something.\n\n<paper>\n{text}\n</paper>"
+    );
+    let s = r.stream(prompt, SUMMARY_TOKENS).await?;
+    cache.put(&model, KEY, s.clone())?;
+    Ok((s, false))
 }
 
 /// Summarises one unit with caching; cached results are returned without a request.
@@ -1291,6 +1326,61 @@ mod tests {
         assert!(
             last.contains("甲") && last.contains("乙"),
             "the merge request includes both partial summaries"
+        );
+    }
+
+    /// A PDF of one page, for tasks that read a paper.
+    struct OnePage(&'static str);
+
+    impl crate::model::PageSource for OnePage {
+        fn page_count(&self) -> usize {
+            1
+        }
+        fn page_aspect(&self, _: usize) -> f32 {
+            1.4
+        }
+        fn render(&self, _: usize, _: u32) -> Result<crate::model::PageImage> {
+            bail!("not used")
+        }
+        fn page_text(&self, _: usize) -> Option<String> {
+            Some(self.0.to_owned())
+        }
+    }
+
+    #[tokio::test]
+    async fn a_paper_brief_asks_for_the_four_parts_and_is_kept() {
+        let dir = std::env::temp_dir().join(format!("aireader-brief-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = crate::db::Db::open(&dir.join("t.db")).unwrap();
+        let mut cache = SummaryCache::open(&db, "b");
+        let doc = Document {
+            path: std::path::PathBuf::new(),
+            title: "论文".into(),
+            author: None,
+            toc: Vec::new(),
+            cover: None,
+            content: Content::Paged(std::sync::Arc::new(OnePage("我们提出一种新方法。"))),
+        };
+        let model = MockCompletionModel::from_stream_turns([streamed(&["速", "读"])]);
+        let r = Runner {
+            model: model.clone().erase(),
+            cfg: cfg(),
+            budget: 4000,
+            emit: &|_| {},
+        };
+        let (text, cached) = paper_brief(&r, &mut cache, "论文", &doc).await.unwrap();
+        assert_eq!((text.as_str(), cached), ("速读", false));
+        let prompt = format!("{:?}", model.requests()[0]);
+        assert!(prompt.contains("limitations"), "{prompt}");
+        assert!(prompt.contains("我们提出一种新方法"), "{prompt}");
+
+        let (text, cached) = paper_brief(&r, &mut cache, "论文", &doc).await.unwrap();
+        assert_eq!((text.as_str(), cached), ("速读", true));
+        assert_eq!(
+            model.requests().len(),
+            1,
+            "the second time needs no request"
         );
     }
 

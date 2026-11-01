@@ -3,6 +3,7 @@
 pub mod ai;
 pub mod annotations;
 pub mod cards;
+pub mod citation;
 pub mod commands;
 pub mod db;
 pub mod dedupe;
@@ -15,6 +16,7 @@ pub mod library;
 pub mod model;
 pub mod ocr;
 pub mod opds;
+pub mod paper;
 pub mod protocol;
 pub mod recall;
 pub mod search;
@@ -123,6 +125,14 @@ pub fn run() {
             commands::save_export,
             commands::backup_library,
             commands::opds_catalogs,
+            commands::paper_detect,
+            commands::paper_lookup,
+            commands::paper_lookup_reference,
+            commands::paper_save,
+            commands::paper_import,
+            commands::paper_references,
+            commands::citation_text,
+            commands::citation_export,
             commands::ocr_status,
             commands::ocr_model,
             commands::ocr_page_image,

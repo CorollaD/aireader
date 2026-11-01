@@ -27,7 +27,9 @@ import type {
   OpdsCatalog,
   OpdsFeed,
   OpenedBook,
+  PaperInfo,
   ReadingReport,
+  Reference,
   SemanticStatus,
   Shelf,
   Suggestion,
@@ -37,6 +39,7 @@ import type {
 } from "./types";
 
 export type NotesFormat = "markdown" | "obsidian" | "csv" | "json";
+export type CitationFormat = "bibtex" | "ris" | "csljson" | "apa" | "mla" | "chicago" | "ieee" | "gbt7714";
 
 // Custom protocols are exposed as http://<scheme>.localhost on Windows.
 const BASE = navigator.userAgent.includes("Windows") ? "http://book.localhost/" : "book://localhost/";
@@ -112,6 +115,15 @@ export const api = {
   saveExport: (fileName: string, extension: string, data: string) => invoke<string | null>("save_export", { fileName, extension, data }),
   /** `day`: the local date the time belongs to. */
   addReadingTime: (id: string, seconds: number, speed: number | null, day: string) => invoke<Book>("add_reading_time", { id, seconds, speed, day }),
+  /** The DOI or arXiv id printed in a PDF, found without using the network. */
+  paperDetect: (id: string) => invoke<string | null>("paper_detect", { id }),
+  paperLookup: (query: string) => invoke<PaperInfo>("paper_lookup", { query }),
+  paperLookupReference: (text: string) => invoke<PaperInfo | null>("paper_lookup_reference", { text }),
+  paperSave: (id: string, info: PaperInfo) => invoke<Book>("paper_save", { id, info }),
+  paperImport: (info: PaperInfo) => invoke<{ id: string; added: boolean }>("paper_import", { info }),
+  paperReferences: (id: string) => invoke<Reference[]>("paper_references", { id }),
+  citationText: (ids: string[], format: CitationFormat) => invoke<string>("citation_text", { ids, format }),
+  citationExport: (ids: string[], format: CitationFormat) => invoke<string | null>("citation_export", { ids, format }),
   ocrStatus: (id: string) => invoke<{ pages: number; pending: number[] }>("ocr_status", { id }),
   ocrModel: (name: string) => invoke<ArrayBuffer>("ocr_model", { name }),
   ocrPageImage: (id: string, page: number, width: number) => invoke<ArrayBuffer>("ocr_page_image", { id, page, width }),

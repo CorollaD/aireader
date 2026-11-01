@@ -17,13 +17,18 @@ import { EditDialog } from "./EditDialog";
 import { DedupeDialog, DedupeProgress } from "./DedupeDialog";
 import { useAi } from "../ai/AiContext";
 import OrganizeDialog from "../ai/OrganizeDialog";
+import CiteDialog from "../paper/CiteDialog";
+import PaperDialog from "../paper/PaperDialog";
 
 const EXTENSIONS = ["epub", "pdf", "txt", "md", "markdown", "mobi", "azw", "azw3", "prc", "fb2", "zip", "docx", "cbz"];
 
 // Sidebar filters; any other value is a group name.
+const isPaper = (b: Book) => !!b.paper && b.paper.kind !== "book";
+
 const ALL = "\u0000all";
 const RECENT = "\u0000recent";
 const UNGROUPED = "\u0000none";
+const PAPERS = "\u0000papers";
 
 const SORTS: { key: ShelfSort; label: MessageKey }[] = [
   { key: "recent", label: "sort.recent" },
@@ -86,6 +91,8 @@ export default function ShelfView(props: {
   const [dedupe, setDedupe] = useState<{ groups: DuplicateGroup[]; intro?: string } | null>(null);
   const [dedupeProgress, setDedupeProgress] = useState<ImportProgress | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [paperFor, setPaperFor] = useState<{ bookId?: string } | null>(null);
+  const [citing, setCiting] = useState<string[] | null>(null);
   const fetching = useRef(false);
   const ai = useAi();
   const openSettings = useOpenSettings();
@@ -197,6 +204,7 @@ export default function ShelfView(props: {
     let books = shelf.books;
     if (filter === RECENT) books = books.filter((b) => b.lastRead);
     else if (filter === UNGROUPED) books = books.filter((b) => !b.group);
+    else if (filter === PAPERS) books = books.filter(isPaper);
     else if (filter !== ALL) books = books.filter((b) => b.group === filter);
     if (q) books = books.filter((b) => b.title.toLowerCase().includes(q) || (b.author ?? "").toLowerCase().includes(q));
     return sortBooks(books, filter === RECENT ? "recent" : settings.shelfSort);
@@ -276,6 +284,7 @@ export default function ShelfView(props: {
         <aside className="sidebar">
           <div className="brand">AiReader</div>
           {sideItem(ALL, "library", t("shelf.all"), shelf.books.length)}
+          {shelf.books.some(isPaper) && sideItem(PAPERS, "note", t("shelf.papers"), count(isPaper))}
           {sideItem(
             RECENT,
             "clock",
@@ -429,6 +438,9 @@ export default function ShelfView(props: {
                 <button onClick={() => (setImportMenu(false), pickFolder())}>
                   <Icon name="folderPlus" /> {t("shelf.importFolder")}
                 </button>
+                <button onClick={() => (setImportMenu(false), setPaperFor({}))}>
+                  <Icon name="note" /> {t("paper.importTitle")}
+                </button>
               </div>
             )}
           </div>
@@ -444,6 +456,7 @@ export default function ShelfView(props: {
             <span>{t("shelf.selectedCount", { n: selected.size })}</span>
             <button onClick={() => setSelected(new Set(visible.map((b) => b.id)))}>{t("shelf.selectAll")}</button>
             <button onClick={() => setEditing(selectedBooks)}>{t("shelf.setGroups")}</button>
+            <button onClick={() => setCiting(selectedBooks.map((b) => b.id))}>{t("cite.export")}</button>
             <button className="danger" onClick={() => setDeleting(selectedBooks)}>
               {t("common.delete")}
             </button>
@@ -524,6 +537,8 @@ export default function ShelfView(props: {
             {t("shelf.open")}
           </button>
           <button onClick={() => (setMenu(null), setEditing([menu.book]))}>{t("shelf.editInfo")}</button>
+          <button onClick={() => (setMenu(null), setPaperFor({ bookId: menu.book.id }))}>{t("paper.details")}</button>
+          <button onClick={() => (setMenu(null), setCiting([menu.book.id]))}>{t("cite.action")}</button>
           <button onClick={() => (setMenu(null), toggle(menu.book.id))}>{selected.has(menu.book.id) ? t("shelf.clearSelection") : t("common.select")}</button>
           <hr />
           <button className="danger" onClick={() => (setMenu(null), setDeleting([menu.book]))}>
@@ -624,6 +639,8 @@ export default function ShelfView(props: {
           }}
         />
       )}
+      {paperFor && <PaperDialog bookId={paperFor.bookId} onClose={() => setPaperFor(null)} onSaved={refresh} onImported={refresh} />}
+      {citing && <CiteDialog ids={citing} onClose={() => setCiting(null)} />}
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
       {downloading !== null && <div className="toast">{t("shelf.downloading", { title: downloading })}</div>}
     </div>

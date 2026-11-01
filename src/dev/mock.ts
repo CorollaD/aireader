@@ -15,6 +15,7 @@ import type {
   Location,
   OpdsCatalog,
   OpdsEntry,
+  PaperInfo,
   Source,
   TextRun,
 } from "../types";
@@ -41,8 +42,26 @@ function book(id: string, title: string, author: string | null, format: string, 
     rotation: 0,
     missing: false,
     synced: false,
+    paper: null,
   };
 }
+
+const SAMPLE_PAPER: PaperInfo = {
+  kind: "preprint",
+  title: "Attention Is All You Need",
+  authors: ["Vaswani, Ashish", "Shazeer, Noam"],
+  year: 2017,
+  venue: null,
+  volume: null,
+  issue: null,
+  pages: null,
+  publisher: null,
+  doi: null,
+  arxiv: "1706.03762",
+  url: "https://arxiv.org/abs/1706.03762",
+  summary: "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks.",
+  pdfUrl: "https://arxiv.org/pdf/1706.03762",
+};
 
 const PARAGRAPH =
   "话说天下大势，分久必合，合久必分。周末七国分争，并入于秦。及秦灭之后，楚、汉分争，又并入于汉。汉朝自高祖斩白蛇而起义，一统天下，后来光武中兴，传至献帝，遂分为三国。";
@@ -396,6 +415,30 @@ export function installMock() {
           b.lastRead = now();
           return null;
         }
+        case "paper_detect":
+          return "arXiv:1706.03762";
+        case "paper_lookup":
+        case "paper_lookup_reference":
+          return SAMPLE_PAPER;
+        case "paper_save": {
+          const b = db.books.find((x) => x.id === a.id)!;
+          b.paper = a.info as PaperInfo;
+          return b;
+        }
+        case "paper_import":
+          return { id: "0003", added: false };
+        case "paper_references":
+          return a.id === "0003"
+            ? [
+                { number: 1, text: "A. Author. The first cited paper. In Proceedings, 2014.", page: 4 },
+                { number: 2, text: "B. Writer. The second cited paper. Journal, 2015.", page: 4 },
+                { number: 3, text: "C. Scribe. The third cited paper. 2016.", page: 4 },
+              ]
+            : [];
+        case "citation_text":
+          return `@article{vaswani2017,\n  title = {{Attention Is All You Need}},\n  note = {${a.format}}\n}\n`;
+        case "citation_export":
+          return "/tmp/references.bib";
         case "ocr_status":
           return { pages: 5, pending: [0, 1, 2].filter((p) => !db.ocr.has(p)) };
         case "ocr_model": {
@@ -414,7 +457,7 @@ export function installMock() {
           return [
             { text: "Attention Is All You Need", x: 0.25, y: 0.2, w: 0.5, h: 0.03 },
             { text: "The dominant sequence transduction models are based on", x: 0.15, y: 0.4, w: 0.7, h: 0.015 },
-            { text: "complex recurrent or convolutional neural networks.", x: 0.15, y: 0.42, w: 0.65, h: 0.015 },
+            { text: "complex recurrent or convolutional neural networks [1, 2].", x: 0.15, y: 0.42, w: 0.65, h: 0.015 },
           ];
         case "get_annotations":
           return db.annotations.get(a.id as string) ?? { bookmarks: [], highlights: [] };

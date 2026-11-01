@@ -69,6 +69,9 @@ pub struct Book {
     /// The book came from another device; its file may not have been fetched yet.
     #[serde(default)]
     pub synced: bool,
+    /// Bibliographic details, once looked up or filled in.
+    #[serde(default)]
+    pub paper: Option<crate::paper::PaperInfo>,
     /// Set when listing if the stored file has disappeared.
     #[serde(default, skip_deserializing)]
     pub missing: bool,
@@ -604,6 +607,7 @@ impl Library {
             finished: None,
             meta_updated: 0,
             synced: false,
+            paper: None,
             missing: false,
         };
         Ok(Prepared { book, staged })
@@ -657,6 +661,27 @@ impl Library {
         if let Some(rotation) = patch.rotation {
             book.rotation = rotation % 360 / 90 * 90;
         }
+        Ok(book.clone())
+    }
+
+    /// Keeps a book's bibliographic details, with its title and authors to match. The link to a
+    /// download is only good for the moment, and isn't kept.
+    pub fn set_paper(&mut self, id: &str, mut info: crate::paper::PaperInfo) -> Result<Book> {
+        let book = self.get_mut(id)?;
+        info.pdf_url = None;
+        if !info.title.trim().is_empty() {
+            book.title = info.title.trim().to_owned();
+        }
+        if !info.authors.is_empty() {
+            let names: Vec<_> = info
+                .authors
+                .iter()
+                .map(|a| crate::paper::display_name(a))
+                .collect();
+            book.author = Some(names.join(", "));
+        }
+        book.paper = Some(info);
+        book.meta_updated = now();
         Ok(book.clone())
     }
 
@@ -859,6 +884,7 @@ impl Library {
                     b.author = incoming.author.clone();
                     b.group = incoming.group.clone();
                     b.rotation = incoming.rotation;
+                    b.paper = incoming.paper.clone();
                     b.meta_updated = incoming.meta_updated;
                     changed = true;
                 }

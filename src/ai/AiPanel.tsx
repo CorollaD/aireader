@@ -780,6 +780,17 @@ export default function AiPanel(props: {
               <span className="ai-card-title">{t("ai.summarizeBook")}</span>
               <span className="muted small ellipsis">{book.title}</span>
             </button>
+            {book.format === "PDF" && (
+              <button
+                className="ai-card"
+                onClick={() => startSummary(t("ai.paperBrief"), { kind: "paperBrief", bookId: book.id })}
+                disabled={summary?.status === "running"}
+              >
+                <Icon name="note" size={18} />
+                <span className="ai-card-title">{t("ai.paperBrief")}</span>
+                <span className="muted small ellipsis">{t("ai.paperBriefHint")}</span>
+              </button>
+            )}
           </div>
           {!summary && <p className="muted small ai-hint">{t("ai.summaryHint")}</p>}
           {summary && (

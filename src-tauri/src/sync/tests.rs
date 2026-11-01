@@ -150,6 +150,35 @@ async fn a_second_device_gets_the_shelf_and_reading_data() {
 }
 
 #[tokio::test]
+async fn citation_details_travel_with_the_book() {
+    let (a, b, remote) = setup("paper");
+    let id = a.import("a.txt", "第一章\n正文");
+    sync(&a, &remote).await;
+    sync(&b, &remote).await;
+    let info = crate::paper::PaperInfo {
+        kind: "article".into(),
+        title: "新标题".into(),
+        authors: vec!["LeCun, Yann".into()],
+        year: Some(2015),
+        pdf_url: Some("https://example.org/a.pdf".into()),
+        ..Default::default()
+    };
+    // Details change in a later second than the shared record's.
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+    a.lib().set_paper(&id, info).unwrap();
+    a.lib().save().unwrap();
+    sync(&a, &remote).await;
+    sync(&b, &remote).await;
+    let lib = b.lib();
+    let book = lib.get(&id).unwrap();
+    assert_eq!(book.title, "新标题");
+    assert_eq!(book.author.as_deref(), Some("Yann LeCun"));
+    let paper = book.paper.as_ref().unwrap();
+    assert_eq!(paper.year, Some(2015));
+    assert_eq!(paper.pdf_url, None, "a download link isn't kept");
+}
+
+#[tokio::test]
 async fn nothing_is_uploaded_when_nothing_changed() {
     let (a, b, remote) = setup("quiet");
     a.import("a.txt", "第一章\n甲");

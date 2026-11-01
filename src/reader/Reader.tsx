@@ -4,7 +4,7 @@ import { api, errorText } from "../api";
 import { onBeforeExit } from "../lifecycle";
 import type { UpdateSettings } from "../App";
 import type { Settings } from "../settings";
-import type { Card, Highlight, Hit, HighlightColor, Location, OpenedBook } from "../types";
+import type { Card, Highlight, HighlightColor, Hit, Location, OpenedBook, Reference } from "../types";
 import { isTyping, Modal, Toast } from "../ui";
 import { t } from "../i18n";
 import { Icon } from "../icons";
@@ -18,7 +18,10 @@ import type { ChatAction } from "../types";
 import { NoteEditor, SelectionToolbar } from "./Annotate";
 import FlowView, { type FlowHandle, type FlowSelection } from "./FlowView";
 import { describe, isValid, progressOf, sameLocation, START } from "./locations";
-import PagedView, { pageText, type PageSelection } from "./PagedView";
+import PagedView, { CitationLinks, pageText, type PageSelection } from "./PagedView";
+import CiteDialog from "../paper/CiteDialog";
+import CitationCard from "../paper/CitationCard";
+import PaperDialog from "../paper/PaperDialog";
 import { useOcr } from "../ocr/useOcr";
 import ProgressBar from "./ProgressBar";
 import SettingsPanel from "./SettingsPanel";
@@ -107,7 +110,24 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
 
   const ann = useAnnotations(bookId);
   const ocr = useOcr(bookId, book?.title ?? "", book?.format === "PDF");
+  const isPdf = book?.format === "PDF";
+  const [references, setReferences] = useState<Reference[]>([]);
+  const [cited, setCited] = useState<{ numbers: number[]; rect: DOMRect } | null>(null);
+  const [paperDialog, setPaperDialog] = useState(false);
+  const [citing, setCiting] = useState(false);
   const [ocrHidden, setOcrHidden] = useState(() => storedFlag(ocrHiddenKey(bookId)));
+  useEffect(() => {
+    setReferences([]);
+    if (!isPdf) return;
+    api
+      .paperReferences(bookId)
+      .then(setReferences)
+      .catch(() => {});
+  }, [bookId, isPdf]);
+  const citationLinks = useMemo(
+    () => ({ count: references.length, onCite: (numbers: number[], rect: DOMRect) => setCited({ numbers, rect }) }),
+    [references.length],
+  );
   const panels = usePanelWidths(bookId);
   const body = useRef<HTMLDivElement>(null);
   const [bodyWidth, setBodyWidth] = useState(0);
@@ -648,6 +668,16 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
                     <button className={settings.pageLayout === "spread" ? "checked" : ""} onClick={() => update({ pageLayout: "spread" })}>
                       <Icon name="spread" /> {t("rs.spread")}
                     </button>
+                    {book.format === "PDF" && (
+                      <>
+                        <button onClick={() => setPaperDialog(true)}>
+                          <Icon name="note" /> {t("paper.details")}
+                        </button>
+                        <button onClick={() => setCiting(true)}>
+                          <Icon name="copy" /> {t("cite.action")}
+                        </button>
+                      </>
+                    )}
                     {ocr.pending.length > 0 && !ocr.running && (
                       <button onClick={ocr.start}>
                         <Icon name="type" /> {t("ocr.recognise", { n: ocr.pending.length })}
@@ -701,6 +731,21 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
           </button>
         </div>
       )}
+      {paperDialog && (
+        <PaperDialog bookId={bookId} onClose={() => setPaperDialog(false)} onSaved={(saved) => setBook((b) => b && { ...b, title: saved.title })} />
+      )}
+      {citing && <CiteDialog ids={[bookId]} onClose={() => setCiting(false)} />}
+      {cited && (
+        <CitationCard
+          references={cited.numbers.flatMap((n) => references.filter((r) => r.number === n))}
+          rect={cited.rect}
+          onJump={(page) => {
+            setCited(null);
+            navigate({ kind: "page", page });
+          }}
+          onClose={() => setCited(null)}
+        />
+      )}
       {ocr.error && <div className="reader-notice error">{t("ocr.failed", { error: ocr.error })}</div>}
 
       <div className="reader-body" ref={body}>
@@ -753,17 +798,19 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
               speaking={speech.position}
             />
           ) : (
-            <PagedView
-              book={book}
-              jump={jump}
-              layout={settings.pageLayout}
-              fit={settings.pageFit}
-              rtl={settings.comicRtl && book.format === "CBZ"}
-              zoom={zoom}
-              rotation={rotation}
-              onLocation={onLocation}
-              onSelect={setPageSel}
-            />
+            <CitationLinks.Provider value={citationLinks}>
+              <PagedView
+                book={book}
+                jump={jump}
+                layout={settings.pageLayout}
+                fit={settings.pageFit}
+                rtl={settings.comicRtl && book.format === "CBZ"}
+                zoom={zoom}
+                rotation={rotation}
+                onLocation={onLocation}
+                onSelect={setPageSel}
+              />
+            </CitationLinks.Provider>
           )}
           {speech.state !== "idle" && (
             <ReadAloudBar

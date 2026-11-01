@@ -26,6 +26,35 @@ export interface Book {
   missing: boolean;
   /** Came from another device; when also `missing`, its file can be downloaded. */
   synced: boolean;
+  /** Bibliographic details, once looked up or filled in. */
+  paper: PaperInfo | null;
+}
+
+export interface PaperInfo {
+  /** "article", "conference", "preprint", "book" or "other". */
+  kind: string;
+  title: string;
+  /** "Family, Given" when the two are known apart. */
+  authors: string[];
+  year: number | null;
+  venue: string | null;
+  volume: string | null;
+  issue: string | null;
+  pages: string | null;
+  publisher: string | null;
+  doi: string | null;
+  arxiv: string | null;
+  url: string | null;
+  summary: string | null;
+  /** An open copy of the file, if one is known. */
+  pdfUrl: string | null;
+}
+
+/** An entry of a paper's reference list. */
+export interface Reference {
+  number: number;
+  text: string;
+  page: number;
 }
 
 export interface Shelf {
@@ -383,6 +412,7 @@ export type AiTask =
   | { kind: "summarizeChapter"; bookId: string; chapter: number }
   | { kind: "summarizePages"; bookId: string; from: number; to: number }
   | { kind: "summarizeBook"; bookId: string }
+  | { kind: "paperBrief"; bookId: string }
   | {
       kind: "chat";
       bookTitle: string;

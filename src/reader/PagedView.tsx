@@ -1,9 +1,10 @@
 // Fixed-layout pages (PDF, comics), rendered by the backend through `book://` URLs.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, createContext, useContext } from "react";
 import { api, pageUrl } from "../api";
 import { isTyping } from "../ui";
 import { watchOcrPages } from "../ocr/job";
+import { citationSegments } from "../paper/citations";
 import type { Location, OpenedBook, TextRun } from "../types";
 import type { Jump } from "./Reader";
 import { pixelRatio } from "../zoom";
@@ -32,6 +33,33 @@ function useSize(ref: React.RefObject<HTMLElement>) {
     return () => ro.disconnect();
   }, [ref]);
   return size;
+}
+
+/** Numbered citations in the text layer link to a list of this many references. */
+export const CitationLinks = createContext<{ count: number; onCite: (numbers: number[], rect: DOMRect) => void } | null>(null);
+
+/** A run's text, with its citations made clickable. They stay in the run, so selecting and the
+ * stretching of the run to its printed width work as before. */
+function RunText({ text }: { text: string }) {
+  const links = useContext(CitationLinks);
+  if (!links?.count) return text;
+  return citationSegments(text, links.count).map((s, i) =>
+    s.cites ? (
+      <span
+        key={i}
+        className="run-cite"
+        onClick={(e) => {
+          if (!window.getSelection()?.isCollapsed) return;
+          e.stopPropagation();
+          links.onCite(s.cites!, e.currentTarget.getBoundingClientRect());
+        }}
+      >
+        {s.text}
+      </span>
+    ) : (
+      s.text
+    ),
+  );
 }
 
 /** Text runs per book and page, fetched once, and again when a page gets recognised. */
@@ -102,7 +130,7 @@ function TextLayer(props: { bookId: string; index: number; width: number; height
         return (
           <span key={i}>
             <span className="run" style={{ left: r.x * w, top: r.y * h, fontSize: r.h * h }}>
-              {r.text}
+              <RunText text={r.text} />
             </span>
             {next && (newLine ? <br /> : <span className="sep"> </span>)}
           </span>
