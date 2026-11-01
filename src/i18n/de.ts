@@ -563,7 +563,6 @@ const de: Messages = {
   "opds.hint": "Bei einem Calibre-Server /opds an die Adresse anhängen, z. B. http://192.168.1.2:8080/opds. Passwörter liegen im Schlüsselbund des Systems.",
   "opds.emptyTitle": "Noch keine Kataloge",
   "opds.emptyHint": "Füge einen OPDS-Katalog hinzu, etwa deine Calibre-Bibliothek, um Bücher zu durchsuchen und herunterzuladen.",
-  "opds.addSuggested": "{name} hinzufügen (kostenlose gemeinfreie Bücher)",
   "opds.search": "Diesen Katalog durchsuchen",
   "opds.results": "Ergebnisse für {query}",
   "opds.noEntries": "Hier ist nichts",
@@ -649,6 +648,20 @@ const de: Messages = {
   "shelf.papers": "Artikel",
   "ai.paperBrief": "Artikel-Überblick",
   "ai.paperBriefHint": "Problem, Methode, Ergebnisse, Grenzen",
+  "opds.sources": "Offene Quellen",
+  "opds.sourceAdded": "Hinzugefügt",
+  "opds.openSite": "Website öffnen",
+  "opds.groupCatalogs": "Kataloge",
+  "opds.groupCatalogsHint": "Hier stöbern, suchen und laden. Nur ausleihbare Bücher haben keinen Download.",
+  "opds.groupWikisource": "Wikisource",
+  "opds.groupWikisourceHint": "Nach Titel suchen und als EPUB exportieren. Sehr lange Werke liefern evtl. nur das Inhaltsverzeichnis; du wirst informiert.",
+  "opds.groupGutendex": "Gutenberg nach Sprache",
+  "opds.groupGutendexHint": "Bücher von Project Gutenberg in einer Sprache.",
+  "opds.groupWebsites": "Bibliothekswebsites",
+  "opds.groupWebsitesHint": "Diese haben keine Schnittstelle für Apps. Sie öffnen sich im Browser; importiere, was du lädst. Prüfe die Bedingungen der Seite.",
+  "opds.searchPrompt": "Oben nach Titel suchen",
+  "opds.thin": "Hinzugefügt, aber mit wenig Text: vielleicht nur das Inhaltsverzeichnis oder ein kurzes Werk",
+  "opds.noDownload": "Keine Datei zum Herunterladen; vielleicht nur ausleihbar",
 };
 
 export default de;

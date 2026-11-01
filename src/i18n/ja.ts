@@ -559,7 +559,6 @@ const ja: Messages = {
   "opds.hint": "Calibre サーバーはアドレスに /opds を付けます（例：http://192.168.1.2:8080/opds）。パスワードはシステムのキーチェーンに保存されます。",
   "opds.emptyTitle": "カタログはまだありません",
   "opds.emptyHint": "Calibre ライブラリなどの OPDS カタログを追加すると、本を閲覧、検索、ダウンロードできます。",
-  "opds.addSuggested": "{name} を追加（無料のパブリックドメイン書籍）",
   "opds.search": "このカタログを検索",
   "opds.results": "「{query}」の検索結果",
   "opds.noEntries": "何もありません",
@@ -641,6 +640,20 @@ const ja: Messages = {
   "shelf.papers": "論文",
   "ai.paperBrief": "論文の要点",
   "ai.paperBriefHint": "課題・手法・結果・限界",
+  "opds.sources": "オープンソース書庫",
+  "opds.sourceAdded": "追加済み",
+  "opds.openSite": "サイトを開く",
+  "opds.groupCatalogs": "カタログ",
+  "opds.groupCatalogsHint": "ここで閲覧、検索、ダウンロードできます。貸出のみの本はダウンロードできません。",
+  "opds.groupWikisource": "ウィキソース",
+  "opds.groupWikisourceHint": "タイトルで検索して EPUB に書き出します。長い作品は目次のみになることがあり、その場合はお知らせします。",
+  "opds.groupGutendex": "言語別 Gutenberg",
+  "opds.groupGutendexHint": "Project Gutenberg の特定言語の本です。",
+  "opds.groupWebsites": "図書館サイト",
+  "opds.groupWebsitesHint": "アプリ用の接続先がないため、ブラウザーで開きます。ダウンロードしたものを取り込んでください。各サイトの利用条件をご確認ください。",
+  "opds.searchPrompt": "上の欄でタイトルを検索してください",
+  "opds.thin": "追加しましたが本文が少なめです。目次のみか、短い作品の可能性があります",
+  "opds.noDownload": "ダウンロードできるファイルがありません。貸出のみの可能性があります",
 };
 
 export default ja;

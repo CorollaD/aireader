@@ -214,6 +214,8 @@ export interface OpdsCatalog {
   title: string;
   url: string;
   username: string;
+  /** "" for an OPDS catalog, or "gutendex" or "wikisource". */
+  kind: string;
 }
 
 export interface OpdsDownload {

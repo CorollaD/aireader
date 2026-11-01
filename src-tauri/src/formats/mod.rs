@@ -2,13 +2,16 @@
 
 pub mod builder;
 pub mod cbz;
+pub mod djvu;
 pub mod docx;
 pub mod epub;
 pub mod fb2;
 pub mod html;
 pub mod markdown;
 pub mod mobi;
+pub mod odt;
 pub mod pdf;
+pub mod rtf;
 pub mod txt;
 
 use std::io::Read;
@@ -21,6 +24,7 @@ use crate::model::{Block, Content, Document};
 /// File extensions offered in the open dialog and accepted when importing folders.
 pub const EXTENSIONS: &[&str] = &[
     "epub", "pdf", "txt", "md", "markdown", "mobi", "azw", "azw3", "prc", "fb2", "docx", "cbz",
+    "djvu", "djv", "rtf", "odt", "html", "htm", "xhtml",
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -34,6 +38,10 @@ pub enum Format {
     Fb2Zip,
     Docx,
     Cbz,
+    Djvu,
+    Rtf,
+    Odt,
+    Html,
 }
 
 impl Format {
@@ -47,6 +55,10 @@ impl Format {
             Format::Fb2 | Format::Fb2Zip => "FB2",
             Format::Docx => "DOCX",
             Format::Cbz => "CBZ",
+            Format::Djvu => "DJVU",
+            Format::Rtf => "RTF",
+            Format::Odt => "ODT",
+            Format::Html => "HTML",
         }
     }
 }
@@ -102,6 +114,10 @@ pub fn open(path: &Path) -> Result<Document> {
         Format::Fb2Zip => fb2::load_zip(path),
         Format::Docx => docx::load(path),
         Format::Cbz => cbz::load(path),
+        Format::Djvu => djvu::load(path),
+        Format::Rtf => rtf::load(path),
+        Format::Odt => odt::load(path),
+        Format::Html => html::load(path),
     };
     doc.with_context(|| crate::t!("open_failed", path = path.display()))
 }
@@ -124,6 +140,10 @@ pub fn detect(path: &Path) -> Result<Format> {
         "fb2" => Format::Fb2,
         "docx" => Format::Docx,
         "cbz" => Format::Cbz,
+        "djvu" | "djv" => Format::Djvu,
+        "rtf" => Format::Rtf,
+        "odt" => Format::Odt,
+        "html" | "htm" | "xhtml" => Format::Html,
         _ => sniff(path)?,
     })
 }
@@ -137,6 +157,12 @@ fn sniff(path: &Path) -> Result<Format> {
     let head = &head[..n];
     if head.starts_with(b"%PDF") {
         return Ok(Format::Pdf);
+    }
+    if head.starts_with(b"AT&TFORM") {
+        return Ok(Format::Djvu);
+    }
+    if head.starts_with(b"{\\rtf") {
+        return Ok(Format::Rtf);
     }
     if head.len() >= 68 && (&head[60..68] == b"BOOKMOBI" || &head[60..68] == b"TEXtREAd") {
         return Ok(Format::Mobi);

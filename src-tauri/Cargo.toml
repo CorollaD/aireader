@@ -17,6 +17,8 @@ ego-tree = "0.11"
 encoding_rs = "0.8.42"
 epub = "2.1.5"
 futures-util = "0.3.34"
+digest_auth = "0.3.1"
+djvu-rs = { version = "0.44", default-features = false, features = ["std"] }
 hayagriva = { version = "0.10.1", default-features = false, features = ["archive"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
 keyring = "4.2"
@@ -32,6 +34,7 @@ rig-core = { version = "0.45", features = ["reqwest"] }
 rig-reqwest = "0.45"
 rig-sqlite = "0.45.0"
 roxmltree = "0.21.1"
+rtf-parser = "0.4.3"
 rs-fsrs = { version = "1.2.1", features = ["serde"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 schemars = "1"
@@ -43,6 +46,7 @@ sqlite-vec = "0.1"
 tauri = { version = "2.12.5", features = [] }
 tauri-plugin-dialog = "2.8.3"
 tauri-plugin-log = "2.10.1"
+tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2.5.4"
 tauri-plugin-window-state = "2.5.0"
 tokio = { version = "1.54.1", features = ["sync", "rt", "macros", "time", "fs"] }

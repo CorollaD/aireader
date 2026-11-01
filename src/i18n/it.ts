@@ -561,7 +561,6 @@ const it: Messages = {
   "opds.hint": "Per un server Calibre, aggiungi /opds all'indirizzo, ad es. http://192.168.1.2:8080/opds. Le password restano nel portachiavi di sistema.",
   "opds.emptyTitle": "Ancora nessun catalogo",
   "opds.emptyHint": "Aggiungi un catalogo OPDS, come la tua libreria Calibre, per sfogliare, cercare e scaricare libri.",
-  "opds.addSuggested": "Aggiungi {name} (libri gratuiti di pubblico dominio)",
   "opds.search": "Cerca in questo catalogo",
   "opds.results": "Risultati per {query}",
   "opds.noEntries": "Non c'è niente qui",
@@ -645,6 +644,20 @@ const it: Messages = {
   "shelf.papers": "Articoli",
   "ai.paperBrief": "Sintesi dell'articolo",
   "ai.paperBriefHint": "Problema, metodo, risultati, limiti",
+  "opds.sources": "Fonti aperte",
+  "opds.sourceAdded": "Aggiunta",
+  "opds.openSite": "Apri sito",
+  "opds.groupCatalogs": "Cataloghi",
+  "opds.groupCatalogsHint": "Sfoglia, cerca e scarica qui. I libri solo in prestito non hanno download.",
+  "opds.groupWikisource": "Wikisource",
+  "opds.groupWikisourceHint": "Cerca per titolo ed esporta in EPUB. Le opere molto lunghe possono esportare solo l'indice: verrai avvisato.",
+  "opds.groupGutendex": "Gutenberg per lingua",
+  "opds.groupGutendexHint": "I libri di Project Gutenberg in una lingua.",
+  "opds.groupWebsites": "Siti di biblioteche",
+  "opds.groupWebsitesHint": "Non hanno un'interfaccia per app. Si aprono nel browser; importa ciò che scarichi. Controlla i termini di ogni sito.",
+  "opds.searchPrompt": "Cerca per titolo qui sopra",
+  "opds.thin": "Aggiunto, ma c'è poco testo: forse solo l'indice, o un'opera breve",
+  "opds.noDownload": "Nessun file da scaricare; forse è solo in prestito",
 };
 
 export default it;

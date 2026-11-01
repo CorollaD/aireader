@@ -204,6 +204,8 @@ export function installMock() {
         case "sync_now":
         case "sync_fetch_book":
           return null;
+        case "open_website":
+          return null;
         case "opds_catalogs":
           return db.catalogs;
         case "opds_save_catalog": {
@@ -375,7 +377,7 @@ export function installMock() {
           return null;
         case "open_book": {
           const b = find(a.id);
-          const paged = b.format === "PDF" || b.format === "CBZ";
+          const paged = ["PDF", "CBZ", "DJVU"].includes(b.format);
           return {
             id: b.id,
             title: b.title,

@@ -120,7 +120,7 @@ export const api = {
   paperLookup: (query: string) => invoke<PaperInfo>("paper_lookup", { query }),
   paperLookupReference: (text: string) => invoke<PaperInfo | null>("paper_lookup_reference", { text }),
   paperSave: (id: string, info: PaperInfo) => invoke<Book>("paper_save", { id, info }),
-  paperImport: (info: PaperInfo) => invoke<{ id: string; added: boolean }>("paper_import", { info }),
+  paperImport: (info: PaperInfo) => invoke<{ id: string; added: boolean; thin: boolean }>("paper_import", { info }),
   paperReferences: (id: string) => invoke<Reference[]>("paper_references", { id }),
   citationText: (ids: string[], format: CitationFormat) => invoke<string>("citation_text", { ids, format }),
   citationExport: (ids: string[], format: CitationFormat) => invoke<string | null>("citation_export", { ids, format }),
@@ -145,7 +145,8 @@ export const api = {
   /** A cover as a data URL, or null if it isn't a usable picture. */
   opdsImage: (catalogId: string, url: string) => invoke<string | null>("opds_image", { catalogId, url }),
   opdsDownload: (catalogId: string, url: string, title: string, extension: string) =>
-    invoke<{ id: string; added: boolean }>("opds_download", { catalogId, url, title, extension }),
+    invoke<{ id: string; added: boolean; thin: boolean }>("opds_download", { catalogId, url, title, extension }),
+  openWebsite: (url: string) => invoke<void>("open_website", { url }),
   /** What is left of today's highlights; `today` is when the local day began (Unix seconds). */
   dailyHighlights: (today: number) => invoke<DailyHighlight[]>("daily_highlights", { today }),
   /** `keep`: bring it back later; otherwise it isn't shown again. */

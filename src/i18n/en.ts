@@ -561,7 +561,6 @@ const en: Messages = {
   "opds.hint": "For a Calibre server, add /opds to its address, e.g. http://192.168.1.2:8080/opds. Passwords are kept in the system keychain.",
   "opds.emptyTitle": "No catalogs yet",
   "opds.emptyHint": "Add an OPDS catalog, such as your own Calibre library, to browse, search and download books to your shelf.",
-  "opds.addSuggested": "Add {name} (free public-domain books)",
   "opds.search": "Search this catalog",
   "opds.results": "Results for {query}",
   "opds.noEntries": "Nothing here",
@@ -646,6 +645,20 @@ const en: Messages = {
   "shelf.papers": "Papers",
   "ai.paperBrief": "Paper brief",
   "ai.paperBriefHint": "Problem, method, results, limits",
+  "opds.sources": "Open sources",
+  "opds.sourceAdded": "Added",
+  "opds.openSite": "Open site",
+  "opds.groupCatalogs": "Catalogs",
+  "opds.groupCatalogsHint": "Browse, search and download here. Books that can only be borrowed show no download.",
+  "opds.groupWikisource": "Wikisource",
+  "opds.groupWikisourceHint": "Search by title and export as EPUB. Very long works may export only their contents page; you'll be told.",
+  "opds.groupGutendex": "Gutenberg by language",
+  "opds.groupGutendexHint": "Project Gutenberg's books in one language.",
+  "opds.groupWebsites": "Library websites",
+  "opds.groupWebsitesHint": "These have no interface for apps. They open in your browser; import what you download. Check each site's terms.",
+  "opds.searchPrompt": "Search by title above",
+  "opds.thin": "Added, but there isn't much text: it may be only a contents page, or simply a short work",
+  "opds.noDownload": "No file to download; it may only be available on loan",
 };
 
 export default en;

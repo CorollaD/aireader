@@ -553,7 +553,6 @@ const zhTW: Messages = {
   "opds.hint": "Calibre 書庫：在位址後加 /opds，例如 http://192.168.1.2:8080/opds。密碼儲存在系統鑰匙圈。",
   "opds.emptyTitle": "還沒有書源",
   "opds.emptyHint": "新增 OPDS 書源後，可以瀏覽、搜尋並把書下載到書架，例如自己的 Calibre 書庫。",
-  "opds.addSuggested": "新增 {name}（免費公版書）",
   "opds.search": "搜尋這個書源",
   "opds.results": "搜尋：{query}",
   "opds.noEntries": "這裡什麼也沒有",
@@ -633,6 +632,20 @@ const zhTW: Messages = {
   "shelf.papers": "論文",
   "ai.paperBrief": "論文速讀",
   "ai.paperBriefHint": "問題、方法、結果、局限",
+  "opds.sources": "開放書源",
+  "opds.sourceAdded": "已新增",
+  "opds.openSite": "開啟網站",
+  "opds.groupCatalogs": "線上目錄",
+  "opds.groupCatalogsHint": "可以直接瀏覽、搜尋和下載。部分書只能借閱，這類書不提供下載。",
+  "opds.groupWikisource": "維基文庫",
+  "opds.groupWikisourceHint": "按標題搜尋，匯出為 EPUB。中文古籍主要在這裡。大部頭可能只匯出目錄，會有提示。",
+  "opds.groupGutendex": "Gutenberg 分語言",
+  "opds.groupGutendexHint": "Project Gutenberg 裡某一種語言的書。",
+  "opds.groupWebsites": "圖書館網站",
+  "opds.groupWebsitesHint": "這些網站沒有介面，在瀏覽器裡開啟，下載後再匯入書架。使用前請看各站的條款。",
+  "opds.searchPrompt": "在右上角輸入標題搜尋",
+  "opds.thin": "已加入書架，但內容不多：可能只匯出了目錄，也可能本來就短",
+  "opds.noDownload": "沒有可下載的檔案，可能只能借閱",
 };
 
 export default zhTW;

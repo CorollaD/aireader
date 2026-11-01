@@ -553,7 +553,6 @@ const zhCN = {
   "opds.hint": "Calibre 书库：在地址后加 /opds，例如 http://192.168.1.2:8080/opds。密码保存在系统钥匙串。",
   "opds.emptyTitle": "还没有书源",
   "opds.emptyHint": "添加 OPDS 书源后，可以浏览、搜索并把书下载到书架，比如自己的 Calibre 书库。",
-  "opds.addSuggested": "添加 {name}（免费公版书）",
   "opds.search": "搜索这个书源",
   "opds.results": "搜索：{query}",
   "opds.noEntries": "这里什么也没有",
@@ -633,6 +632,20 @@ const zhCN = {
   "shelf.papers": "论文",
   "ai.paperBrief": "论文速读",
   "ai.paperBriefHint": "问题、方法、结果、局限",
+  "opds.sources": "开放书源",
+  "opds.sourceAdded": "已添加",
+  "opds.openSite": "打开网站",
+  "opds.groupCatalogs": "在线目录",
+  "opds.groupCatalogsHint": "可以直接浏览、搜索和下载。部分书只能借阅，这类书不提供下载。",
+  "opds.groupWikisource": "维基文库",
+  "opds.groupWikisourceHint": "按标题搜索，导出为 EPUB。中文古籍主要在这里。大部头可能只导出目录，会有提示。",
+  "opds.groupGutendex": "Gutenberg 分语言",
+  "opds.groupGutendexHint": "Project Gutenberg 里某一种语言的书。",
+  "opds.groupWebsites": "图书馆网站",
+  "opds.groupWebsitesHint": "这些网站没有接口，在浏览器里打开，下载后再导入书架。使用前请看各站的条款。",
+  "opds.searchPrompt": "在右上角输入标题搜索",
+  "opds.thin": "已加入书架，但内容不多：可能只导出了目录，也可能本来就短",
+  "opds.noDownload": "没有可下载的文件，可能只能借阅",
 };
 
 export default zhCN;

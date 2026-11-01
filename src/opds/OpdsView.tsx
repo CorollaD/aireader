@@ -6,9 +6,8 @@ import { t } from "../i18n";
 import { Icon } from "../icons";
 import type { OpdsCatalog, OpdsDownload, OpdsEntry, OpdsFeed } from "../types";
 import { Confirm, Modal, Toast } from "../ui";
-
-/** A free catalog that needs no account, offered when none has been added. */
-const SUGGESTED = { title: "Project Gutenberg", url: "https://www.gutenberg.org/ebooks.opds/" };
+import SourcesDialog from "./SourcesDialog";
+import type { Source } from "./sources";
 
 /** A page of a catalog on the way back up. */
 interface Crumb {
@@ -57,7 +56,12 @@ function CatalogDialog(props: { catalog: Partial<OpdsCatalog>; onSave: (c: OpdsC
           <button
             className="primary"
             disabled={!url.trim()}
-            onClick={() => props.onSave({ id: props.catalog.id ?? "", title: title.trim() || url.trim(), url: url.trim(), username }, password)}
+            onClick={() =>
+              props.onSave(
+                { id: props.catalog.id ?? "", title: title.trim() || url.trim(), url: url.trim(), username, kind: props.catalog.kind ?? "" },
+                password,
+              )
+            }
           >
             {t("common.save")}
           </button>
@@ -131,6 +135,7 @@ function EntryRow(props: {
         )}
         {entry.author && <div className="muted small">{entry.author}</div>}
         {entry.summary && <div className="muted small opds-summary">{entry.summary}</div>}
+        {entry.downloads.length === 0 && !entry.link && <div className="muted small">{t("opds.noDownload")}</div>}
         {entry.downloads.length > 0 && (
           <div className="opds-downloads">
             {state.bookId ? (
@@ -161,6 +166,7 @@ export default function OpdsView(props: { onBack: () => void; onOpen: (bookId: s
   const [dialog, setDialog] = useState<Partial<OpdsCatalog> | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [sources, setSources] = useState(false);
   const page = crumbs[crumbs.length - 1] ?? null;
 
   /** Runs a request for a feed, showing progress and errors. */
@@ -211,6 +217,11 @@ export default function OpdsView(props: { onBack: () => void; onOpen: (bookId: s
     }
   };
 
+  const addSource = (source: Source) => {
+    setSources(false);
+    save({ id: "", username: "", ...source });
+  };
+
   const remove = async () => {
     if (!current) return;
     const list = await api.opdsRemoveCatalog(current);
@@ -241,7 +252,7 @@ export default function OpdsView(props: { onBack: () => void; onOpen: (bookId: s
   const download = async (entry: OpdsEntry, d: OpdsDownload) => {
     try {
       const book = await api.opdsDownload(current!, d.url, entry.title, d.extension);
-      setToast(book.added ? t("opds.added") : t("opds.already"));
+      setToast(book.thin ? t("opds.thin") : book.added ? t("opds.added") : t("opds.already"));
       return book.id;
     } catch (e) {
       setToast(errorText(e));
@@ -279,6 +290,9 @@ export default function OpdsView(props: { onBack: () => void; onOpen: (bookId: s
             </button>
           </>
         )}
+        <button onClick={() => setSources(true)}>
+          <Icon name="library" size={14} /> {t("opds.sources")}
+        </button>
         <button onClick={() => setDialog({})}>
           <Icon name="plus" size={14} /> {t("opds.add")}
         </button>
@@ -289,8 +303,8 @@ export default function OpdsView(props: { onBack: () => void; onOpen: (bookId: s
           <div className="review-done">
             <div className="ai-welcome-title">{t("opds.emptyTitle")}</div>
             <p className="muted small">{t("opds.emptyHint")}</p>
-            <button className="primary" onClick={() => save({ id: "", username: "", ...SUGGESTED })}>
-              {t("opds.addSuggested", { name: SUGGESTED.title })}
+            <button className="primary" onClick={() => setSources(true)}>
+              {t("opds.sources")}
             </button>
           </div>
         )}
@@ -315,7 +329,9 @@ export default function OpdsView(props: { onBack: () => void; onOpen: (bookId: s
           </div>
         )}
         {error && <div className="error small opds-error">{error}</div>}
-        {page?.feed.entries.length === 0 && !busy && <div className="empty muted">{t("opds.noEntries")}</div>}
+        {page?.feed.entries.length === 0 && !busy && (
+          <div className="empty muted">{crumbs.length === 1 && searchable ? t("opds.searchPrompt") : t("opds.noEntries")}</div>
+        )}
         {current &&
           page?.feed.entries.map((entry, i) => (
             <EntryRow key={entry.id || i} entry={entry} catalogId={current} onFollow={follow} onDownload={download} onOpen={props.onOpen} />
@@ -339,6 +355,7 @@ export default function OpdsView(props: { onBack: () => void; onOpen: (bookId: s
         />
       )}
       {dialog && <CatalogDialog catalog={dialog} onSave={save} onClose={() => setDialog(null)} />}
+      {sources && <SourcesDialog catalogs={catalogs ?? []} onAdd={addSource} onClose={() => setSources(false)} />}
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
     </div>
   );

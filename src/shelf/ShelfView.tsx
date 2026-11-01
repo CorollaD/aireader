@@ -20,7 +20,28 @@ import OrganizeDialog from "../ai/OrganizeDialog";
 import CiteDialog from "../paper/CiteDialog";
 import PaperDialog from "../paper/PaperDialog";
 
-const EXTENSIONS = ["epub", "pdf", "txt", "md", "markdown", "mobi", "azw", "azw3", "prc", "fb2", "zip", "docx", "cbz"];
+const EXTENSIONS = [
+  "epub",
+  "pdf",
+  "txt",
+  "md",
+  "markdown",
+  "mobi",
+  "azw",
+  "azw3",
+  "prc",
+  "fb2",
+  "zip",
+  "docx",
+  "cbz",
+  "djvu",
+  "djv",
+  "rtf",
+  "odt",
+  "html",
+  "htm",
+  "xhtml",
+];
 
 // Sidebar filters; any other value is a group name.
 const isPaper = (b: Book) => !!b.paper && b.paper.kind !== "book";
@@ -38,7 +59,7 @@ const SORTS: { key: ShelfSort; label: MessageKey }[] = [
   { key: "progress", label: "sort.progress" },
 ];
 
-const FORMATS = "EPUB · PDF · TXT · Markdown · MOBI/AZW3 · FB2 · DOCX · CBZ";
+const FORMATS = "EPUB · PDF · TXT · Markdown · MOBI/AZW3 · FB2 · DOCX · ODT · RTF · HTML · CBZ · DjVu";
 
 function sortBooks(books: Book[], sort: ShelfSort): Book[] {
   const byText = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });

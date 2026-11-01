@@ -94,6 +94,37 @@
         "contentTypes": [
           "com.adobe.pdf"
         ]
+      },
+      {
+        "ext": [
+          "djvu",
+          "djv"
+        ],
+        "name": "DjVu document",
+        "description": "DjVu scanned book",
+        "role": "Viewer",
+        "rank": "Alternate",
+        "mimeType": "image/vnd.djvu"
+      },
+      {
+        "ext": [
+          "rtf"
+        ],
+        "name": "Rich Text",
+        "description": "RTF document",
+        "role": "Viewer",
+        "rank": "Alternate",
+        "mimeType": "application/rtf"
+      },
+      {
+        "ext": [
+          "odt"
+        ],
+        "name": "OpenDocument text",
+        "description": "ODT document",
+        "role": "Viewer",
+        "rank": "Alternate",
+        "mimeType": "application/vnd.oasis.opendocument.text"
       }
     ]
   }

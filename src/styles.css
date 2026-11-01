@@ -848,6 +848,25 @@ input[type="color"] {
   margin: 0 0 8px;
 }
 
+.source-list {
+  max-height: 68vh;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.source-group + .source-group {
+  margin-top: 16px;
+}
+
+.source-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 3px 0;
+  border-top: 1px solid var(--border);
+}
+
 /* ---------- Reader ---------- */
 
 .reader {

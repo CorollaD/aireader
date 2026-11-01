@@ -109,7 +109,7 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
   const saveTimer = useRef<number>();
 
   const ann = useAnnotations(bookId);
-  const ocr = useOcr(bookId, book?.title ?? "", book?.format === "PDF");
+  const ocr = useOcr(bookId, book?.title ?? "", book?.format === "PDF" || book?.format === "DJVU");
   const isPdf = book?.format === "PDF";
   const [references, setReferences] = useState<Reference[]>([]);
   const [cited, setCited] = useState<{ numbers: number[]; rect: DOMRect } | null>(null);

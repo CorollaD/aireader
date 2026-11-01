@@ -58,25 +58,48 @@ impl PageSource for CbzSource {
     }
 
     fn render(&self, index: usize, width: u32) -> Result<PageImage> {
-        let img = image::load_from_memory(&self.read(index)?)?;
-        if img.width() > 0 {
-            self.aspects.lock().unwrap()[index] = Some(img.height() as f32 / img.width() as f32);
+        let (page, aspect) = picture(&self.read(index)?, width)?;
+        if aspect.is_some() {
+            self.aspects.lock().unwrap()[index] = aspect;
         }
-        let img = if img.width() > width {
-            let h = (img.height() as f32 * width as f32 / img.width() as f32)
-                .round()
-                .max(1.0) as u32;
-            img.resize_exact(width, h, FilterType::Triangle)
-        } else {
-            img
-        };
-        let rgba = img.to_rgba8();
-        Ok(PageImage {
-            width: rgba.width(),
-            height: rgba.height(),
-            rgba: rgba.into_raw(),
-        })
+        Ok(page)
     }
+}
+
+/// Whether a file in a comic archive is one of its pages.
+fn is_page(name: &str) -> bool {
+    let ext = name
+        .rsplit_once('.')
+        .map(|(_, e)| e.to_lowercase())
+        .unwrap_or_default();
+    !name.starts_with("__MACOSX")
+        && !name
+            .rsplit(['/', '\\'])
+            .next()
+            .unwrap_or("")
+            .starts_with('.')
+        && IMAGE_EXTS.contains(&ext.as_str())
+}
+
+/// Decodes a page, at most `width` pixels wide; also gives its height/width.
+fn picture(bytes: &[u8], width: u32) -> Result<(PageImage, Option<f32>)> {
+    let img = image::load_from_memory(bytes)?;
+    let aspect = (img.width() > 0).then(|| img.height() as f32 / img.width() as f32);
+    let img = if img.width() > width {
+        let h = (img.height() as f32 * width as f32 / img.width() as f32)
+            .round()
+            .max(1.0) as u32;
+        img.resize_exact(width, h, FilterType::Triangle)
+    } else {
+        img
+    };
+    let rgba = img.to_rgba8();
+    let page = PageImage {
+        width: rgba.width(),
+        height: rgba.height(),
+        rgba: rgba.into_raw(),
+    };
+    Ok((page, aspect))
 }
 
 pub fn open_source(path: &Path) -> Result<CbzSource> {
@@ -84,16 +107,7 @@ pub fn open_source(path: &Path) -> Result<CbzSource> {
     let mut names: Vec<String> = zip
         .file_names()
         .filter_map(Result::ok)
-        .filter(|n| {
-            !n.starts_with("__MACOSX") && !n.rsplit('/').next().unwrap_or("").starts_with('.')
-        })
-        .filter(|n| {
-            let ext = n
-                .rsplit_once('.')
-                .map(|(_, e)| e.to_lowercase())
-                .unwrap_or_default();
-            IMAGE_EXTS.contains(&ext.as_str())
-        })
+        .filter(|n| is_page(n))
         .map(|n| n.into_owned())
         .collect();
     if names.is_empty() {

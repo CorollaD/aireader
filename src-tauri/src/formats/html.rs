@@ -1,13 +1,18 @@
-//! HTML/XHTML → [`Block`] conversion shared by EPUB and MOBI. CSS is ignored.
+//! HTML/XHTML → [`Block`] conversion shared by EPUB and MOBI, and web pages saved as files. CSS
+//! is ignored.
 
 use std::collections::HashMap;
+use std::path::Path;
 
+use anyhow::{Context, Result, bail};
+use base64::Engine;
 use ego_tree::NodeRef;
 use scraper::node::Element;
 use scraper::{Html, Node};
 
-use super::builder::Builder;
-use crate::model::{Block, ImageRef};
+use super::builder::{Builder, heading_toc, split_by_headings};
+use super::txt;
+use crate::model::{Block, Content, Document, ImageRef};
 
 pub struct HtmlOutput {
     pub blocks: Vec<Block>,
@@ -36,6 +41,43 @@ pub fn convert(
         blocks: w.b.blocks,
         anchors: w.anchors,
     }
+}
+
+/// A picture embedded in the page. Others are separate files, which an import doesn't bring.
+fn embedded_image(element: &Element) -> Option<ImageRef> {
+    let (kind, data) = element
+        .attr("src")?
+        .strip_prefix("data:image/")?
+        .split_once(',')?;
+    if !kind.ends_with(";base64") {
+        return None;
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data.trim())
+        .ok()?;
+    Some(ImageRef::new(bytes))
+}
+
+/// A web page saved as a file.
+pub fn load(path: &Path) -> Result<Document> {
+    let text = txt::decode(&std::fs::read(path).context(crate::t!("read_failed"))?);
+    let title = Html::parse_document(&text)
+        .select(&scraper::Selector::parse("title").expect("valid selector"))
+        .next()
+        .map(|t| t.text().collect::<String>().trim().to_owned())
+        .filter(|t| !t.is_empty());
+    let chapters = split_by_headings(convert(&text, &mut embedded_image).blocks);
+    if chapters.iter().all(|c| c.blocks.is_empty()) {
+        bail!(crate::t!("document_empty"));
+    }
+    Ok(Document {
+        path: path.to_owned(),
+        title: title.unwrap_or_else(|| Document::file_stem(path)),
+        author: None,
+        toc: heading_toc(&chapters, 3),
+        cover: None,
+        content: Content::Flow(chapters),
+    })
 }
 
 struct Walker<'r> {
@@ -234,6 +276,41 @@ impl Walker<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_saved_page_opens_as_a_book() {
+        let dir = std::env::temp_dir().join(format!("aireader-html-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("page.html");
+        std::fs::write(
+            &file,
+            r#"<html><head><title> 网页标题 </title><style>p{color:red}</style></head>
+            <body><h1>第一节</h1><p>正文<b>内容</b></p>
+            <img src="data:image/png;base64,aGVsbG8="><img src="other.png"></body></html>"#,
+        )
+        .unwrap();
+        let doc = load(&file).unwrap();
+        assert_eq!(doc.title, "网页标题");
+        assert_eq!(doc.toc[0].title, "第一节");
+        let Content::Flow(chapters) = &doc.content else {
+            panic!("a page is text")
+        };
+        let images = chapters
+            .iter()
+            .flat_map(|c| &c.blocks)
+            .filter(|b| matches!(b, Block::Image(_)))
+            .count();
+        assert_eq!(images, 1, "only what is inside the file");
+    }
+
+    #[test]
+    fn an_empty_page_is_refused() {
+        let dir = std::env::temp_dir().join(format!("aireader-html-e-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("empty.html");
+        std::fs::write(&file, "<html><head></head><body></body></html>").unwrap();
+        assert!(load(&file).is_err());
+    }
 
     fn conv(html: &str) -> HtmlOutput {
         convert(html, &mut |e| {

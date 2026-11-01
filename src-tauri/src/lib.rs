@@ -59,6 +59,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         // Logs go to the terminal and to the app's log folder (e.g. ~/Library/Logs/<identifier>).
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -125,6 +126,7 @@ pub fn run() {
             commands::save_export,
             commands::backup_library,
             commands::opds_catalogs,
+            commands::open_website,
             commands::paper_detect,
             commands::paper_lookup,
             commands::paper_lookup_reference,

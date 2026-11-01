@@ -565,7 +565,6 @@ const fr: Messages = {
     "Pour un serveur Calibre, ajoutez /opds à son adresse, par ex. http://192.168.1.2:8080/opds. Les mots de passe sont conservés dans le trousseau du système.",
   "opds.emptyTitle": "Aucun catalogue pour le moment",
   "opds.emptyHint": "Ajoutez un catalogue OPDS, comme votre bibliothèque Calibre, pour parcourir, chercher et télécharger des livres.",
-  "opds.addSuggested": "Ajouter {name} (livres gratuits du domaine public)",
   "opds.search": "Chercher dans ce catalogue",
   "opds.results": "Résultats pour {query}",
   "opds.noEntries": "Rien ici",
@@ -652,6 +651,22 @@ const fr: Messages = {
   "shelf.papers": "Articles",
   "ai.paperBrief": "Synthèse de l'article",
   "ai.paperBriefHint": "Problème, méthode, résultats, limites",
+  "opds.sources": "Sources ouvertes",
+  "opds.sourceAdded": "Ajoutée",
+  "opds.openSite": "Ouvrir le site",
+  "opds.groupCatalogs": "Catalogues",
+  "opds.groupCatalogsHint": "Parcourez, cherchez et téléchargez ici. Les livres en prêt seul n'ont pas de téléchargement.",
+  "opds.groupWikisource": "Wikisource",
+  "opds.groupWikisourceHint":
+    "Cherchez par titre et exportez en EPUB. Les œuvres très longues peuvent n'exporter que la table des matières : vous serez prévenu.",
+  "opds.groupGutendex": "Gutenberg par langue",
+  "opds.groupGutendexHint": "Les livres de Project Gutenberg dans une langue.",
+  "opds.groupWebsites": "Sites de bibliothèques",
+  "opds.groupWebsitesHint":
+    "Ils n'ont pas d'interface pour les applications. Ils s'ouvrent dans le navigateur ; importez ce que vous téléchargez. Consultez les conditions de chaque site.",
+  "opds.searchPrompt": "Cherchez par titre ci-dessus",
+  "opds.thin": "Ajouté, mais il y a peu de texte : peut-être la table des matières seule, ou une œuvre courte",
+  "opds.noDownload": "Aucun fichier à télécharger ; peut-être disponible en prêt seulement",
 };
 
 export default fr;

@@ -559,7 +559,6 @@ const ko: Messages = {
   "opds.hint": "Calibre 서버는 주소에 /opds를 붙이세요 (예: http://192.168.1.2:8080/opds). 비밀번호는 시스템 키체인에 저장됩니다.",
   "opds.emptyTitle": "아직 카탈로그가 없습니다",
   "opds.emptyHint": "Calibre 서재 같은 OPDS 카탈로그를 추가하면 책을 둘러보고 검색해 내려받을 수 있습니다.",
-  "opds.addSuggested": "{name} 추가 (무료 퍼블릭 도메인 도서)",
   "opds.search": "이 카탈로그 검색",
   "opds.results": "{query} 검색 결과",
   "opds.noEntries": "항목이 없습니다",
@@ -640,6 +639,20 @@ const ko: Messages = {
   "shelf.papers": "논문",
   "ai.paperBrief": "논문 요약",
   "ai.paperBriefHint": "문제, 방법, 결과, 한계",
+  "opds.sources": "공개 서재",
+  "opds.sourceAdded": "추가됨",
+  "opds.openSite": "사이트 열기",
+  "opds.groupCatalogs": "카탈로그",
+  "opds.groupCatalogsHint": "여기서 둘러보고 검색하고 내려받을 수 있습니다. 대출 전용 도서는 내려받을 수 없습니다.",
+  "opds.groupWikisource": "위키문헌",
+  "opds.groupWikisourceHint": "제목으로 검색해 EPUB으로 내보냅니다. 아주 긴 작품은 목차만 나올 수 있으며, 그 경우 알려 드립니다.",
+  "opds.groupGutendex": "언어별 Gutenberg",
+  "opds.groupGutendexHint": "Project Gutenberg의 특정 언어 도서입니다.",
+  "opds.groupWebsites": "도서관 사이트",
+  "opds.groupWebsitesHint": "앱용 인터페이스가 없어 브라우저에서 열립니다. 내려받은 파일을 가져오세요. 각 사이트의 약관을 확인하세요.",
+  "opds.searchPrompt": "위에서 제목으로 검색하세요",
+  "opds.thin": "추가했지만 내용이 적습니다. 목차만 있거나 짧은 작품일 수 있습니다",
+  "opds.noDownload": "내려받을 파일이 없습니다. 대출만 가능할 수 있습니다",
 };
 
 export default ko;

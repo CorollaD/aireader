@@ -1115,7 +1115,19 @@ pub async fn lookup_word(app: AppHandle, word: String) -> CmdResult<Vec<Definiti
 // --- online catalogs (OPDS) ---------------------------------------------------------------------
 
 const CATALOGS: &str = "opds_catalogs";
-const USER_AGENT: &str = concat!("AiReader/", env!("CARGO_PKG_VERSION"));
+/// Wikimedia asks clients to say who they are and where to find out more.
+const USER_AGENT: &str = concat!(
+    "AiReader/",
+    env!("CARGO_PKG_VERSION"),
+    " (https://github.com/CorollaD/aireader)"
+);
+const CATALOG_ACCEPT: &str =
+    "application/opds+json, application/atom+xml;q=0.9, application/json;q=0.8, */*;q=0.5";
+/// The Wikisource export service says nothing until the whole book is ready.
+const EXPORT_STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(240);
+/// With less text than this, an exported work may have stopped at its table of contents: Don
+/// Quixote's came to 5,853 characters. Short works land here too, so it is only a warning.
+const THIN_EXPORT_CHARS: usize = 20_000;
 const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 /// A feed or picture; book files may take as long as they keep arriving.
 const PAGE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(45);
@@ -1153,23 +1165,53 @@ async fn catalog_get(
     url: &str,
     timeout: Option<std::time::Duration>,
 ) -> anyhow::Result<reqwest::Response> {
+    let stall = if catalog.kind == "wikisource" {
+        EXPORT_STALL_TIMEOUT
+    } else {
+        STALL_TIMEOUT
+    };
     let client = reqwest::Client::builder()
         .user_agent(USER_AGENT)
         .connect_timeout(CONNECT_TIMEOUT)
-        .read_timeout(STALL_TIMEOUT)
+        .read_timeout(stall)
         .build()?;
-    let mut request = client.get(url);
-    if let Some(timeout) = timeout {
-        request = request.timeout(timeout);
-    }
-    if !catalog.username.is_empty() && crate::opds::same_host(&catalog.url, url) {
-        let password = crate::ai::commands::secret(app, &catalog_secret(&catalog.id));
-        request = request.basic_auth(&catalog.username, password);
-    }
-    let response = request.send().await.map_err(|e| {
+    let build = || {
+        let request = client
+            .get(url)
+            .header(reqwest::header::ACCEPT, CATALOG_ACCEPT);
+        match timeout {
+            Some(timeout) => request.timeout(timeout),
+            None => request,
+        }
+    };
+    let network = |e: reqwest::Error| {
         log::warn!("catalog request failed: {e}");
         anyhow::anyhow!(crate::t!("opds_network"))
-    })?;
+    };
+    let login = (!catalog.username.is_empty() && crate::opds::same_host(&catalog.url, url))
+        .then(|| crate::ai::commands::secret(app, &catalog_secret(&catalog.id)));
+    let mut request = build();
+    if let Some(password) = &login {
+        request = request.basic_auth(&catalog.username, password.as_deref());
+    }
+    let mut response = request.send().await.map_err(network)?;
+    // Calibre's server, among others, asks for Digest.
+    if response.status() == reqwest::StatusCode::UNAUTHORIZED
+        && let Some(password) = &login
+        && let Some(answer) = response
+            .headers()
+            .get(reqwest::header::WWW_AUTHENTICATE)
+            .and_then(|h| h.to_str().ok())
+            .and_then(|h| {
+                crate::opds::digest_answer(h, url, &catalog.username, password.as_deref())
+            })
+    {
+        response = build()
+            .header(reqwest::header::AUTHORIZATION, answer)
+            .send()
+            .await
+            .map_err(network)?;
+    }
     match response.status().as_u16() {
         401 | 403 => anyhow::bail!(crate::t!("opds_auth")),
         200..=299 => Ok(response),
@@ -1186,8 +1228,8 @@ async fn catalog_page(app: &AppHandle, catalog: &Catalog, url: &str) -> anyhow::
 }
 
 async fn catalog_feed(app: &AppHandle, catalog: &Catalog, url: &str) -> anyhow::Result<Feed> {
-    let xml = catalog_page(app, catalog, url).await?;
-    crate::opds::parse_feed(&xml, url).map_err(|e| {
+    let body = catalog_page(app, catalog, url).await?;
+    crate::opds::parse_page(catalog, &body, url).map_err(|e| {
         log::warn!("{url}: {e:#}");
         anyhow::anyhow!(crate::t!("opds_not_a_catalog"))
     })
@@ -1209,6 +1251,9 @@ pub async fn opds_save_catalog(
     if !(address.starts_with("http://") || address.starts_with("https://")) {
         return Err(crate::t!("opds_bad_address"));
     }
+    if !matches!(catalog.kind.as_str(), "" | "gutendex" | "wikisource") {
+        return Err(crate::t!("opds_bad_address"));
+    }
     let saved = Catalog {
         id: if catalog.id.is_empty() {
             format!("{:x}", library::now_millis())
@@ -1218,6 +1263,7 @@ pub async fn opds_save_catalog(
         title: catalog.title.trim().to_owned(),
         url: address,
         username: catalog.username.trim().to_owned(),
+        kind: catalog.kind.clone(),
     };
     if let Some(password) = password {
         crate::ai::commands::set_secret(&app, &catalog_secret(&saved.id), &password)
@@ -1245,6 +1291,9 @@ pub async fn opds_remove_catalog(app: AppHandle, id: String) -> CmdResult<Vec<Ca
 #[tauri::command]
 pub async fn opds_feed(app: AppHandle, catalog_id: String, url: Option<String>) -> CmdResult<Feed> {
     let catalog = catalog(&app, &catalog_id).map_err(err)?;
+    if url.is_none() && catalog.kind == "wikisource" {
+        return Ok(crate::opds::wikisource_home(&catalog));
+    }
     let url = url.unwrap_or_else(|| catalog.url.clone());
     catalog_feed(&app, &catalog, &url).await.map_err(err)
 }
@@ -1306,6 +1355,19 @@ pub struct DownloadedBook {
     id: String,
     /// False when the book was already on the shelf.
     added: bool,
+    /// So little arrived that it is probably only a table of contents.
+    thin: bool,
+}
+
+/// Opens a site in the browser. Only web addresses: this goes to the system, which would also
+/// run anything else it knows how to open.
+#[tauri::command]
+pub fn open_website(app: AppHandle, url: String) -> CmdResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err(crate::t!("opds_bad_address"));
+    }
+    app.opener().open_url(url, None::<&str>).map_err(err)
 }
 
 /// Downloads a book from a catalog and adds it to the shelf.
@@ -1320,6 +1382,19 @@ pub async fn opds_download(
     use std::io::Write;
     let catalog = catalog(&app, &catalog_id).map_err(err)?;
     let mut response = catalog_get(&app, &catalog, &url, None).await.map_err(err)?;
+    let is_json = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|t| t.starts_with("application/json"));
+    if is_json {
+        let body = response.bytes().await.map_err(err)?;
+        let target = crate::opds::wrapped_redirect(&body, &url)
+            .ok_or_else(|| crate::t!("opds_not_a_catalog"))?;
+        response = catalog_get(&app, &catalog, &target, None)
+            .await
+            .map_err(err)?;
+    }
     let dir = std::env::temp_dir().join(format!("aireader-opds-{:x}", library::now_millis()));
     std::fs::create_dir_all(&dir).map_err(err)?;
     let file = dir.join(export::file_name(&title, &extension, &mut HashSet::new()));
@@ -1346,10 +1421,18 @@ pub async fn opds_download(
         Err(e) => Err(err(e)),
     };
     let _ = std::fs::remove_dir_all(&dir);
-    Ok(match imported? {
-        Imported::Added(id) => DownloadedBook { id, added: true },
-        Imported::Existing(id) => DownloadedBook { id, added: false },
-    })
+    let (id, added) = match imported? {
+        Imported::Added(id) => (id, true),
+        Imported::Existing(id) => (id, false),
+    };
+    let thin = catalog.kind == "wikisource" && book_chars(&app, &id) < THIN_EXPORT_CHARS;
+    Ok(DownloadedBook { id, added, thin })
+}
+
+fn book_chars(app: &AppHandle, id: &str) -> usize {
+    state(app)
+        .open_book(id)
+        .map_or(0, |book| book.chars.iter().sum())
 }
 
 #[tauri::command]
@@ -1602,8 +1685,16 @@ pub async fn paper_import(
     };
     let _ = std::fs::remove_dir_all(&dir);
     Ok(match imported? {
-        Imported::Added(id) => DownloadedBook { id, added: true },
-        Imported::Existing(id) => DownloadedBook { id, added: false },
+        Imported::Added(id) => DownloadedBook {
+            id,
+            added: true,
+            thin: false,
+        },
+        Imported::Existing(id) => DownloadedBook {
+            id,
+            added: false,
+            thin: false,
+        },
     })
 }
 
@@ -1677,14 +1768,17 @@ pub struct OcrStatus {
     pending: Vec<usize>,
 }
 
-/// Recognition is for PDFs: a comic's text sits in speech bubbles, in pictures of any shape.
+/// Recognition is for PDFs and DjVu scans: a comic's text sits in speech bubbles, in pictures of any shape.
 fn ocr_source(
     st: &AppState,
     id: &str,
 ) -> anyhow::Result<(Arc<OpenBook>, Arc<crate::ocr::OcrSource>)> {
     let book = st.open_book(id)?;
-    let is_pdf = st.library().get(id).is_some_and(|b| b.format == "PDF");
-    let source = book.ocr.clone().filter(|_| is_pdf);
+    let scanned = st
+        .library()
+        .get(id)
+        .is_some_and(|b| matches!(b.format.as_str(), "PDF" | "DJVU"));
+    let source = book.ocr.clone().filter(|_| scanned);
     let source = source.ok_or_else(|| anyhow::anyhow!(crate::t!("not_text_book")))?;
     Ok((book, source))
 }

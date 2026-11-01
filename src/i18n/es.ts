@@ -563,7 +563,6 @@ const es: Messages = {
     "Para un servidor Calibre, añade /opds a su dirección, p. ej. http://192.168.1.2:8080/opds. Las contraseñas se guardan en el llavero del sistema.",
   "opds.emptyTitle": "Aún no hay catálogos",
   "opds.emptyHint": "Añade un catálogo OPDS, como tu biblioteca de Calibre, para explorar, buscar y descargar libros.",
-  "opds.addSuggested": "Añadir {name} (libros gratuitos de dominio público)",
   "opds.search": "Buscar en este catálogo",
   "opds.results": "Resultados de {query}",
   "opds.noEntries": "No hay nada aquí",
@@ -649,6 +648,20 @@ const es: Messages = {
   "shelf.papers": "Artículos",
   "ai.paperBrief": "Resumen del artículo",
   "ai.paperBriefHint": "Problema, método, resultados, límites",
+  "opds.sources": "Fuentes abiertas",
+  "opds.sourceAdded": "Añadida",
+  "opds.openSite": "Abrir sitio",
+  "opds.groupCatalogs": "Catálogos",
+  "opds.groupCatalogsHint": "Explora, busca y descarga aquí. Los libros solo en préstamo no tienen descarga.",
+  "opds.groupWikisource": "Wikisource",
+  "opds.groupWikisourceHint": "Busca por título y exporta a EPUB. Las obras muy largas pueden exportar solo el índice; se te avisará.",
+  "opds.groupGutendex": "Gutenberg por idioma",
+  "opds.groupGutendexHint": "Los libros de Project Gutenberg en un idioma.",
+  "opds.groupWebsites": "Sitios de bibliotecas",
+  "opds.groupWebsitesHint": "No tienen interfaz para apps. Se abren en el navegador; importa lo que descargues. Revisa las condiciones de cada sitio.",
+  "opds.searchPrompt": "Busca por título arriba",
+  "opds.thin": "Añadido, pero hay poco texto: puede ser solo el índice o una obra breve",
+  "opds.noDownload": "Sin archivo para descargar; quizá solo esté en préstamo",
 };
 
 export default es;
