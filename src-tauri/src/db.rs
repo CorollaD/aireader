@@ -117,6 +117,8 @@ impl Db {
         conn.execute_batch(SCHEMA)?;
         conn.execute_batch(crate::fulltext::SCHEMA)?;
         conn.execute_batch(crate::cards::SCHEMA)?;
+        conn.execute_batch(crate::stats::SCHEMA)?;
+        conn.execute_batch(crate::recall::SCHEMA)?;
         conn.execute(
             "INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', ?1)",
             params![SCHEMA_VERSION.to_string()],
@@ -172,6 +174,7 @@ pub fn delete_book_data(conn: &Connection, book_id: &str) -> Result<()> {
     crate::ai::semantic::delete_book_passages(conn, book_id)?;
     crate::fulltext::delete_book(conn, book_id)?;
     crate::cards::detach_book(conn, book_id)?;
+    crate::recall::clean(conn)?;
     Ok(())
 }
 

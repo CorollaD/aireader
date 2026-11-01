@@ -2,7 +2,7 @@
 // (`npm run dev`, then open http://localhost:1420). Never included in production builds.
 
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { AiConfig, AiEvent, AiTask, Annotations, Block, Book, Card, ChatRecord, DictRecord, Location, Source } from "../types";
+import type { AiConfig, AiEvent, AiTask, Annotations, Block, Book, Card, ChatRecord, DictRecord, Location, OpdsCatalog, OpdsEntry, Source } from "../types";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -59,6 +59,8 @@ export function installMock() {
     indexed: new Set<string>(),
     cards: [] as Card[],
     reviewed: 0,
+    catalogs: [] as OpdsCatalog[],
+    seen: 0,
     dicts: [] as DictRecord[],
   };
   const aiStatus = () => ({
@@ -143,6 +145,94 @@ export function installMock() {
         case "import_font":
           return "LXGW WenKai.ttf";
         case "remove_font":
+          return null;
+        case "opds_catalogs":
+          return db.catalogs;
+        case "opds_save_catalog": {
+          const c = { ...(a.catalog as OpdsCatalog) };
+          c.id ||= String(db.catalogs.length + 1);
+          db.catalogs = [...db.catalogs.filter((x) => x.id !== c.id), c];
+          return db.catalogs;
+        }
+        case "opds_remove_catalog":
+          db.catalogs = db.catalogs.filter((c) => c.id !== a.id);
+          return db.catalogs;
+        case "opds_search":
+        case "opds_feed": {
+          const book = (n: number): OpdsEntry => ({
+            id: `b${n}`,
+            title: `示例图书 ${n}`,
+            author: "佚名",
+            summary: "一段来自书源的简介，用来看列表的排版效果。",
+            cover: null,
+            link: null,
+            downloads: [
+              { url: `http://x/${n}.epub`, mime: "application/epub+zip", format: "EPUB", extension: "epub", title: "EPUB (no images)" },
+              { url: `http://x/${n}.pdf`, mime: "application/pdf", format: "PDF", extension: "pdf", title: null },
+            ],
+          });
+          if (cmd === "opds_search" || a.url) {
+            const page = a.url === "more" ? 1 : 0;
+            return { title: "书籍", entries: [0, 1, 2].map((i) => book(page * 3 + i)), next: page ? null : "more", search: null };
+          }
+          return {
+            title: "示例书库",
+            entries: [{ id: "n1", title: "热门图书", author: null, summary: "最近下载最多", cover: null, link: "http://x/top", downloads: [] }, book(9)],
+            next: null,
+            search: "http://x/search?q={searchTerms}",
+          };
+        }
+        case "opds_image":
+          return null;
+        case "opds_download": {
+          const b = book(String(nextId++).padStart(4, "0"), a.title as string, null, "EPUB", null);
+          db.books.push(b);
+          return { id: b.id, added: true };
+        }
+        case "reading_report": {
+          // Sample reading on most days of the last four months.
+          const days: { day: string; seconds: number }[] = [];
+          for (let i = 120; i >= 0; i--) {
+            const d = new Date(Date.now() - i * 86_400_000);
+            if ((i * 7) % 5 === 4) continue;
+            days.push({ day: d.toISOString().slice(0, 10), seconds: 300 + ((i * 2311) % 5400) });
+          }
+          const year = a.year as number;
+          const shown = days.filter((d) => d.day.startsWith(String(year)));
+          return {
+            streak: 4,
+            longestStreak: 12,
+            today: 1500,
+            last7Days: 15_300,
+            last30Days: 72_000,
+            lifetimeSeconds: 540_000,
+            years: [year],
+            days: shown,
+            yearSeconds: shown.reduce((n, d) => n + d.seconds, 0),
+            books: [
+              { bookId: "0001", title: "三国演义", seconds: 180_000 },
+              { bookId: "0002", title: "Alice's Adventures in Wonderland", seconds: 96_000 },
+              { bookId: "0004", title: "Rust 程序设计语言", seconds: 42_000 },
+            ],
+            highlights: 86,
+            cardsReviewed: 412,
+            finished: [{ id: "0004", title: "Rust 程序设计语言", finished: now() - 864_000 }],
+          };
+        }
+        case "daily_highlights":
+          return db.seen < 2
+            ? [0, 1].slice(db.seen).map((i) => ({
+                id: `h${i}`,
+                bookId: "0001",
+                bookTitle: "三国演义",
+                text: PARAGRAPH.slice(0, 40),
+                note: i === 0 ? "开篇的总论" : null,
+                color: "yellow",
+                location: { kind: "flow", chapter: 0, block: 1 },
+              }))
+            : [];
+        case "highlight_seen":
+          db.seen += 1;
           return null;
         case "lookup_word":
           return db.dicts.length && String(a.word).length < 20 ? [{ dictionary: db.dicts[0].name, word: String(a.word), text: "n. 示例释义\n例句一则" }] : [];
@@ -318,6 +408,20 @@ export function installMock() {
             const outline =
               "- 第一回 宴桃园豪杰三结义\n  - 背景\n    - 天下大势 分久必合 合久必分\n    - 黄巾起义\n  - 人物\n    - 刘备：汉室宗亲\n    - 关羽：红脸长髯\n    - 张飞：豹头环眼\n  - 事件\n    - 桃园结义\n    - 招募乡勇\n    - 破黄巾初立战功\n  - 主旨\n    - 忠义\n    - 乱世英雄";
             stream(a.onEvent as { id: number }, outline, task.scope.kind === "book");
+            return null;
+          }
+          if (task.kind === "generateCards" || task.kind === "quiz") {
+            const result =
+              task.kind === "quiz"
+                ? [0, 1].map((i) => ({
+                    question: `第 ${i + 1} 题：全书开篇讲的是什么？`,
+                    options: ["天下大势", "桃园结义", "赤壁之战", "三顾茅庐"],
+                    answer: 0,
+                    explanation: "开篇即点明分合之势。",
+                    quote: "话说天下大势",
+                  }))
+                : ["什么是分久必合？", "周末七国的结局是什么？"].map((front) => ({ front, back: "示例答案", quote: "话说天下大势" }));
+            setTimeout(() => stream(a.onEvent as { id: number }, JSON.stringify(result)), 200);
             return null;
           }
           if (task.kind === "define") {

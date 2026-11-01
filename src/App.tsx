@@ -8,6 +8,8 @@ import { CUSTOM_FONT, DEFAULT_SETTINGS, normalizeSettings, themeVars, UI_SCALES,
 import SettingsDialog, { SettingsOpener, type SettingsTab } from "./SettingsDialog";
 import ShelfView from "./shelf/ShelfView";
 import ReviewView from "./study/ReviewView";
+import StatsView from "./stats/StatsView";
+import OpdsView from "./opds/OpdsView";
 import Reader, { type OpenAt } from "./reader/Reader";
 import { AiProvider } from "./ai/AiContext";
 import { applyUiScale } from "./zoom";
@@ -21,7 +23,7 @@ export default function App() {
   const [reading, setReading] = useState<string | null>(null);
   /** Where to open the book: a search result rather than the saved position. */
   const [openAt, setOpenAt] = useState<OpenAt | null>(null);
-  const [reviewing, setReviewing] = useState(false);
+  const [page, setPage] = useState<"review" | "stats" | "opds" | null>(null);
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
   const saveTimer = useRef<number>();
   const pendingSettings = useRef<Settings | null>(null);
@@ -141,7 +143,7 @@ export default function App() {
 
   const open = useCallback((id: string, at?: OpenAt) => {
     setOpenAt(at ?? null);
-    setReviewing(false);
+    setPage(null);
     setReading(id);
   }, []);
 
@@ -161,13 +163,24 @@ export default function App() {
   return (
     <SettingsOpener.Provider value={openSettings}>
       <AiProvider openSettings={openAiSettings}>
-        <ErrorBoundary key={reviewing ? "review" : (reading ?? "shelf")} onReset={reading ? close : undefined} resetLabel={t("error.backToShelf")}>
-          {reviewing ? (
-            <ReviewView settings={settings} onBack={() => setReviewing(false)} onOpen={(id, location) => open(id, { location })} />
+        <ErrorBoundary key={page ?? reading ?? "shelf"} onReset={reading ? close : undefined} resetLabel={t("error.backToShelf")}>
+          {page === "review" ? (
+            <ReviewView settings={settings} onBack={() => setPage(null)} onOpen={(id, location) => open(id, { location })} />
+          ) : page === "stats" ? (
+            <StatsView onBack={() => setPage(null)} onOpen={(id) => open(id)} />
+          ) : page === "opds" ? (
+            <OpdsView onBack={() => setPage(null)} onOpen={(id) => open(id)} />
           ) : reading ? (
             <Reader bookId={reading} openAt={openAt} settings={settings} update={update} onClose={close} />
           ) : (
-            <ShelfView settings={settings} update={update} onOpen={open} onReview={() => setReviewing(true)} />
+            <ShelfView
+              settings={settings}
+              update={update}
+              onOpen={open}
+              onReview={() => setPage("review")}
+              onStats={() => setPage("stats")}
+              onOpds={() => setPage("opds")}
+            />
           )}
         </ErrorBoundary>
         {settingsTab && <SettingsDialog settings={settings} update={update} tab={settingsTab} onTab={setSettingsTab} onClose={() => setSettingsTab(null)} />}

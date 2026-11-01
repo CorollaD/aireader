@@ -13,6 +13,7 @@ import type {
   BookPatch,
   Card,
   CardStats,
+  DailyHighlight,
   ChatRecord,
   Definition,
   DictRecord,
@@ -23,7 +24,10 @@ import type {
   ImportReport,
   Location,
   MergeReport,
+  OpdsCatalog,
+  OpdsFeed,
   OpenedBook,
+  ReadingReport,
   SemanticStatus,
   Shelf,
   Suggestion,
@@ -103,7 +107,24 @@ export const api = {
   backupLibrary: (books: boolean) => invoke<string | null>("backup_library", { books }),
   /** Saves base64 data through a save dialog; resolves to the path, or null if cancelled. */
   saveExport: (fileName: string, extension: string, data: string) => invoke<string | null>("save_export", { fileName, extension, data }),
-  addReadingTime: (id: string, seconds: number, speed: number | null) => invoke<Book>("add_reading_time", { id, seconds, speed }),
+  /** `day`: the local date the time belongs to. */
+  addReadingTime: (id: string, seconds: number, speed: number | null, day: string) => invoke<Book>("add_reading_time", { id, seconds, speed, day }),
+  opdsCatalogs: () => invoke<OpdsCatalog[]>("opds_catalogs"),
+  /** Adds or updates a catalog; `password` undefined keeps the stored one. */
+  opdsSaveCatalog: (catalog: OpdsCatalog, password?: string) => invoke<OpdsCatalog[]>("opds_save_catalog", { catalog, password }),
+  opdsRemoveCatalog: (id: string) => invoke<OpdsCatalog[]>("opds_remove_catalog", { id }),
+  /** A page of a catalog; `url` null is its first page. */
+  opdsFeed: (catalogId: string, url: string | null) => invoke<OpdsFeed>("opds_feed", { catalogId, url }),
+  opdsSearch: (catalogId: string, search: string, query: string) => invoke<OpdsFeed>("opds_search", { catalogId, search, query }),
+  /** A cover as a data URL, or null if it isn't a usable picture. */
+  opdsImage: (catalogId: string, url: string) => invoke<string | null>("opds_image", { catalogId, url }),
+  opdsDownload: (catalogId: string, url: string, title: string, extension: string) =>
+    invoke<{ id: string; added: boolean }>("opds_download", { catalogId, url, title, extension }),
+  /** What is left of today's highlights; `today` is when the local day began (Unix seconds). */
+  dailyHighlights: (today: number) => invoke<DailyHighlight[]>("daily_highlights", { today }),
+  /** `keep`: bring it back later; otherwise it isn't shown again. */
+  highlightSeen: (id: string, keep: boolean) => invoke<void>("highlight_seen", { id, keep }),
+  readingReport: (today: string, year: number) => invoke<ReadingReport>("reading_report", { today, year }),
   aiGetConfig: () => invoke<AiStatus>("ai_get_config"),
   /** `apiKey`: undefined keeps the stored key, "" removes it. */
   /** Keys: undefined keeps the stored one, "" removes it. */

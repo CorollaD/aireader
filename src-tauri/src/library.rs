@@ -23,6 +23,8 @@ use crate::model::Location;
 const COVER_WIDTH: u32 = 360;
 const COVER_HEIGHT: u32 = 540;
 const STAGING_PREFIX: &str = ".incoming-";
+/// Progress from which a book counts as read: the end matter rarely gets read.
+const FINISHED_AT: f32 = 0.98;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,6 +60,9 @@ pub struct Book {
     /// Page rotation in degrees (0/90/180/270) for paged books.
     #[serde(default)]
     pub rotation: u16,
+    /// When the book was first read to its end (Unix seconds).
+    #[serde(default)]
+    pub finished: Option<u64>,
     /// Set when listing if the stored file has disappeared.
     #[serde(default, skip_deserializing)]
     pub missing: bool,
@@ -586,6 +591,7 @@ impl Library {
             read_seconds: 0,
             reading_speed: None,
             rotation: 0,
+            finished: None,
             missing: false,
         };
         Ok(Prepared { book, staged })
@@ -657,6 +663,9 @@ impl Library {
         book.position = Some(position);
         book.progress = progress.clamp(0.0, 1.0);
         book.last_read = Some(now());
+        if book.progress >= FINISHED_AT && book.finished.is_none() {
+            book.finished = book.last_read;
+        }
         Ok(())
     }
 
@@ -681,6 +690,7 @@ impl Library {
         for o in &others {
             book.read_seconds += o.read_seconds;
             book.last_read = book.last_read.max(o.last_read);
+            book.finished = book.finished.or(o.finished);
             if book.group.is_none() {
                 book.group = o.group.clone();
             }

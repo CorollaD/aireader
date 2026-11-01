@@ -4,7 +4,7 @@ import { api, errorText } from "../api";
 import { onBeforeExit } from "../lifecycle";
 import type { UpdateSettings } from "../App";
 import type { Settings } from "../settings";
-import type { Card, Hit, HighlightColor, Location, OpenedBook } from "../types";
+import type { Card, Highlight, Hit, HighlightColor, Location, OpenedBook } from "../types";
 import { isTyping, Modal, Toast } from "../ui";
 import { t } from "../i18n";
 import { Icon } from "../icons";
@@ -136,6 +136,9 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
       .catch(() => {});
   }, [bookId]);
   useEffect(refreshCards, [refreshCards]);
+
+  const cardFromHighlight = (h: Highlight) =>
+    setLookup({ word: h.text, context: "", location: { kind: "flow", chapter: h.chapter, block: h.startBlock }, back: h.note ?? "" });
 
   const flush = useCallback(() => {
     window.clearTimeout(saveTimer.current);
@@ -673,6 +676,7 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
             onRemoveHighlight={ann.removeHighlight}
             onExport={() => setExporting(true)}
             cards={cards}
+            onCardFromHighlight={cardFromHighlight}
             onEditCard={(card) => setLookup({ word: card.front, context: card.context, location: card.location, card })}
             onDeleteCard={(card) => api.deleteCard(card.id).then(refreshCards, () => {})}
           />
@@ -748,6 +752,8 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
             onSaveNote={saveAiNote}
             onNavigate={(loc) => navigate(loc, true)}
             onClose={() => setAiOpen(false)}
+            highlights={ann.data.highlights}
+            onCardsSaved={refreshCards}
           />
         )}
         {searchShown && (
@@ -879,6 +885,16 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
             ann.removeHighlight(mark.id);
             setActiveMark(null);
           }}
+          extra={[
+            {
+              label: t("daily.makeCard"),
+              icon: "layers",
+              run: () => {
+                cardFromHighlight(mark);
+                setActiveMark(null);
+              },
+            },
+          ]}
         />
       )}
       {lookup && (

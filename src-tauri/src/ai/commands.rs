@@ -11,6 +11,7 @@ use tauri::{AppHandle, Manager};
 
 use super::config::{AiConfig, EmbeddingConfig, KeyringStore, SecretStore};
 use super::semantic;
+use super::study;
 use rig_core::DynModel;
 use rig_core::operation::Embedding as EmbeddingOp;
 
@@ -38,6 +39,21 @@ pub struct AiState {
     running: Mutex<HashMap<String, tauri::async_runtime::JoinHandle<()>>>,
     /// Search indexes of recently asked-about books, newest last.
     indexes: Mutex<Vec<(String, Arc<BookIndex>)>>,
+}
+
+/// A secret in the system keychain, for features outside AI too.
+pub fn secret(app: &AppHandle, name: &str) -> Option<String> {
+    ai_state(app).secrets.get(name)
+}
+
+/// Stores a secret; an empty value removes it.
+pub fn set_secret(app: &AppHandle, name: &str, value: &str) -> Result<()> {
+    let secrets = &ai_state(app).secrets;
+    if value.is_empty() {
+        secrets.delete(name)
+    } else {
+        secrets.set(name, value)
+    }
 }
 
 /// How many book indexes stay in memory.
@@ -347,6 +363,26 @@ async fn run_task(
             let (book, title) = open_book(app, &book_id).await?;
             let mut cache = cache(app, &book_id);
             tasks::mind_map(&runner, &mut cache, &book.doc, &title, scope, refresh).await
+        }
+        AiTask::GenerateCards {
+            book_id,
+            scope,
+            count,
+        } => {
+            let (book, title) = open_book(app, &book_id).await?;
+            let mut cache = cache(app, &book_id);
+            let (topic, text) =
+                study::material(&runner, &mut cache, &book.doc, &title, scope).await?;
+            let cards = study::cards(&runner, &title, &topic, &text, count).await?;
+            Ok((serde_json::to_string(&cards)?, false))
+        }
+        AiTask::Quiz { book_id, scope } => {
+            let (book, title) = open_book(app, &book_id).await?;
+            let mut cache = cache(app, &book_id);
+            let (topic, text) =
+                study::material(&runner, &mut cache, &book.doc, &title, scope).await?;
+            let quiz = study::quiz(&runner, &title, &topic, &text).await?;
+            Ok((serde_json::to_string(&quiz)?, false))
         }
         AiTask::Define {
             book_title,

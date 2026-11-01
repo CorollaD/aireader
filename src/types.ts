@@ -176,6 +176,89 @@ export interface Card {
   lapses: number;
 }
 
+/** An online catalog of books. Its password is kept in the system keychain. */
+export interface OpdsCatalog {
+  id: string;
+  title: string;
+  url: string;
+  username: string;
+}
+
+export interface OpdsDownload {
+  url: string;
+  mime: string;
+  format: string;
+  extension: string;
+  title: string | null;
+}
+
+export interface OpdsEntry {
+  id: string;
+  title: string;
+  author: string | null;
+  summary: string;
+  cover: string | null;
+  /** The feed this entry leads to; books have `downloads` instead. */
+  link: string | null;
+  downloads: OpdsDownload[];
+}
+
+export interface OpdsFeed {
+  title: string;
+  entries: OpdsEntry[];
+  next: string | null;
+  search: string | null;
+}
+
+/** The text flashcards or a quiz are made from. */
+export type StudyScope = { kind: "chapter"; chapter: number } | { kind: "pages"; from: number; to: number } | { kind: "text"; title: string; text: string };
+
+/** A flashcard suggested by the AI. */
+export interface StudyCard {
+  front: string;
+  back: string;
+  /** A short excerpt it is based on. */
+  quote: string;
+}
+
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  /** Index of the right option. */
+  answer: number;
+  explanation: string;
+  quote: string;
+}
+
+/** An old highlight brought back today. */
+export interface DailyHighlight {
+  id: string;
+  bookId: string;
+  bookTitle: string;
+  text: string;
+  note: string | null;
+  color: HighlightColor;
+  location: Location;
+}
+
+/** The statistics page's numbers; times are in seconds. */
+export interface ReadingReport {
+  streak: number;
+  longestStreak: number;
+  today: number;
+  last7Days: number;
+  last30Days: number;
+  /** All reading time, including from before days were recorded. */
+  lifetimeSeconds: number;
+  years: number[];
+  days: { day: string; seconds: number }[];
+  yearSeconds: number;
+  books: { bookId: string; title: string; seconds: number }[];
+  highlights: number;
+  cardsReviewed: number;
+  finished: { id: string; title: string; finished: number }[];
+}
+
 export interface CardStats {
   total: number;
   due: number;
@@ -306,6 +389,8 @@ export type AiTask =
       history: ChatTurn[];
     }
   | { kind: "define"; bookTitle: string; word: string; context: string }
+  | { kind: "generateCards"; bookId: string; scope: StudyScope; count: number }
+  | { kind: "quiz"; bookId: string; scope: StudyScope }
   | { kind: "ask"; bookId: string; location: Location | null; history: ChatTurn[]; spoilerFree?: boolean }
   | { kind: "buildIndex"; bookId: string }
   | { kind: "mindMap"; bookId: string; scope: MindMapScope; refresh?: boolean };

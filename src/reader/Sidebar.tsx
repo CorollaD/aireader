@@ -24,6 +24,7 @@ interface Props {
   onRemoveHighlight: (id: string) => void;
   onExport: () => void;
   cards: Card[];
+  onCardFromHighlight: (highlight: Highlight) => void;
   onEditCard: (card: Card) => void;
   onDeleteCard: (card: Card) => void;
   width: number;
@@ -206,6 +207,16 @@ function Notes(props: Props) {
             <div className="entry-meta">
               <span>{formatDate(h.updated)}</span>
               <span className="entry-actions">
+                <button
+                  className="icon"
+                  title={t("daily.makeCard")}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    props.onCardFromHighlight(h);
+                  }}
+                >
+                  <Icon name="layers" size={14} />
+                </button>
                 <button
                   className="icon"
                   title={t("side.editNote")}

@@ -16,7 +16,10 @@ use crate::export::{self, BookNotes, NotesFormat};
 use crate::formats;
 use crate::library::{self, Book, BookPatch, Library};
 use crate::model::{Block, Content, Document, Location, TocEntry};
+use crate::opds::{Catalog, Feed};
+use crate::recall::{self, DailyHighlight};
 use crate::search::{Hit, SearchText};
+use crate::stats;
 
 type CmdResult<T> = Result<T, String>;
 
@@ -521,6 +524,7 @@ pub async fn merge_duplicates(app: AppHandle, merges: Vec<Merge>) -> CmdResult<M
                     )
                     .map_err(err)?;
                 cards::move_book(&lib.db().conn(), id, &m.keep).map_err(err)?;
+                stats::move_book(&lib.db().conn(), id, &m.keep).map_err(err)?;
             }
             lib.absorb(&m.keep, &ids, furthest).map_err(err)?;
             lib.remove(&ids);
@@ -1070,6 +1074,246 @@ pub async fn lookup_word(app: AppHandle, word: String) -> CmdResult<Vec<Definiti
     .await
 }
 
+// --- online catalogs (OPDS) ---------------------------------------------------------------------
+
+const CATALOGS: &str = "opds_catalogs";
+const USER_AGENT: &str = concat!("AiReader/", env!("CARGO_PKG_VERSION"));
+const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+/// A feed or picture; book files may take as long as they keep arriving.
+const PAGE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(45);
+const STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+const MAX_COVER_BYTES: usize = 2 << 20;
+
+fn catalog_list(app: &AppHandle) -> anyhow::Result<Vec<Catalog>> {
+    let db = state(app).library().db().clone();
+    let conn = db.conn();
+    Ok(crate::db::kv_get(&conn, CATALOGS)?.unwrap_or_default())
+}
+
+fn save_catalog_list(app: &AppHandle, list: &[Catalog]) -> anyhow::Result<()> {
+    let db = state(app).library().db().clone();
+    let conn = db.conn();
+    crate::db::kv_set(&conn, CATALOGS, &list)
+}
+
+fn catalog(app: &AppHandle, id: &str) -> anyhow::Result<Catalog> {
+    catalog_list(app)?
+        .into_iter()
+        .find(|c| c.id == id)
+        .ok_or_else(|| anyhow::anyhow!(crate::t!("opds_failed", status = 404)))
+}
+
+fn catalog_secret(id: &str) -> String {
+    format!("opds:{id}")
+}
+
+/// A request to a catalog. Its password only goes to the catalog's own host; reqwest also drops
+/// it from redirects to other hosts.
+async fn catalog_get(
+    app: &AppHandle,
+    catalog: &Catalog,
+    url: &str,
+    timeout: Option<std::time::Duration>,
+) -> anyhow::Result<reqwest::Response> {
+    let client = reqwest::Client::builder()
+        .user_agent(USER_AGENT)
+        .connect_timeout(CONNECT_TIMEOUT)
+        .read_timeout(STALL_TIMEOUT)
+        .build()?;
+    let mut request = client.get(url);
+    if let Some(timeout) = timeout {
+        request = request.timeout(timeout);
+    }
+    if !catalog.username.is_empty() && crate::opds::same_host(&catalog.url, url) {
+        let password = crate::ai::commands::secret(app, &catalog_secret(&catalog.id));
+        request = request.basic_auth(&catalog.username, password);
+    }
+    let response = request.send().await.map_err(|e| {
+        log::warn!("catalog request failed: {e}");
+        anyhow::anyhow!(crate::t!("opds_network"))
+    })?;
+    match response.status().as_u16() {
+        401 | 403 => anyhow::bail!(crate::t!("opds_auth")),
+        200..=299 => Ok(response),
+        status => anyhow::bail!(crate::t!("opds_failed", status = status)),
+    }
+}
+
+async fn catalog_page(app: &AppHandle, catalog: &Catalog, url: &str) -> anyhow::Result<String> {
+    let response = catalog_get(app, catalog, url, Some(PAGE_TIMEOUT)).await?;
+    response
+        .text()
+        .await
+        .map_err(|_| anyhow::anyhow!(crate::t!("opds_network")))
+}
+
+async fn catalog_feed(app: &AppHandle, catalog: &Catalog, url: &str) -> anyhow::Result<Feed> {
+    let xml = catalog_page(app, catalog, url).await?;
+    crate::opds::parse_feed(&xml, url).map_err(|e| {
+        log::warn!("{url}: {e:#}");
+        anyhow::anyhow!(crate::t!("opds_not_a_catalog"))
+    })
+}
+
+#[tauri::command]
+pub async fn opds_catalogs(app: AppHandle) -> CmdResult<Vec<Catalog>> {
+    catalog_list(&app).map_err(err)
+}
+
+/// Adds a catalog, or updates the one with its id. `password`: `None` keeps the stored one.
+#[tauri::command]
+pub async fn opds_save_catalog(
+    app: AppHandle,
+    catalog: Catalog,
+    password: Option<String>,
+) -> CmdResult<Vec<Catalog>> {
+    let address = catalog.url.trim().to_owned();
+    if !(address.starts_with("http://") || address.starts_with("https://")) {
+        return Err(crate::t!("opds_bad_address"));
+    }
+    let saved = Catalog {
+        id: if catalog.id.is_empty() {
+            format!("{:x}", library::now_millis())
+        } else {
+            catalog.id
+        },
+        title: catalog.title.trim().to_owned(),
+        url: address,
+        username: catalog.username.trim().to_owned(),
+    };
+    if let Some(password) = password {
+        crate::ai::commands::set_secret(&app, &catalog_secret(&saved.id), &password)
+            .map_err(err)?;
+    }
+    let mut list = catalog_list(&app).map_err(err)?;
+    match list.iter_mut().find(|c| c.id == saved.id) {
+        Some(existing) => *existing = saved,
+        None => list.push(saved),
+    }
+    save_catalog_list(&app, &list).map_err(err)?;
+    Ok(list)
+}
+
+#[tauri::command]
+pub async fn opds_remove_catalog(app: AppHandle, id: String) -> CmdResult<Vec<Catalog>> {
+    let _ = crate::ai::commands::set_secret(&app, &catalog_secret(&id), "");
+    let mut list = catalog_list(&app).map_err(err)?;
+    list.retain(|c| c.id != id);
+    save_catalog_list(&app, &list).map_err(err)?;
+    Ok(list)
+}
+
+/// A page of a catalog: `url`, or its first page.
+#[tauri::command]
+pub async fn opds_feed(app: AppHandle, catalog_id: String, url: Option<String>) -> CmdResult<Feed> {
+    let catalog = catalog(&app, &catalog_id).map_err(err)?;
+    let url = url.unwrap_or_else(|| catalog.url.clone());
+    catalog_feed(&app, &catalog, &url).await.map_err(err)
+}
+
+/// Searches a catalog; `search` is what its feed gave: a template or a description to fetch.
+#[tauri::command]
+pub async fn opds_search(
+    app: AppHandle,
+    catalog_id: String,
+    search: String,
+    query: String,
+) -> CmdResult<Feed> {
+    let catalog = catalog(&app, &catalog_id).map_err(err)?;
+    let template = if search.contains("{searchTerms}") {
+        search
+    } else {
+        let xml = catalog_page(&app, &catalog, &search).await.map_err(err)?;
+        crate::opds::parse_search_description(&xml, &search).map_err(err)?
+    };
+    let url = crate::opds::search_url(&template, &query);
+    catalog_feed(&app, &catalog, &url).await.map_err(err)
+}
+
+/// A cover as a `data:` URL: the page may only show images from the app itself.
+#[tauri::command]
+pub async fn opds_image(
+    app: AppHandle,
+    catalog_id: String,
+    url: String,
+) -> CmdResult<Option<String>> {
+    use base64::Engine;
+    let catalog = catalog(&app, &catalog_id).map_err(err)?;
+    let response = catalog_get(&app, &catalog, &url, Some(PAGE_TIMEOUT))
+        .await
+        .map_err(err)?;
+    let mime = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .to_owned();
+    if !mime.starts_with("image/") || mime.contains("svg") {
+        return Ok(None);
+    }
+    let bytes = response.bytes().await.map_err(err)?;
+    if bytes.len() > MAX_COVER_BYTES {
+        return Ok(None);
+    }
+    let data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Ok(Some(format!("data:{mime};base64,{data}")))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadedBook {
+    id: String,
+    /// False when the book was already on the shelf.
+    added: bool,
+}
+
+/// Downloads a book from a catalog and adds it to the shelf.
+#[tauri::command]
+pub async fn opds_download(
+    app: AppHandle,
+    catalog_id: String,
+    url: String,
+    title: String,
+    extension: String,
+) -> CmdResult<DownloadedBook> {
+    use std::io::Write;
+    let catalog = catalog(&app, &catalog_id).map_err(err)?;
+    let mut response = catalog_get(&app, &catalog, &url, None).await.map_err(err)?;
+    let dir = std::env::temp_dir().join(format!("aireader-opds-{:x}", library::now_millis()));
+    std::fs::create_dir_all(&dir).map_err(err)?;
+    let file = dir.join(export::file_name(&title, &extension, &mut HashSet::new()));
+    let written = async {
+        let mut out = std::fs::File::create(&file)?;
+        while let Some(chunk) = response.chunk().await? {
+            out.write_all(&chunk)?;
+        }
+        anyhow::Ok(())
+    }
+    .await;
+    let imported = match written {
+        Ok(()) => {
+            let path = file.clone();
+            let app = app.clone();
+            blocking(move || {
+                let imported = import_file(&app, &path, None).map_err(err)?;
+                state(&app).library().save().map_err(err)?;
+                start_indexing(&app);
+                Ok(imported)
+            })
+            .await
+        }
+        Err(e) => Err(err(e)),
+    };
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(match imported? {
+        Imported::Added(id) => DownloadedBook { id, added: true },
+        Imported::Existing(id) => DownloadedBook { id, added: false },
+    })
+}
+
 #[tauri::command]
 pub async fn list_fonts(app: AppHandle) -> CmdResult<Vec<String>> {
     blocking(move || Ok(state(&app).library().fonts())).await
@@ -1162,14 +1406,83 @@ pub async fn add_reading_time(
     id: String,
     seconds: u64,
     speed: Option<f32>,
+    day: String,
 ) -> CmdResult<Book> {
     blocking(move || {
         let mut lib = state(&app).library();
         lib.add_reading_time(&id, seconds, speed).map_err(err)?;
         lib.save_book(&id).map_err(err)?;
-        lib.get(&id)
+        let book = lib
+            .get(&id)
             .cloned()
-            .ok_or_else(|| crate::t!("book_not_found"))
+            .ok_or_else(|| crate::t!("book_not_found"))?;
+        stats::record(&lib.db().conn(), &day, &id, &book.title, seconds).map_err(err)?;
+        Ok(book)
+    })
+    .await
+}
+
+/// What is left of today's highlights to look back on; `today` is when the local day began.
+#[tauri::command]
+pub async fn daily_highlights(app: AppHandle, today: u64) -> CmdResult<Vec<DailyHighlight>> {
+    with_db(app, move |c| recall::today(c, library::now(), today)).await
+}
+
+/// `keep`: bring the highlight back later; otherwise it isn't shown again.
+#[tauri::command]
+pub async fn highlight_seen(app: AppHandle, id: String, keep: bool) -> CmdResult<()> {
+    with_db(app, move |c| recall::seen(c, &id, keep, library::now())).await
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinishedBook {
+    id: String,
+    title: String,
+    /// Unix seconds.
+    finished: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadingReport {
+    #[serde(flatten)]
+    report: stats::Report,
+    /// All reading time, including from before days were recorded.
+    lifetime_seconds: u64,
+    /// Books finished in the chosen year, most recent first.
+    finished: Vec<FinishedBook>,
+}
+
+/// `today` is the reader's local date (`YYYY-MM-DD`).
+#[tauri::command]
+pub async fn reading_report(app: AppHandle, today: String, year: i32) -> CmdResult<ReadingReport> {
+    blocking(move || {
+        let (db, books) = {
+            let lib = state(&app).library();
+            (lib.db().clone(), lib.books())
+        };
+        let report = stats::report(&db.conn(), &today, year).map_err(err)?;
+        let prefix = format!("{year:04}-");
+        let mut finished: Vec<FinishedBook> = books
+            .iter()
+            .filter_map(|b| {
+                let finished = b
+                    .finished
+                    .filter(|&f| library::date(f).starts_with(&prefix))?;
+                Some(FinishedBook {
+                    id: b.id.clone(),
+                    title: b.title.clone(),
+                    finished,
+                })
+            })
+            .collect();
+        finished.sort_by_key(|b| std::cmp::Reverse(b.finished));
+        Ok(ReadingReport {
+            report,
+            lifetime_seconds: books.iter().map(|b| b.read_seconds).sum(),
+            finished,
+        })
     })
     .await
 }

@@ -14,6 +14,7 @@ use super::provider::{
     is_transient, stream_text,
 };
 use super::retrieval::BookIndex;
+use super::study::StudyScope;
 use crate::model::{Content, Document, Location};
 
 const SUMMARY_TOKENS: u64 = 2_048;
@@ -64,6 +65,16 @@ pub enum AiTask {
         action: Option<ChatAction>,
         history: Vec<ChatTurn>,
     },
+    /// Flashcards on part of a book; the result is JSON.
+    #[serde(rename_all = "camelCase")]
+    GenerateCards {
+        book_id: String,
+        scope: StudyScope,
+        count: usize,
+    },
+    /// A multiple-choice quiz on part of a book; the result is JSON.
+    #[serde(rename_all = "camelCase")]
+    Quiz { book_id: String, scope: StudyScope },
     /// A short definition of a word or phrase as used in a sentence, for a flashcard.
     #[serde(rename_all = "camelCase")]
     Define {
@@ -150,7 +161,7 @@ pub struct Runner<'a> {
 }
 
 impl Runner<'_> {
-    fn system(&self) -> String {
+    pub(super) fn system(&self) -> String {
         format!(
             "You are a careful reading assistant. Answer only from the book content provided; \
              do not invent plot points, characters or arguments that are not in it. \
@@ -167,10 +178,16 @@ impl Runner<'_> {
 
     /// One request, sent again after a pause when it fails for a passing reason (see
     /// [`is_transient`]), so one hiccup doesn't end a long whole-book run.
-    async fn complete(&self, prompt: String, max_tokens: u64) -> Result<String> {
+    pub(super) async fn complete(&self, prompt: String, max_tokens: u64) -> Result<String> {
+        self.complete_request(self.request(prompt, max_tokens))
+            .await
+    }
+
+    /// [`Self::complete`] for a request built by the caller.
+    pub(super) async fn complete_request(&self, request: CompletionRequest) -> Result<String> {
         let mut attempt = 0;
         loop {
-            match complete_reply(&self.model, self.request(prompt.clone(), max_tokens)).await {
+            match complete_reply(&self.model, request.clone()).await {
                 Ok((text, usage)) => {
                     (self.emit)(AiEvent::Usage { usage });
                     return Ok(text);
@@ -704,7 +721,7 @@ pub async fn mind_map(
 }
 
 /// The unit's text when it fits, otherwise its (cached) summary.
-async fn unit_material(
+pub(super) async fn unit_material(
     r: &Runner<'_>,
     cache: &mut SummaryCache,
     book: &str,

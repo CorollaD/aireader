@@ -13,8 +13,11 @@ pub mod fulltext;
 pub mod i18n;
 pub mod library;
 pub mod model;
+pub mod opds;
 pub mod protocol;
+pub mod recall;
 pub mod search;
+pub mod stats;
 
 use std::path::{Path, PathBuf};
 
@@ -115,6 +118,16 @@ pub fn run() {
             commands::set_locale,
             commands::save_export,
             commands::backup_library,
+            commands::opds_catalogs,
+            commands::opds_save_catalog,
+            commands::opds_remove_catalog,
+            commands::opds_feed,
+            commands::opds_search,
+            commands::opds_image,
+            commands::opds_download,
+            commands::reading_report,
+            commands::daily_highlights,
+            commands::highlight_seen,
             commands::add_card,
             commands::find_card,
             commands::list_cards,

@@ -63,6 +63,8 @@ export default function ShelfView(props: {
   update: UpdateSettings;
   onOpen: (id: string, at?: { location: Location; query: string }) => void;
   onReview: () => void;
+  onStats: () => void;
+  onOpds: () => void;
 }) {
   const { settings, update } = props;
   const [shelf, setShelf] = useState<Shelf>({ books: [], groups: [] });
@@ -254,6 +256,14 @@ export default function ShelfView(props: {
             <Icon name="layers" />
             <span className="ellipsis">{t("cards.review")}</span>
             {!!cardStats?.due && <span className="count">{cardStats.due}</span>}
+          </button>
+          <button className="side-item" onClick={props.onStats}>
+            <Icon name="chart" />
+            <span className="ellipsis">{t("stats.title")}</span>
+          </button>
+          <button className="side-item" onClick={props.onOpds}>
+            <Icon name="globe" />
+            <span className="ellipsis">{t("opds.title")}</span>
           </button>
           <div className="side-heading">
             <span>{t("shelf.groups")}</span>

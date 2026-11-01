@@ -12,11 +12,16 @@ import { speakOnce } from "../reader/useSpeech";
 import type { Card, Definition, Location } from "../types";
 import { Modal } from "../ui";
 
+/** The longest text worth looking up in a dictionary. */
+const MAX_WORD = 30;
+
 /** What is being looked up. */
 export interface LookupRequest {
   word: string;
   context: string;
   location: Location | null;
+  /** An answer to start from, e.g. the note on a highlight. */
+  back?: string;
 }
 
 export default function LookupDialog(props: {
@@ -33,21 +38,24 @@ export default function LookupDialog(props: {
   const ai = useAi();
   const openSettings = useOpenSettings();
   const [front, setFront] = useState(request.word);
-  const [back, setBack] = useState("");
+  const [back, setBack] = useState(request.back ?? "");
   const [definitions, setDefinitions] = useState<Definition[] | null>(null);
   const [existing, setExisting] = useState<Card | null>(props.card ?? null);
   const [asking, setAsking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const edited = useRef(false);
+  const shortText = request.word.length <= MAX_WORD;
 
   useEffect(() => {
     let alive = true;
-    Promise.all([props.card ?? api.findCard(book.id, request.word), api.lookupWord(request.word)])
+    // Passages aren't in dictionaries.
+    const lookedUp = shortText ? api.lookupWord(request.word) : Promise.resolve([]);
+    Promise.all([props.card ?? api.findCard(book.id, request.word), lookedUp])
       .then(([card, defs]) => {
         if (!alive) return;
         setExisting(card);
         setDefinitions(defs);
-        if (!edited.current) setBack(card?.back || defs[0]?.text || "");
+        if (!edited.current) setBack(card?.back || request.back || defs[0]?.text || "");
       })
       .catch((e) => {
         setDefinitions([]);
@@ -56,7 +64,7 @@ export default function LookupDialog(props: {
     return () => {
       alive = false;
     };
-  }, [book.id, request.word, props.card]);
+  }, [book.id, request.word, request.back, props.card, shortText]);
 
   const askAi = async () => {
     if (!(await ai.ensureConsent())) return;
@@ -154,7 +162,7 @@ export default function LookupDialog(props: {
               <Icon name="sparkles" size={14} /> {asking ? t("cards.asking") : t("cards.askAi")}
             </button>
           )}
-          {definitions?.length === 0 && (
+          {definitions?.length === 0 && shortText && (
             <span className="muted small">
               {t("cards.noDefinition")}{" "}
               <button className="link-button" onClick={() => openSettings("dictionary")}>

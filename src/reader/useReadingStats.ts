@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { onBeforeExit } from "../lifecycle";
 import type { Location, OpenedBook } from "../types";
+import { localDay } from "../stats/calendar";
 import { unitsAt } from "./locations";
 
 const TICK_MS = 15_000;
@@ -62,7 +63,7 @@ export function useReadingStats(book: OpenedBook | null, location: Location | nu
       a.units = 0;
       setStats((s) => ({ ...s, readSeconds: s.readSeconds + seconds }));
       return api
-        .addReadingTime(book.id, seconds, speed)
+        .addReadingTime(book.id, seconds, speed, localDay())
         .then((b) => setStats({ readSeconds: b.readSeconds, readingSpeed: b.readingSpeed }))
         .catch(() => {});
     };

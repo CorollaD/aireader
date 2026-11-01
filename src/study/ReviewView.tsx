@@ -10,6 +10,7 @@ import type { Settings } from "../settings";
 import type { Card, CardStats, Location } from "../types";
 import { Toast, isTyping } from "../ui";
 import { formatInterval, startOfToday } from "./intervals";
+import DailyHighlights from "./DailyHighlights";
 import LookupDialog, { type LookupRequest } from "./LookupDialog";
 
 /** Cards due again within this time come back in the same session. */
@@ -23,7 +24,7 @@ const RATINGS: { value: 1 | 2 | 3 | 4; label: MessageKey; className: string }[] 
 ];
 
 export default function ReviewView(props: { settings: Settings; onBack: () => void; onOpen: (bookId: string, location: Location) => void }) {
-  const [tab, setTab] = useState<"review" | "cards">("review");
+  const [tab, setTab] = useState<"review" | "highlights" | "cards">("review");
   const [stats, setStats] = useState<CardStats | null>(null);
   const refreshStats = useCallback(() => {
     api
@@ -43,6 +44,9 @@ export default function ReviewView(props: { settings: Settings; onBack: () => vo
           <button className={tab === "review" ? "on" : ""} onClick={() => setTab("review")}>
             {t("cards.review")}
           </button>
+          <button className={tab === "highlights" ? "on" : ""} onClick={() => setTab("highlights")}>
+            {t("daily.title")}
+          </button>
           <button className={tab === "cards" ? "on" : ""} onClick={() => setTab("cards")}>
             {t("cards.all")}
           </button>
@@ -50,7 +54,9 @@ export default function ReviewView(props: { settings: Settings; onBack: () => vo
         <span className="spacer" />
         {stats && <span className="muted small">{t("cards.stats", { due: stats.due, done: stats.reviewedToday, total: stats.total })}</span>}
       </header>
-      {tab === "review" ? <Review {...props} onChanged={refreshStats} /> : <CardList settings={props.settings} onChanged={refreshStats} />}
+      {tab === "review" && <Review {...props} onChanged={refreshStats} />}
+      {tab === "highlights" && <DailyHighlights settings={props.settings} onOpen={props.onOpen} />}
+      {tab === "cards" && <CardList settings={props.settings} onChanged={refreshStats} />}
     </div>
   );
 }

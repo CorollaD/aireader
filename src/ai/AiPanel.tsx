@@ -5,7 +5,20 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, errorText, runAiTask } from "../api";
-import type { AiEvent, AiTask, BookEstimate, ChatAction, ChatRecord, Location, MindMapScope, OpenedBook, SemanticStatus, Source, Usage } from "../types";
+import type {
+  AiEvent,
+  AiTask,
+  BookEstimate,
+  ChatAction,
+  ChatRecord,
+  Highlight,
+  Location,
+  MindMapScope,
+  OpenedBook,
+  SemanticStatus,
+  Source,
+  Usage,
+} from "../types";
 import { Modal } from "../ui";
 import type { TextRange } from "../reader/anchors";
 import { formatDate, formatNumber, t, type MessageKey } from "../i18n";
@@ -15,6 +28,7 @@ import { MOD } from "../reader/shortcuts";
 import { useAi } from "./AiContext";
 import { presetOf } from "./presets";
 import Markdown from "./Markdown";
+import StudyTab from "./StudyTab";
 import { MindMapPreview, MindMapViewer, outlineMarkdown, saveMindMap } from "./MindMap";
 
 /** A passage the conversation is about (from the selection toolbar). */
@@ -32,7 +46,7 @@ export interface ChatRequest extends Quote {
   n: number;
 }
 
-type Tab = "chat" | "summary" | "map";
+type Tab = "chat" | "summary" | "map" | "study";
 type Status = "idle" | "running" | "done" | "error" | "stopped";
 type Progress = { done: number; total: number; label: string };
 
@@ -139,6 +153,7 @@ const TABS: { key: Tab; icon: IconName; label: MessageKey }[] = [
   { key: "chat", icon: "message", label: "ai.chatTab" },
   { key: "summary", icon: "bookOpen", label: "ai.summaryTab" },
   { key: "map", icon: "mindmap", label: "ai.mapTab" },
+  { key: "study", icon: "layers", label: "ai.studyTab" },
 ];
 
 export default function AiPanel(props: {
@@ -148,6 +163,8 @@ export default function AiPanel(props: {
   onSaveNote: (quote: Quote, note: string) => void;
   onNavigate: (loc: Location) => void;
   onClose: () => void;
+  highlights: Highlight[];
+  onCardsSaved: () => void;
   width: number;
 }) {
   const { book, location } = props;
@@ -737,6 +754,18 @@ export default function AiPanel(props: {
           </div>
         </>
       )}
+
+      {/* Stays mounted, so a quiz in progress survives a look at the other tabs. */}
+      <div className="ai-tab-page" hidden={tab !== "study"}>
+        <StudyTab
+          book={book}
+          location={location}
+          highlights={props.highlights}
+          onCardsSaved={props.onCardsSaved}
+          onNavigate={props.onNavigate}
+          onNotice={setNotice}
+        />
+      </div>
 
       {tab === "summary" && (
         <div className="ai-scroll" ref={body} onScroll={onScroll}>

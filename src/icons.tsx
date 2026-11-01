@@ -21,6 +21,8 @@ const PATHS = {
   minus: "M5 12h14",
   rotate: "M21 12a9 9 0 1 1-2.64-6.36L21 8M21 3v5h-5",
   spread: "M3 5h7a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H3zM21 5h-7a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h7z",
+  check: "M20 6L9 17l-5-5",
+  chart: "M3 3v18h18M8 17v-5M13 17V8M18 17v-9",
   volume: "M11 5L6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14",
   play: "M6 4l14 8-14 8z",
   pause: "M6 4h4v16H6zM14 4h4v16h-4z",
