@@ -2,7 +2,7 @@
 // (`npm run dev`, then open http://localhost:1420). Never included in production builds.
 
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { AiConfig, AiEvent, AiTask, Annotations, Block, Book, ChatRecord, Location, Source } from "../types";
+import type { AiConfig, AiEvent, AiTask, Annotations, Block, Book, Card, ChatRecord, DictRecord, Location, Source } from "../types";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -57,6 +57,9 @@ export function installMock() {
     ai: { provider: "", model: "", baseUrl: null, language: "auto", consented: false, embedding: { provider: "", model: "", baseUrl: null } } as AiConfig,
     aiKey: false,
     indexed: new Set<string>(),
+    cards: [] as Card[],
+    reviewed: 0,
+    dicts: [] as DictRecord[],
   };
   const aiStatus = () => ({
     config: db.ai,
@@ -141,6 +144,66 @@ export function installMock() {
           return "LXGW WenKai.ttf";
         case "remove_font":
           return null;
+        case "lookup_word":
+          return db.dicts.length && String(a.word).length < 20 ? [{ dictionary: db.dicts[0].name, word: String(a.word), text: "n. 示例释义\n例句一则" }] : [];
+        case "find_card":
+          return db.cards.find((c) => c.bookId === a.bookId && c.front.toLowerCase() === String(a.front).toLowerCase()) ?? null;
+        case "add_card": {
+          const c: Card = { ...(a.card as Card), created: now(), suspended: false, due: now(), reps: 0, lapses: 0 };
+          db.cards.unshift(c);
+          return c;
+        }
+        case "list_cards":
+          return db.cards.filter((c) => !a.bookId || c.bookId === a.bookId);
+        case "due_cards":
+          return db.cards.filter((c) => !c.suspended && c.due <= now());
+        case "card_stats":
+          return { total: db.cards.length, due: db.cards.filter((c) => !c.suspended && c.due <= now()).length, reviewedToday: db.reviewed };
+        case "update_card":
+          Object.assign(
+            db.cards.find((c) => c.id === a.id)!,
+            a.patch,
+          );
+          return db.cards.find((c) => c.id === a.id);
+        case "delete_card":
+          db.cards = db.cards.filter((c) => c.id !== a.id);
+          return null;
+        case "card_intervals":
+          return [60, 600, 86_400, 8 * 86_400];
+        case "review_card": {
+          const c = db.cards.find((x) => x.id === a.id)!;
+          c.reps += 1;
+          c.due = now() + [60, 600, 86_400, 8 * 86_400][(a.rating as number) - 1];
+          db.reviewed += 1;
+          return { ...c };
+        }
+        case "export_cards":
+          return "/Users/me/AiReader-cards.csv";
+        case "list_dictionaries":
+          return db.dicts;
+        case "import_dictionary":
+          db.dicts = [...db.dicts, { id: String(db.dicts.length + 1), name: "简明英汉词典", words: 54_321, enabled: true }];
+          return db.dicts;
+        case "set_dictionaries":
+          db.dicts = a.records as DictRecord[];
+          return null;
+        case "search_library":
+          return [
+            {
+              bookId: "0001",
+              hits: [
+                { location: { kind: "flow", chapter: 1, block: 3 }, title: "第2回 示例章节", snippet: `…话说天下大势，${String(a.query)}，分久必合…` },
+                { location: { kind: "flow", chapter: 2, block: 5 }, title: "第3回 示例章节", snippet: `…周末七国分争，${String(a.query)}，并入于秦…` },
+              ],
+            },
+            { bookId: "0003", hits: [{ location: { kind: "page", page: 2 }, title: "", snippet: `The dominant ${String(a.query)} models…` }] },
+          ];
+        case "fulltext_status":
+          return { done: 3, total: 12 };
+        case "stop_indexing":
+          return null;
+        case "export_notes":
+          return a.id ? "/Users/me/笔记.md" : "/Users/me/AiReader-notes";
         case "backup_library":
           return `/Users/me/AiReader-backup${a.books ? "-full" : ""}.zip`;
         case "find_duplicates":
@@ -215,8 +278,6 @@ export function installMock() {
         case "save_annotations":
           db.annotations.set(a.id as string, a.annotations as Annotations);
           return null;
-        case "export_notes":
-          return "/Users/demo/Documents/笔记.md";
         case "add_reading_time": {
           const b = find(a.id);
           b.readSeconds += a.seconds as number;
@@ -257,6 +318,10 @@ export function installMock() {
             const outline =
               "- 第一回 宴桃园豪杰三结义\n  - 背景\n    - 天下大势 分久必合 合久必分\n    - 黄巾起义\n  - 人物\n    - 刘备：汉室宗亲\n    - 关羽：红脸长髯\n    - 张飞：豹头环眼\n  - 事件\n    - 桃园结义\n    - 招募乡勇\n    - 破黄巾初立战功\n  - 主旨\n    - 忠义\n    - 乱世英雄";
             stream(a.onEvent as { id: number }, outline, task.scope.kind === "book");
+            return null;
+          }
+          if (task.kind === "define") {
+            stream(a.onEvent as { id: number }, `${task.word}：此处指天下局势的走向。`);
             return null;
           }
           if (task.kind === "ask") {

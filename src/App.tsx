@@ -7,7 +7,8 @@ import { resolveLanguage, setLanguage, t } from "./i18n";
 import { CUSTOM_FONT, DEFAULT_SETTINGS, normalizeSettings, themeVars, UI_SCALES, type Settings } from "./settings";
 import SettingsDialog, { SettingsOpener, type SettingsTab } from "./SettingsDialog";
 import ShelfView from "./shelf/ShelfView";
-import Reader from "./reader/Reader";
+import ReviewView from "./study/ReviewView";
+import Reader, { type OpenAt } from "./reader/Reader";
 import { AiProvider } from "./ai/AiContext";
 import { applyUiScale } from "./zoom";
 import ErrorBoundary from "./ErrorBoundary";
@@ -18,6 +19,9 @@ export default function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
   const [reading, setReading] = useState<string | null>(null);
+  /** Where to open the book: a search result rather than the saved position. */
+  const [openAt, setOpenAt] = useState<OpenAt | null>(null);
+  const [reviewing, setReviewing] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
   const saveTimer = useRef<number>();
   const pendingSettings = useRef<Settings | null>(null);
@@ -49,7 +53,11 @@ export default function App() {
     const opened = listen("open-file", () => {
       api
         .takeStartupBook()
-        .then((id) => id && setReading(id))
+        .then((id) => {
+          if (!id) return;
+          setOpenAt(null);
+          setReading(id);
+        })
         .catch(() => {});
     });
     return () => {
@@ -131,7 +139,14 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [reading, settings.uiScale, update]);
 
+  const open = useCallback((id: string, at?: OpenAt) => {
+    setOpenAt(at ?? null);
+    setReviewing(false);
+    setReading(id);
+  }, []);
+
   const close = useCallback(() => {
+    setOpenAt(null);
     setReading(null);
     getCurrentWindow()
       .setTitle("AiReader")
@@ -146,11 +161,13 @@ export default function App() {
   return (
     <SettingsOpener.Provider value={openSettings}>
       <AiProvider openSettings={openAiSettings}>
-        <ErrorBoundary key={reading ?? "shelf"} onReset={reading ? close : undefined} resetLabel={t("error.backToShelf")}>
-          {reading ? (
-            <Reader bookId={reading} settings={settings} update={update} onClose={close} />
+        <ErrorBoundary key={reviewing ? "review" : (reading ?? "shelf")} onReset={reading ? close : undefined} resetLabel={t("error.backToShelf")}>
+          {reviewing ? (
+            <ReviewView settings={settings} onBack={() => setReviewing(false)} onOpen={(id, location) => open(id, { location })} />
+          ) : reading ? (
+            <Reader bookId={reading} openAt={openAt} settings={settings} update={update} onClose={close} />
           ) : (
-            <ShelfView settings={settings} update={update} onOpen={setReading} />
+            <ShelfView settings={settings} update={update} onOpen={open} onReview={() => setReviewing(true)} />
           )}
         </ErrorBoundary>
         {settingsTab && <SettingsDialog settings={settings} update={update} tab={settingsTab} onTab={setSettingsTab} onClose={() => setSettingsTab(null)} />}

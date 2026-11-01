@@ -4,11 +4,14 @@ import { api, errorText } from "../api";
 import { onBeforeExit } from "../lifecycle";
 import type { UpdateSettings } from "../App";
 import type { Settings } from "../settings";
-import type { Hit, HighlightColor, Location, OpenedBook } from "../types";
-import { isTyping, Toast } from "../ui";
+import type { Card, Hit, HighlightColor, Location, OpenedBook } from "../types";
+import { isTyping, Modal, Toast } from "../ui";
 import { t } from "../i18n";
 import { Icon } from "../icons";
 import { useOpenSettings } from "../SettingsDialog";
+import ExportNotes from "../ExportNotes";
+import LookupDialog, { type LookupRequest } from "../study/LookupDialog";
+import { sentenceAt } from "./speech";
 import AiPanel, { type ChatRequest, type Quote } from "../ai/AiPanel";
 import { useAi } from "../ai/AiContext";
 import type { ChatAction } from "../types";
@@ -22,6 +25,8 @@ import { MOD } from "./shortcuts";
 import Sidebar, { type SidebarTab } from "./Sidebar";
 import { useAnnotations } from "./useAnnotations";
 import { useReadingStats } from "./useReadingStats";
+import { useSpeech, useVoices } from "./useSpeech";
+import ReadAloudBar from "./ReadAloudBar";
 import { Resizer, fitWidth, minWidth, usePanelWidths, type Panel } from "./Resizer";
 
 /** A navigation request; `n` makes repeated jumps to the same place distinct. */
@@ -37,8 +42,14 @@ async function toggleFullscreen() {
   await win.setFullscreen(!(await win.isFullscreen()));
 }
 
-export default function Reader(props: { bookId: string; settings: Settings; update: UpdateSettings; onClose: () => void }) {
-  const { settings, update, bookId } = props;
+/** Opens a book at a search result, with the search shown. */
+export interface OpenAt {
+  location: Location;
+  query?: string;
+}
+
+export default function Reader(props: { bookId: string; openAt: OpenAt | null; settings: Settings; update: UpdateSettings; onClose: () => void }) {
+  const { settings, update, bookId, openAt } = props;
   const [book, setBook] = useState<OpenedBook | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [location, setLocation] = useState<Location | null>(null);
@@ -60,6 +71,9 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
   const [selection, setSelection] = useState<FlowSelection | null>(null);
   const [activeMark, setActiveMark] = useState<{ id: string; rect: DOMRect } | null>(null);
   const [noteFor, setNoteFor] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [cards, setCards] = useState<Card[]>([]);
+  const [lookup, setLookup] = useState<(LookupRequest & { card?: Card }) | null>(null);
   const [history, setHistory] = useState<{ back: Location[]; forward: Location[] }>({ back: [], forward: [] });
   const [toast, setToast] = useState<string | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
@@ -84,7 +98,9 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
     setBodyWidth(el.clientWidth);
     return () => ro.disconnect();
   }, [book]);
-  const stats = useReadingStats(book, location);
+  const voices = useVoices();
+  const speech = useSpeech(book, settings, setToast, (loc) => go(loc));
+  const stats = useReadingStats(book, location, speech.state === "playing");
 
   useEffect(() => {
     api
@@ -92,14 +108,34 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
       .then((b) => {
         setBook(b);
         setRotation(b.rotation);
-        const start = b.position && isValid(b, b.position) ? b.position : START[b.kind];
+        const saved = b.position && isValid(b, b.position) ? b.position : START[b.kind];
+        const at = openAt && isValid(b, openAt.location) ? openAt.location : null;
+        const start = at ?? saved;
         setJump({ loc: start, n: 0 });
+        if (at) setFlash(at.kind === "flow" ? { chapter: at.chapter, block: at.block } : null);
+        const query = openAt?.query;
+        if (at && query) {
+          // Shows every match in the book; the passage found may be a long one.
+          setSearch({ open: true, query, hits: null, busy: true });
+          api.searchBook(bookId, query).then(
+            (hits) => setSearch((s) => ({ ...s, hits, busy: false })),
+            () => setSearch((s) => ({ ...s, hits: [], busy: false })),
+          );
+        }
         getCurrentWindow()
           .setTitle(`${b.title} — AiReader`)
           .catch(() => {});
       })
       .catch((e) => setError(errorText(e)));
   }, [bookId]);
+
+  const refreshCards = useCallback(() => {
+    api
+      .listCards(bookId)
+      .then(setCards)
+      .catch(() => {});
+  }, [bookId]);
+  useEffect(refreshCards, [refreshCards]);
 
   const flush = useCallback(() => {
     window.clearTimeout(saveTimer.current);
@@ -266,15 +302,6 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
     }
   };
 
-  const exportNotes = async () => {
-    try {
-      const path = await api.exportNotes(bookId);
-      if (path) setToast(t("reader.exported", { path }));
-    } catch (e) {
-      setToast(errorText(e));
-    }
-  };
-
   // --- search --------------------------------------------------------------------------------
 
   const runSearch = async () => {
@@ -292,6 +319,14 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
   const isFlow = book?.kind === "flow";
   // PDFs are searched through their text layer; comics have no text.
   const searchable = isFlow || book?.format === "PDF";
+  const canSpeak = searchable && voices.length > 0;
+
+  /** Starts reading where the reader is; while reading, pauses or resumes. */
+  const toggleSpeech = () => {
+    if (speech.state === "playing") speech.pause();
+    else if (speech.state === "paused") speech.resume();
+    else if (location) speech.start(location.kind === "flow" ? { kind: "flow", chapter: location.chapter, block: location.block } : location);
+  };
 
   const rotate = () => {
     const next = (rotation + 90) % 360;
@@ -314,6 +349,9 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
         e.preventDefault();
         setSearch((s) => ({ ...s, open: true }));
         setTimeout(() => searchInput.current?.focus(), 0);
+      } else if (key === "r" && !cmd && !e.altKey && !typing && canSpeak) {
+        e.preventDefault();
+        toggleSpeech();
       } else if (cmd && e.shiftKey && key === "a") {
         e.preventDefault();
         setAiOpen((o) => !o);
@@ -363,6 +401,9 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
   }, [
     isFlow,
     searchable,
+    canSpeak,
+    speech.state,
+    location,
     settings.fontSize,
     settings.showToc,
     panel,
@@ -506,6 +547,16 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
           >
             <Icon name="bookmark" filled={!!currentBookmark} />
           </button>
+          {canSpeak && (
+            <button
+              className={`icon-button${speech.state !== "idle" ? " on" : ""}`}
+              title={`${t("reader.readAloud")} (R)`}
+              aria-label={t("reader.readAloud")}
+              onClick={toggleSpeech}
+            >
+              <Icon name="volume" />
+            </button>
+          )}
           {searchable && (
             <button
               className={`icon-button${search.open ? " on" : ""}`}
@@ -620,7 +671,10 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
             onRemoveBookmark={ann.removeBookmark}
             onEditNote={setNoteFor}
             onRemoveHighlight={ann.removeHighlight}
-            onExport={exportNotes}
+            onExport={() => setExporting(true)}
+            cards={cards}
+            onEditCard={(card) => setLookup({ word: card.front, context: card.context, location: card.location, card })}
+            onDeleteCard={(card) => api.deleteCard(card.id).then(refreshCards, () => {})}
           />
         )}
         {tocShown && (
@@ -647,6 +701,7 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
               onMarkClick={onMarkClick}
               onMoved={onMoved}
               onLink={(loc) => navigate(loc, true)}
+              speaking={speech.position}
             />
           ) : (
             <PagedView
@@ -659,6 +714,17 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
               rotation={rotation}
               onLocation={onLocation}
               onSelect={setPageSel}
+            />
+          )}
+          {speech.state !== "idle" && (
+            <ReadAloudBar
+              state={speech.state}
+              voices={voices}
+              settings={settings}
+              update={update}
+              onPlayPause={toggleSpeech}
+              onStep={speech.step}
+              onStop={speech.stop}
             />
           )}
           {!focus && <ProgressBar book={book} location={location} stats={stats} onJump={(loc) => navigate(loc)} />}
@@ -729,15 +795,40 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
             copy(selection.text);
             clearSelection();
           }}
-          extra={
-            ai.ready
+          extra={[
+            {
+              label: t("cards.lookup"),
+              icon: "bookOpen" as const,
+              run: () => {
+                const block = flowRef.current?.blockText(selection.chapter, selection.startBlock) ?? selection.text;
+                setLookup({
+                  word: selection.text.trim(),
+                  context: sentenceAt(block, selection.start),
+                  location: { kind: "flow", chapter: selection.chapter, block: selection.startBlock },
+                });
+                clearSelection();
+              },
+            },
+            ...(canSpeak
               ? [
-                  { label: t("reader.explain"), title: t("reader.explainTitle"), icon: "sparkles", run: () => askAi("explain") },
-                  { label: t("reader.translate"), title: t("reader.translateTitle"), icon: "languages", run: () => askAi("translate") },
-                  { label: t("reader.ask"), title: t("reader.askTitle"), icon: "message", run: () => askAi(null) },
+                  {
+                    label: t("reader.readFromHere"),
+                    icon: "volume" as const,
+                    run: () => {
+                      speech.start({ kind: "flow", chapter: selection.chapter, block: selection.startBlock, offset: selection.start });
+                      clearSelection();
+                    },
+                  },
                 ]
-              : undefined
-          }
+              : []),
+            ...(ai.ready
+              ? [
+                  { label: t("reader.explain"), title: t("reader.explainTitle"), icon: "sparkles" as const, run: () => askAi("explain") },
+                  { label: t("reader.translate"), title: t("reader.translateTitle"), icon: "languages" as const, run: () => askAi("translate") },
+                  { label: t("reader.ask"), title: t("reader.askTitle"), icon: "message" as const, run: () => askAi(null) },
+                ]
+              : []),
+          ]}
         />
       )}
       {pageSel && (
@@ -748,15 +839,24 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
             window.getSelection()?.removeAllRanges();
             setPageSel(null);
           }}
-          extra={
-            ai.ready
+          extra={[
+            {
+              label: t("cards.lookup"),
+              icon: "bookOpen" as const,
+              run: () => {
+                setLookup({ word: pageSel.text.trim(), context: "", location: { kind: "page", page: pageSel.page } });
+                window.getSelection()?.removeAllRanges();
+                setPageSel(null);
+              },
+            },
+            ...(ai.ready
               ? [
-                  { label: t("reader.explain"), title: t("reader.explainTitle"), icon: "sparkles", run: () => askAiPage("explain") },
-                  { label: t("reader.translate"), title: t("reader.translateTitle"), icon: "languages", run: () => askAiPage("translate") },
-                  { label: t("reader.ask"), title: t("reader.askTitle"), icon: "message", run: () => askAiPage(null) },
+                  { label: t("reader.explain"), title: t("reader.explainTitle"), icon: "sparkles" as const, run: () => askAiPage("explain") },
+                  { label: t("reader.translate"), title: t("reader.translateTitle"), icon: "languages" as const, run: () => askAiPage("translate") },
+                  { label: t("reader.ask"), title: t("reader.askTitle"), icon: "message" as const, run: () => askAiPage(null) },
                 ]
-              : undefined
-          }
+              : []),
+          ]}
         />
       )}
       {mark && activeMark && !selection && (
@@ -780,6 +880,24 @@ export default function Reader(props: { bookId: string; settings: Settings; upda
             setActiveMark(null);
           }}
         />
+      )}
+      {lookup && (
+        <LookupDialog
+          request={lookup}
+          book={{ id: bookId, title: book.title }}
+          card={lookup.card}
+          settings={settings}
+          onSaved={() => {
+            refreshCards();
+            setToast(t("cards.saved"));
+          }}
+          onClose={() => setLookup(null)}
+        />
+      )}
+      {exporting && (
+        <Modal title={t("side.exportTitle")} width={460} onClose={() => setExporting(false)}>
+          <ExportNotes bookId={bookId} />
+        </Modal>
       )}
       {noteHighlight && (
         <NoteEditor

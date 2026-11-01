@@ -71,6 +71,26 @@ function offsetIn(blockEl: HTMLElement, node: Node, offset: number): number {
   return total;
 }
 
+/** A DOM range over `start..end` of a block element's text. */
+export function rangeIn(blockEl: HTMLElement, start: number, end: number): Range | null {
+  const range = document.createRange();
+  let pos = 0;
+  let started = false;
+  for (const t of textNodes(blockEl)) {
+    const next = pos + t.data.length;
+    if (!started && start < next) {
+      range.setStart(t, start - pos);
+      started = true;
+    }
+    if (started && end <= next) {
+      range.setEnd(t, end - pos);
+      return range;
+    }
+    pos = next;
+  }
+  return null;
+}
+
 function blockOf(node: Node): HTMLElement | null {
   const el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
   return (el?.closest("[data-block]") as HTMLElement | null) ?? null;

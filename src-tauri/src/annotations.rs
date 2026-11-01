@@ -159,6 +159,25 @@ pub fn write(conn: &Connection, book_id: &str, ann: &Annotations) -> Result<()> 
     Ok(())
 }
 
+/// A chapter's title, or a generated name for one without.
+pub fn chapter_name(titles: &[String], chapter: usize) -> String {
+    titles
+        .get(chapter)
+        .filter(|t| !t.trim().is_empty())
+        .cloned()
+        .unwrap_or_else(|| crate::t!("title_chapter", n = chapter + 1))
+}
+
+/// The books that have any bookmarks or highlights.
+pub fn books_with_notes(conn: &Connection) -> Result<Vec<String>> {
+    let mut stmt =
+        conn.prepare("SELECT book_id FROM bookmarks UNION SELECT book_id FROM highlights")?;
+    let ids = stmt
+        .query_map([], |r| r.get(0))?
+        .collect::<rusqlite::Result<Vec<String>>>()?;
+    Ok(ids)
+}
+
 /// Renders highlights and notes as Markdown, grouped by chapter in reading order.
 pub fn to_markdown(
     title: &str,
@@ -176,11 +195,7 @@ pub fn to_markdown(
     for h in highlights {
         if chapter != Some(h.chapter) {
             chapter = Some(h.chapter);
-            let name = chapter_titles
-                .get(h.chapter)
-                .filter(|t| !t.trim().is_empty())
-                .cloned()
-                .unwrap_or_else(|| crate::t!("title_chapter", n = h.chapter + 1));
+            let name = chapter_name(chapter_titles, h.chapter);
             out.push_str(&format!("## {name}\n\n"));
         }
         for line in h.text.trim().lines() {

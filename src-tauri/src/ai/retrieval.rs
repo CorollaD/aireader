@@ -121,7 +121,7 @@ fn split_chars(text: &str, max: usize) -> Vec<&str> {
     pieces
 }
 
-fn is_cjk(c: char) -> bool {
+pub fn is_cjk(c: char) -> bool {
     matches!(c as u32,
         0x3040..=0x30FF      // kana
         | 0x3400..=0x4DBF    // CJK extension A

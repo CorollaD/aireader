@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { TocEntry } from "../types";
-import type { Bookmark, Highlight, Location, OpenedBook } from "../types";
+import type { Bookmark, Card, Highlight, Location, OpenedBook } from "../types";
 import { formatDate, t } from "../i18n";
 import { Icon } from "../icons";
 import { MOD } from "./shortcuts";
 import { atOrBefore } from "./locations";
 
-export type SidebarTab = "toc" | "bookmarks" | "notes";
+export type SidebarTab = "toc" | "bookmarks" | "notes" | "cards";
 
 interface Props {
   book: OpenedBook;
@@ -23,6 +23,9 @@ interface Props {
   onEditNote: (id: string) => void;
   onRemoveHighlight: (id: string) => void;
   onExport: () => void;
+  cards: Card[];
+  onEditCard: (card: Card) => void;
+  onDeleteCard: (card: Card) => void;
   width: number;
   onCollapse: () => void;
 }
@@ -49,6 +52,7 @@ export default function Sidebar(props: Props) {
     ["toc", t("side.toc"), null],
     ["bookmarks", t("side.bookmarks"), props.bookmarks.length],
     ...(flow ? ([["notes", t("side.notes"), props.highlights.length]] as [SidebarTab, string, number][]) : []),
+    ["cards", t("side.cards"), props.cards.length],
   ];
 
   return (
@@ -73,8 +77,48 @@ export default function Sidebar(props: Props) {
           ))}
         {tab === "bookmarks" && <Bookmarks {...props} />}
         {tab === "notes" && flow && <Notes {...props} />}
+        {tab === "cards" && <Cards {...props} />}
       </div>
     </aside>
+  );
+}
+
+function Cards(props: Props) {
+  if (props.cards.length === 0) return <div className="side-empty muted small">{t("side.noCards")}</div>;
+  return (
+    <>
+      {props.cards.map((c) => (
+        <div key={c.id} className="side-entry" onClick={() => c.location && props.onNavigate(c.location, true)}>
+          <div className="entry-title">{c.front}</div>
+          {c.back && <div className="entry-text">{c.back}</div>}
+          <div className="entry-meta">
+            <span>{formatDate(c.created)}</span>
+            <span className="entry-actions">
+              <button
+                className="icon"
+                title={t("cards.edit")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  props.onEditCard(c);
+                }}
+              >
+                <Icon name="edit" size={14} />
+              </button>
+              <button
+                className="icon"
+                title={t("common.delete")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  props.onDeleteCard(c);
+                }}
+              >
+                <Icon name="close" size={14} />
+              </button>
+            </span>
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
 

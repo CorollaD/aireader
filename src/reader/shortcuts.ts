@@ -35,6 +35,7 @@ export function shortcuts(): { group: string; items: [string, string][] }[] {
         [`${MOD}+F`, t("sc.search")],
         ["T", t("sc.sidebar")],
         [`${MOD}+Shift+A`, t("sc.aiPanel")],
+        ["R", t("sc.readAloud")],
         ["F", t("sc.focus")],
         [mac ? "⌃⌘F / F11" : "F11", t("sc.fullscreen")],
         ["?", t("sc.help")],

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
+import LibrarySearch from "./LibrarySearch";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -8,7 +9,8 @@ import { formatList, t, type MessageKey } from "../i18n";
 import { Icon, type IconName } from "../icons";
 import { useOpenSettings } from "../SettingsDialog";
 import type { ShelfSort, Settings } from "../settings";
-import type { Book, BookPatch, DuplicateGroup, ImportProgress, Shelf } from "../types";
+import type { Book, BookPatch, CardStats, DuplicateGroup, ImportProgress, Location, Shelf } from "../types";
+import { startOfToday } from "../study/intervals";
 import { Confirm, Modal, Toast } from "../ui";
 import { BookCard, BookRow } from "./BookCard";
 import { EditDialog } from "./EditDialog";
@@ -56,11 +58,18 @@ interface Menu {
   y: number;
 }
 
-export default function ShelfView(props: { settings: Settings; update: UpdateSettings; onOpen: (id: string) => void }) {
+export default function ShelfView(props: {
+  settings: Settings;
+  update: UpdateSettings;
+  onOpen: (id: string, at?: { location: Location; query: string }) => void;
+  onReview: () => void;
+}) {
   const { settings, update } = props;
   const [shelf, setShelf] = useState<Shelf>({ books: [], groups: [] });
   const [filter, setFilter] = useState(ALL);
   const [query, setQuery] = useState("");
+  const [foundInBooks, setFoundInBooks] = useState(false);
+  const [cardStats, setCardStats] = useState<CardStats | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState<Menu | null>(null);
   const [editing, setEditing] = useState<Book[] | null>(null);
@@ -84,6 +93,13 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
       .catch((e) => setToast(errorText(e)));
   }, []);
   useEffect(refresh, [refresh]);
+
+  useEffect(() => {
+    api
+      .cardStats(startOfToday())
+      .then(setCardStats)
+      .catch(() => {});
+  }, []);
 
   const fail = (e: unknown) => setToast(errorText(e));
 
@@ -234,6 +250,11 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
             t("shelf.ungrouped"),
             count((b) => !b.group),
           )}
+          <button className="side-item" onClick={props.onReview}>
+            <Icon name="layers" />
+            <span className="ellipsis">{t("cards.review")}</span>
+            {!!cardStats?.due && <span className="count">{cardStats.due}</span>}
+          </button>
           <div className="side-heading">
             <span>{t("shelf.groups")}</span>
             <button className="icon" title={t("shelf.newGroup")} aria-label={t("shelf.newGroup")} onClick={() => setGroupDialog({ old: null })}>
@@ -401,7 +422,7 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
               <div className="muted small">{t("shelf.dropHint")}</div>
             </div>
           ) : visible.length === 0 ? (
-            <div className="empty muted">{t("shelf.noMatch")}</div>
+            !foundInBooks && <div className="empty muted">{t("shelf.noMatch")}</div>
           ) : settings.shelfView === "grid" ? (
             <div className="book-grid">
               {visible.map((b) => (
@@ -442,6 +463,12 @@ export default function ShelfView(props: { settings: Settings; update: UpdateSet
               ))}
             </div>
           )}
+          <LibrarySearch
+            query={query}
+            books={shelf.books}
+            onResults={setFoundInBooks}
+            onOpen={(b, location) => (b.missing ? setToast(t("shelf.fileMissing")) : props.onOpen(b.id, { location, query: query.trim() }))}
+          />
         </div>
       </main>
 

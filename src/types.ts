@@ -158,6 +158,61 @@ export interface Hit {
   snippet: string;
 }
 
+/** A flashcard. `bookId` is null once its book has left the shelf. */
+export interface Card {
+  id: string;
+  bookId: string | null;
+  bookTitle: string;
+  front: string;
+  back: string;
+  /** The sentence it came from. */
+  context: string;
+  location: Location | null;
+  created: number;
+  suspended: boolean;
+  /** Unix seconds. */
+  due: number;
+  reps: number;
+  lapses: number;
+}
+
+export interface CardStats {
+  total: number;
+  due: number;
+  reviewedToday: number;
+}
+
+export interface DictRecord {
+  id: string;
+  name: string;
+  words: number;
+  enabled: boolean;
+}
+
+/** What one dictionary says about a word. */
+export interface Definition {
+  dictionary: string;
+  word: string;
+  text: string;
+}
+
+/** A passage found by searching the whole library. */
+export interface TextHit extends Hit {
+  /** Chapter or page. */
+  title: string;
+}
+
+export interface LibraryHits {
+  bookId: string;
+  hits: TextHit[];
+}
+
+/** Books added to the full-text index so far, while it is being built. */
+export interface IndexProgress {
+  done: number;
+  total: number;
+}
+
 // --- AI (src-tauri/src/ai) ---
 
 export interface AiConfig {
@@ -250,7 +305,8 @@ export type AiTask =
       action: ChatAction | null;
       history: ChatTurn[];
     }
-  | { kind: "ask"; bookId: string; location: Location | null; history: ChatTurn[] }
+  | { kind: "define"; bookTitle: string; word: string; context: string }
+  | { kind: "ask"; bookId: string; location: Location | null; history: ChatTurn[]; spoilerFree?: boolean }
   | { kind: "buildIndex"; bookId: string }
   | { kind: "mindMap"; bookId: string; scope: MindMapScope; refresh?: boolean };
 

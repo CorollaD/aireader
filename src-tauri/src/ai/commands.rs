@@ -348,11 +348,20 @@ async fn run_task(
             let mut cache = cache(app, &book_id);
             tasks::mind_map(&runner, &mut cache, &book.doc, &title, scope, refresh).await
         }
+        AiTask::Define {
+            book_title,
+            word,
+            context,
+        } => {
+            let text = tasks::define(&runner, &book_title, &word, &context).await?;
+            Ok((text, false))
+        }
         AiTask::BuildIndex { .. } => unreachable!("handled above"),
         AiTask::Ask {
             book_id,
             location,
             history,
+            spoiler_free,
         } => {
             let index = book_index(app, &book_id).await?;
             let title = app_state(app)
@@ -367,7 +376,16 @@ async fn run_task(
                 .map(|t| t.text.clone())
                 .unwrap_or_default();
             let semantic = semantic_hits(app, &book_id, &query).await;
-            let text = tasks::ask(&runner, &title, &index, location, &history, &semantic).await?;
+            let text = tasks::ask(
+                &runner,
+                &title,
+                &index,
+                location,
+                &history,
+                &semantic,
+                spoiler_free,
+            )
+            .await?;
             Ok((text, false))
         }
     }

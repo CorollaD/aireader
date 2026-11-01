@@ -105,6 +105,23 @@ const ACTION_LABEL: Record<ChatAction, MessageKey> = {
 
 const EMPTY_CHAT: Chat = { id: null, turns: [], quote: null, status: "idle", error: null, taskId: null };
 
+/** Whether questions about a book stick to what has been read; remembered per book. */
+function readSpoilerFree(bookId: string): boolean {
+  try {
+    return localStorage.getItem(`spoiler-free:${bookId}`) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeSpoilerFree(bookId: string, on: boolean) {
+  try {
+    localStorage.setItem(`spoiler-free:${bookId}`, on ? "1" : "0");
+  } catch {
+    // Only the remembering is lost.
+  }
+}
+
 /** What a saved conversation is called in the history list. */
 function chatTitle(c: Chat): string {
   const first = c.turns.find((turn) => turn.role === "user")?.text ?? c.quote?.selection ?? "";
@@ -150,6 +167,7 @@ export default function AiPanel(props: {
   const nextMapId = useRef(1);
   const [sessions, setSessions] = useState<ChatRecord[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [spoilerFree, setSpoilerFree] = useState(() => readSpoilerFree(book.id));
   const [semantic, setSemantic] = useState<SemanticStatus | null>(null);
   const [indexing, setIndexing] = useState<{ done: number; total: number; taskId: string } | null>(null);
 
@@ -253,7 +271,7 @@ export default function AiPanel(props: {
           action: c.quote.action,
           history,
         }
-      : { kind: "ask", bookId: book.id, location, history };
+      : { kind: "ask", bookId: book.id, location, history, spoilerFree };
     const taskId = runAiTask(task, (e: AiEvent) =>
       setChat((cur) => {
         if (cur.taskId !== taskId) return cur;
@@ -648,6 +666,19 @@ export default function AiPanel(props: {
           </div>
 
           <div className="ai-composer">
+            {!chat.quote && (
+              <label className="ai-spoiler muted" title={t("ai.spoilerFreeHint")}>
+                <input
+                  type="checkbox"
+                  checked={spoilerFree}
+                  onChange={(e) => {
+                    setSpoilerFree(e.target.checked);
+                    writeSpoilerFree(book.id, e.target.checked);
+                  }}
+                />
+                <span>{t("ai.spoilerFree")}</span>
+              </label>
+            )}
             {!chat.quote && (
               <div className="ai-basis muted">
                 <Icon name="search" size={12} />

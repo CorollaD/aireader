@@ -19,6 +19,9 @@ export interface Settings {
   pageLayout: "continuous" | "single" | "spread";
   /** How paged books are scaled before zoom. */
   pageFit: "width" | "page" | "height";
+  /** Reading aloud: a system voice (`voiceURI`; `null` picks one for the text's language). */
+  ttsVoice: string | null;
+  ttsRate: number;
   /** Comics turn right to left (manga): reversed arrow keys, and spreads read right to left. */
   comicRtl: boolean;
   /** Reflowable books: vertical scrolling or horizontal pages. */
@@ -51,6 +54,8 @@ export const DEFAULT_SETTINGS: Settings = {
   pageLayout: "continuous",
   pageFit: "width",
   comicRtl: false,
+  ttsVoice: null,
+  ttsRate: 1,
   flowMode: "scroll",
   columns: 1,
   paragraphSpacing: 0.75,
@@ -107,6 +112,8 @@ export function normalizeSettings(raw: unknown): Settings {
   if (!/^#[0-9a-f]{6}$/i.test(s.background)) s.background = DEFAULT_SETTINGS.background;
   if (s.textColor !== null && !/^#[0-9a-f]{6}$/i.test(s.textColor)) s.textColor = null;
   if (!(s.fontFamily in FONT_STACKS)) s.fontFamily = DEFAULT_SETTINGS.fontFamily;
+  if (typeof s.ttsVoice !== "string" || !s.ttsVoice) s.ttsVoice = null;
+  if (typeof s.ttsRate !== "number" || !(s.ttsRate >= 0.5 && s.ttsRate <= 2)) s.ttsRate = DEFAULT_SETTINGS.ttsRate;
   if (typeof s.customFont !== "string" || !s.customFont) s.customFont = null;
   if (!UI_SCALES.some((u) => u.value === s.uiScale)) s.uiScale = DEFAULT_SETTINGS.uiScale;
   if (!["continuous", "single", "spread"].includes(s.pageLayout)) s.pageLayout = DEFAULT_SETTINGS.pageLayout;

@@ -12,6 +12,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 anyhow = "1.0.104"
 base64 = "0.23.1"
 chardetng = "1.0.0"
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 ego-tree = "0.11"
 encoding_rs = "0.8.42"
 epub = "2.1.5"
@@ -21,6 +22,7 @@ keyring = "4.2"
 log = "0.4.34"
 mobi = "0.8.0"
 natord = "1.0.9"
+opendict-rs = "0.1.0"
 pdfium-render = { version = "0.9.4", default-features = false, features = ["pdfium_latest", "thread_safe"] }
 pulldown-cmark = "0.13.4"
 regex = "1.13.1"
@@ -29,6 +31,7 @@ rig-core = { version = "0.45", features = ["reqwest"] }
 rig-reqwest = "0.45"
 rig-sqlite = "0.45.0"
 roxmltree = "0.21.1"
+rs-fsrs = { version = "1.2.1", features = ["serde"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 schemars = "1"
 scraper = "0.29.0"
@@ -43,6 +46,7 @@ tauri-plugin-single-instance = "2.5.4"
 tauri-plugin-window-state = "2.5.0"
 tokio = { version = "1.54.1", features = ["sync", "rt", "macros", "time"] }
 tokio-rusqlite = { version = "0.6", default-features = false, features = ["bundled"] }
+unicode-normalization = "0.1.26"
 zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
 
 [profile.dev.package."*"]

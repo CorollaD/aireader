@@ -66,6 +66,18 @@ impl SearchText {
     }
 }
 
+/// A piece of `text` around the first of `words` it contains, or its start if it has none (the
+/// search that found it treats punctuation and accents more loosely).
+pub fn snippet_around(text: &str, words: &[&str]) -> String {
+    let lower = text.to_lowercase();
+    let found = words.iter().find_map(|w| {
+        let w = w.to_lowercase();
+        lower.find(&w).map(|pos| (pos, w.chars().count()))
+    });
+    let (pos, chars) = found.unwrap_or((0, 0));
+    snippet(text, &lower, pos, chars)
+}
+
 /// The match at byte `pos` of `lower` with some context on both sides.
 fn snippet(text: &str, lower: &str, pos: usize, query_chars: usize) -> String {
     // Byte offsets only line up when lowercasing kept the length.

@@ -881,11 +881,16 @@ input[type="color"] {
   border-bottom: 1px solid var(--border);
 }
 .side-tabs button {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   border: none;
   border-radius: 0;
   background: none;
-  padding: 8px 0;
+  padding: 8px 4px;
+  font-size: 13px;
   color: var(--muted);
 }
 .side-tabs button.on {
@@ -2743,4 +2748,251 @@ article.flow a.internal:hover {
 .custom-font select {
   flex: 1;
   min-width: 120px;
+}
+
+/* "Only what I've read" switch above the question box. */
+.ai-spoiler {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 4px 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.ai-spoiler input {
+  margin: 0;
+}
+
+/* Matches inside books, under the shelf. */
+.library-search {
+  margin-top: 16px;
+}
+.library-search mark {
+  background: var(--accent-soft);
+  color: inherit;
+  border-radius: 2px;
+}
+.index-note {
+  margin: 6px 0 10px;
+}
+.library-hit {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.library-hit .row-cover {
+  flex-shrink: 0;
+  width: 44px;
+  height: 64px;
+}
+.library-hit-main {
+  flex: 1;
+  min-width: 0;
+}
+.library-hit-main .hit {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 5px 8px;
+  white-space: normal;
+  height: auto;
+}
+.library-hit-main .hit:hover {
+  background: var(--hover);
+}
+.library-hit-main .hit-chapter {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Reading aloud: the sentence being read, and the controls. */
+::highlight(speaking) {
+  background-color: var(--accent-soft);
+}
+.read-aloud {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  flex-shrink: 0;
+}
+.read-aloud select {
+  font-size: 12px;
+  height: 26px;
+}
+.read-aloud-voice {
+  max-width: 200px;
+}
+
+/* Looking up a word and saving it as a flashcard. */
+.lookup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lookup-word {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lookup-word input {
+  flex: 1;
+  font-size: 17px;
+  font-weight: 600;
+}
+.lookup .note-text {
+  min-height: 110px;
+}
+.lookup-sources,
+.lookup-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Flashcard review. */
+.review-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.review-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--bar-h);
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.review-stage,
+.review-done {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 20px;
+}
+.review-done {
+  justify-content: center;
+  text-align: center;
+}
+.flashcard {
+  width: min(620px, 100%);
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 4px 18px var(--shadow);
+  user-select: text;
+}
+.flashcard-front {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--reader-font);
+  font-size: 26px;
+  font-weight: 600;
+}
+.flashcard hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+.flashcard-back {
+  white-space: pre-wrap;
+  font-size: 16px;
+  line-height: 1.7;
+}
+.flashcard-source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+.review-answers {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.review-answers button {
+  min-width: 92px;
+  height: auto;
+  padding: 7px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.review-answers small {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+/* All flashcards. */
+.card-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+  width: min(760px, 100%);
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+.card-list-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.card-list-bar input {
+  flex: 1;
+}
+.card-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+  border-top: 1px solid var(--border);
+}
+.card-row.suspended {
+  opacity: 0.55;
+}
+.card-row-main {
+  flex: 1;
+  min-width: 0;
+}
+.card-row .entry-actions.always {
+  display: flex;
+  opacity: 1;
+}
+
+/* Dictionaries in Settings. */
+.dict-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.dict-row .toggle {
+  min-width: 0;
+  max-width: 60%;
+}
+.settings-page .dict-row + button,
+.panel-section > button {
+  margin-top: 8px;
 }

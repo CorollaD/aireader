@@ -21,11 +21,14 @@ export interface ReadingStats {
   readingSpeed: number | null;
 }
 
-export function useReadingStats(book: OpenedBook | null, location: Location | null): ReadingStats {
+/** `listening`: the book is being read aloud, which counts as reading from any window. */
+export function useReadingStats(book: OpenedBook | null, location: Location | null, listening: boolean): ReadingStats {
   const [stats, setStats] = useState<ReadingStats>({ readSeconds: 0, readingSpeed: null });
   const lastActivity = useRef(Date.now());
   const locRef = useRef(location);
   locRef.current = location;
+  const listeningRef = useRef(listening);
+  listeningRef.current = listening;
   const acc = useRef({ seconds: 0, units: 0, lastUnits: null as number | null });
 
   useEffect(() => {
@@ -67,10 +70,11 @@ export function useReadingStats(book: OpenedBook | null, location: Location | nu
     const tick = () => {
       const loc = locRef.current;
       const units = loc ? unitsAt(book, loc) : null;
-      const active = document.visibilityState === "visible" && document.hasFocus() && Date.now() - lastActivity.current < IDLE_MS;
-      if (active) {
+      const reading = document.visibilityState === "visible" && document.hasFocus() && Date.now() - lastActivity.current < IDLE_MS;
+      if (reading || listeningRef.current) {
         a.seconds += TICK_MS / 1000;
-        if (units !== null && a.lastUnits !== null) {
+        // Listening says nothing about reading speed.
+        if (reading && !listeningRef.current && units !== null && a.lastUnits !== null) {
           const moved = units - a.lastUnits;
           if (moved > 0 && moved <= MAX_PER_TICK[book.kind]) a.units += moved;
         }

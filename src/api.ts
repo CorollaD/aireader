@@ -11,9 +11,15 @@ import type {
   Book,
   BookEstimate,
   BookPatch,
+  Card,
+  CardStats,
   ChatRecord,
+  Definition,
+  DictRecord,
   DuplicateGroup,
   Hit,
+  IndexProgress,
+  LibraryHits,
   ImportReport,
   Location,
   MergeReport,
@@ -23,6 +29,8 @@ import type {
   Suggestion,
   TextRun,
 } from "./types";
+
+export type NotesFormat = "markdown" | "obsidian" | "csv" | "json";
 
 // Custom protocols are exposed as http://<scheme>.localhost on Windows.
 const BASE = navigator.userAgent.includes("Windows") ? "http://book.localhost/" : "book://localhost/";
@@ -54,6 +62,11 @@ export const api = {
   getChapter: (id: string, index: number) => invoke<Block[]>("get_chapter", { id, index }),
   getPageText: (id: string, page: number) => invoke<TextRun[]>("get_page_text", { id, page }),
   searchBook: (id: string, query: string) => invoke<Hit[]>("search_book", { id, query }),
+  /** Passages across the library, best books first. */
+  searchLibrary: (query: string) => invoke<LibraryHits[]>("search_library", { query }),
+  /** Progress while books are added to the full-text index; null when it is up to date. */
+  fulltextStatus: () => invoke<IndexProgress | null>("fulltext_status"),
+  stopIndexing: () => invoke<void>("stop_indexing"),
   saveProgress: (id: string, position: Location, progress: number) => invoke<void>("save_progress", { id, position, progress }),
   getAnnotations: (id: string) => invoke<Annotations>("get_annotations", { id }),
   saveAnnotations: (id: string, annotations: Annotations) => invoke<void>("save_annotations", { id, annotations }),
@@ -61,8 +74,26 @@ export const api = {
   listChats: (bookId: string) => invoke<ChatRecord[]>("list_chats", { bookId }),
   saveChat: (bookId: string, chat: ChatRecord) => invoke<void>("save_chat", { bookId, chat }),
   deleteChat: (id: string) => invoke<void>("delete_chat", { id }),
-  /** Opens a save dialog; resolves to the written path, or null if cancelled. */
-  exportNotes: (id: string) => invoke<string | null>("export_notes", { id }),
+  /** Exports one book's notes, or all books' (`null`); resolves to the path, or null if cancelled. */
+  exportNotes: (id: string | null, format: NotesFormat) => invoke<string | null>("export_notes", { id, format }),
+  addCard: (card: Omit<Card, "created" | "suspended" | "due" | "reps" | "lapses">) => invoke<Card>("add_card", { card }),
+  findCard: (bookId: string | null, front: string) => invoke<Card | null>("find_card", { bookId, front }),
+  /** All cards, or one book's, newest first. */
+  listCards: (bookId: string | null) => invoke<Card[]>("list_cards", { bookId }),
+  dueCards: () => invoke<Card[]>("due_cards"),
+  cardStats: (today: number) => invoke<CardStats>("card_stats", { today }),
+  updateCard: (id: string, patch: Partial<Pick<Card, "front" | "back" | "suspended">>) => invoke<Card>("update_card", { id, patch }),
+  deleteCard: (id: string) => invoke<void>("delete_card", { id }),
+  /** Seconds until the card returns after each answer, from Again to Easy. */
+  cardIntervals: (id: string) => invoke<[number, number, number, number]>("card_intervals", { id }),
+  reviewCard: (id: string, rating: 1 | 2 | 3 | 4) => invoke<Card>("review_card", { id, rating }),
+  exportCards: () => invoke<string | null>("export_cards"),
+  listDictionaries: () => invoke<DictRecord[]>("list_dictionaries"),
+  /** Opens a file dialog; resolves to the new list, or null if cancelled. */
+  importDictionary: () => invoke<DictRecord[] | null>("import_dictionary"),
+  /** Saves the order and on/off state; dictionaries left out are deleted. */
+  setDictionaries: (records: DictRecord[]) => invoke<void>("set_dictionaries", { records }),
+  lookupWord: (word: string) => invoke<Definition[]>("lookup_word", { word }),
   /** Reading fonts the user added (file names). */
   listFonts: () => invoke<string[]>("list_fonts"),
   /** Opens a file dialog and adds the font; resolves to its name, or null if cancelled. */

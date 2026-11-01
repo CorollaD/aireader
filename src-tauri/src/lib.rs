@@ -2,10 +2,14 @@
 
 pub mod ai;
 pub mod annotations;
+pub mod cards;
 pub mod commands;
 pub mod db;
 pub mod dedupe;
+pub mod dictionary;
+pub mod export;
 pub mod formats;
+pub mod fulltext;
 pub mod i18n;
 pub mod library;
 pub mod model;
@@ -69,6 +73,7 @@ pub fn run() {
             let startup = file_arg(std::env::args_os().skip(1), &cwd);
             app.manage(commands::AppState::new(library, startup));
             app.manage(ai::commands::AiState::default());
+            commands::start_indexing(app.handle());
             Ok(())
         })
         // Closing goes through the frontend first, so it can save what is still pending.
@@ -94,6 +99,9 @@ pub fn run() {
             commands::get_chapter,
             commands::get_page_text,
             commands::search_book,
+            commands::search_library,
+            commands::fulltext_status,
+            commands::stop_indexing,
             commands::save_progress,
             commands::get_settings,
             commands::get_annotations,
@@ -107,6 +115,20 @@ pub fn run() {
             commands::set_locale,
             commands::save_export,
             commands::backup_library,
+            commands::add_card,
+            commands::find_card,
+            commands::list_cards,
+            commands::due_cards,
+            commands::card_stats,
+            commands::update_card,
+            commands::delete_card,
+            commands::card_intervals,
+            commands::review_card,
+            commands::export_cards,
+            commands::list_dictionaries,
+            commands::import_dictionary,
+            commands::set_dictionaries,
+            commands::lookup_word,
             commands::list_fonts,
             commands::import_font,
             commands::remove_font,

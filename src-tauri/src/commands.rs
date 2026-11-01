@@ -1,14 +1,18 @@
 //! Tauri commands exposed to the frontend, plus the shared application state.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::annotations::{self, AnnotationStore, Annotations};
+use crate::cards::{self, Card, CardPatch, NewCard, Stats};
 use crate::dedupe::{self, DuplicateGroup, ProfileCache};
+use crate::dictionary::{self, Definition, DictRecord, Dictionaries};
+use crate::export::{self, BookNotes, NotesFormat};
 use crate::formats;
 use crate::library::{self, Book, BookPatch, Library};
 use crate::model::{Block, Content, Document, Location, TocEntry};
@@ -48,14 +52,36 @@ pub struct AppState {
     startup_file: Mutex<Option<PathBuf>>,
     /// Most recently used last.
     open: Mutex<Vec<(String, Arc<OpenBook>)>>,
+    indexer: Indexer,
+    dictionaries: Dictionaries,
+}
+
+/// The background job that adds books to the full-text index.
+#[derive(Default)]
+struct Indexer {
+    running: AtomicBool,
+    /// More books may have arrived; look again before finishing.
+    again: AtomicBool,
+    /// Stopped by the user, until the next start of the app.
+    stopped: AtomicBool,
+    progress: Mutex<Option<IndexProgress>>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct IndexProgress {
+    done: usize,
+    total: usize,
 }
 
 impl AppState {
     pub fn new(library: Library, startup_file: Option<PathBuf>) -> Self {
+        let dictionaries = Dictionaries::new(library.root().join("dictionaries"));
         Self {
             library: Mutex::new(library),
             startup_file: Mutex::new(startup_file),
             open: Mutex::new(Vec::new()),
+            indexer: Indexer::default(),
+            dictionaries,
         }
     }
 
@@ -138,6 +164,68 @@ pub fn request_open(app: &AppHandle, file: PathBuf) {
         *st.startup_file.lock().unwrap() = Some(file);
         let _ = app.emit("open-file", ());
     }
+}
+
+/// Adds books missing from the full-text index, one at a time, on a thread of its own. It has
+/// its own database connection, so the app isn't held up. Emits `fulltext-progress` (null when
+/// finished).
+pub fn start_indexing(app: &AppHandle) {
+    let ix = &state(app).indexer;
+    ix.again.store(true, Ordering::SeqCst);
+    if ix.stopped.load(Ordering::SeqCst) || ix.running.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let ix = &state(&app).indexer;
+        while ix.again.swap(false, Ordering::SeqCst) {
+            if let Err(e) = index_pending(&app) {
+                log::warn!("full-text indexing failed: {e:#}");
+            }
+        }
+        *ix.progress.lock().unwrap() = None;
+        ix.running.store(false, Ordering::SeqCst);
+        let _ = app.emit("fulltext-progress", None::<IndexProgress>);
+    });
+}
+
+fn index_pending(app: &AppHandle) -> anyhow::Result<()> {
+    let ix = &state(app).indexer;
+    let (books, mut conn) = {
+        let lib = state(app).library();
+        let conn = rusqlite::Connection::open(lib.db().path())?;
+        (lib.books(), conn)
+    };
+    conn.busy_timeout(std::time::Duration::from_secs(30))?;
+    let hashes: Vec<(String, String)> = books
+        .iter()
+        .filter(|b| !b.missing)
+        .map(|b| (b.id.clone(), b.sha256.clone()))
+        .collect();
+    let todo = crate::fulltext::pending(&conn, &hashes)?;
+    for (done, id) in todo.iter().enumerate() {
+        if ix.stopped.load(Ordering::SeqCst) {
+            break;
+        }
+        let progress = IndexProgress {
+            done,
+            total: todo.len(),
+        };
+        *ix.progress.lock().unwrap() = Some(progress.clone());
+        let _ = app.emit("fulltext-progress", Some(progress));
+        let Some(book) = books.iter().find(|b| b.id == *id) else {
+            continue;
+        };
+        let path = state(app).library().book_path(book);
+        // A file that can't be parsed (or breaks a parser) is left out, not retried each start.
+        let doc = std::panic::catch_unwind(|| formats::open(&path))
+            .ok()
+            .and_then(Result::ok);
+        crate::fulltext::index_book(&mut conn, id, &book.sha256, doc.as_ref())?;
+        // Gives the reader's own page rendering room on big libraries.
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    Ok(())
 }
 
 /// Seconds the frontend gets to save before the app quits anyway.
@@ -276,6 +364,7 @@ pub async fn import_books(
             }
         }
         state(&app).library().save().map_err(err)?;
+        start_indexing(&app);
         // Titles alone are enough to suggest a check; the dialog compares contents.
         let books = state(&app).library().books();
         report.possible_duplicates = dedupe::candidate_groups(&books)
@@ -431,6 +520,7 @@ pub async fn merge_duplicates(app: AppHandle, merges: Vec<Merge>) -> CmdResult<M
                         rusqlite::params![m.keep, id],
                     )
                     .map_err(err)?;
+                cards::move_book(&lib.db().conn(), id, &m.keep).map_err(err)?;
             }
             lib.absorb(&m.keep, &ids, furthest).map_err(err)?;
             lib.remove(&ids);
@@ -454,6 +544,7 @@ pub async fn take_startup_book(app: AppHandle) -> CmdResult<Option<String>> {
             Imported::Added(id) | Imported::Existing(id) => id,
         };
         state(&app).library().save().map_err(err)?;
+        start_indexing(&app);
         Ok(Some(id))
     })
     .await
@@ -628,6 +719,39 @@ pub async fn save_progress(
     .await
 }
 
+/// Passages across the library matching `query`, for books still on the shelf.
+#[tauri::command]
+pub async fn search_library(
+    app: AppHandle,
+    query: String,
+) -> CmdResult<Vec<crate::fulltext::BookHits>> {
+    blocking(move || {
+        let (db, ids): (_, HashSet<String>) = {
+            let lib = state(&app).library();
+            (
+                lib.db().clone(),
+                lib.books().into_iter().map(|b| b.id).collect(),
+            )
+        };
+        let mut hits = crate::fulltext::search(&db.conn(), &query).map_err(err)?;
+        hits.retain(|b| ids.contains(&b.book_id));
+        Ok(hits)
+    })
+    .await
+}
+
+/// How far the full-text index has got, while books are being added to it.
+#[tauri::command]
+pub fn fulltext_status(app: AppHandle) -> Option<IndexProgress> {
+    state(&app).indexer.progress.lock().unwrap().clone()
+}
+
+/// Stops adding books to the full-text index until the app is next started.
+#[tauri::command]
+pub fn stop_indexing(app: AppHandle) {
+    state(&app).indexer.stopped.store(true, Ordering::SeqCst);
+}
+
 #[tauri::command]
 pub async fn get_settings(app: AppHandle) -> CmdResult<serde_json::Value> {
     blocking(move || Ok(state(&app).library().settings().clone())).await
@@ -698,37 +822,250 @@ pub async fn delete_chat(app: AppHandle, id: String) -> CmdResult<()> {
     .await
 }
 
-/// Writes the book's highlights and notes as Markdown to a file the user picks.
-/// Returns the chosen path, or `None` if the dialog was cancelled.
+/// A book's notes for exporting. Chapter names come from the book, which is parsed only if it
+/// has highlights (and left out if it can't be read: they get generated names).
+fn book_notes(app: &AppHandle, id: &str) -> anyhow::Result<Option<BookNotes>> {
+    let st = state(app);
+    let Some(entry) = st.library().get(id).cloned() else {
+        return Ok(None);
+    };
+    let annotations = annotation_store(app).load(id)?;
+    let chapters = if annotations.highlights.is_empty() {
+        Vec::new()
+    } else {
+        match st.open_book(id).as_ref().map(|b| &b.doc.content) {
+            Ok(Content::Flow(chs)) => chs.iter().map(|c| c.title.clone()).collect(),
+            _ => Vec::new(),
+        }
+    };
+    Ok(Some(BookNotes {
+        title: entry.title,
+        author: entry.author,
+        chapters,
+        annotations,
+    }))
+}
+
+/// Exports the notes of one book (`id`), or of every book, to where the user picks: a file, or
+/// a folder for all books in a one-file-per-book format. Returns that path, or `None` if the
+/// dialog was cancelled.
 #[tauri::command]
-pub async fn export_notes(app: AppHandle, id: String) -> CmdResult<Option<String>> {
+pub async fn export_notes(
+    app: AppHandle,
+    id: Option<String>,
+    format: NotesFormat,
+) -> CmdResult<Option<String>> {
     use tauri_plugin_dialog::DialogExt;
     blocking(move || {
-        let entry = state(&app)
-            .library()
-            .get(&id)
-            .cloned()
-            .ok_or_else(|| crate::t!("book_not_found"))?;
-        let book = state(&app).open_book(&id).map_err(err)?;
-        let titles: Vec<String> = match &book.doc.content {
-            Content::Flow(chs) => chs.iter().map(|c| c.title.clone()).collect(),
-            Content::Paged(_) => Vec::new(),
+        let ids = match &id {
+            Some(id) => vec![id.clone()],
+            None => {
+                let db = state(&app).library().db().clone();
+                let conn = db.conn();
+                annotations::books_with_notes(&conn).map_err(err)?
+            }
         };
-        let ann = annotation_store(&app).load(&id).map_err(err)?;
-        let markdown =
-            annotations::to_markdown(&entry.title, entry.author.as_deref(), &titles, &ann);
+        let mut books = Vec::new();
+        for id in &ids {
+            books.extend(book_notes(&app, id).map_err(err)?);
+        }
+        if books.is_empty() {
+            return Err(crate::t!("notes_none"));
+        }
+        let ext = format.extension();
+        if id.is_none() && !format.single_file() {
+            let Some(dir) = app.dialog().file().blocking_pick_folder() else {
+                return Ok(None);
+            };
+            let dir = dir.into_path().map_err(err)?;
+            let mut taken = HashSet::new();
+            for b in &books {
+                let name = export::file_name(&b.title, ext, &mut taken);
+                std::fs::write(dir.join(name), export::book_markdown(b, format)).map_err(err)?;
+            }
+            return Ok(Some(dir.display().to_string()));
+        }
+        let name = match &books[..] {
+            [b] if id.is_some() => crate::t!("notes_file", title = b.title),
+            _ => format!("AiReader-notes-{}.{ext}", library::today()),
+        };
+        let content = match format {
+            NotesFormat::Csv => export::to_csv(&books),
+            NotesFormat::Json => export::to_json(&books).map_err(err)?,
+            _ => export::book_markdown(&books[0], format),
+        };
+        let name = match name.rsplit_once('.') {
+            Some((stem, _)) => format!("{stem}.{ext}"),
+            None => name,
+        };
         let Some(path) = app
             .dialog()
             .file()
-            .add_filter("Markdown", &["md"])
-            .set_file_name(crate::t!("notes_file", title = entry.title))
+            .add_filter(ext.to_uppercase(), &[ext])
+            .set_file_name(name)
             .blocking_save_file()
         else {
             return Ok(None);
         };
         let path = path.into_path().map_err(err)?;
-        std::fs::write(&path, markdown).map_err(err)?;
+        std::fs::write(&path, content).map_err(err)?;
         Ok(Some(path.display().to_string()))
+    })
+    .await
+}
+
+// --- flashcards --------------------------------------------------------------------------------
+
+/// A blocking command that works on the library database.
+async fn with_db<T: Send + 'static>(
+    app: AppHandle,
+    f: impl FnOnce(&rusqlite::Connection) -> anyhow::Result<T> + Send + 'static,
+) -> CmdResult<T> {
+    blocking(move || {
+        let db = state(&app).library().db().clone();
+        let conn = db.conn();
+        f(&conn).map_err(err)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn add_card(app: AppHandle, card: NewCard) -> CmdResult<Card> {
+    with_db(app, move |c| cards::add(c, card, library::now())).await
+}
+
+#[tauri::command]
+pub async fn find_card(
+    app: AppHandle,
+    book_id: Option<String>,
+    front: String,
+) -> CmdResult<Option<Card>> {
+    with_db(app, move |c| cards::find(c, book_id.as_deref(), &front)).await
+}
+
+#[tauri::command]
+pub async fn list_cards(app: AppHandle, book_id: Option<String>) -> CmdResult<Vec<Card>> {
+    with_db(app, move |c| cards::list(c, book_id.as_deref())).await
+}
+
+#[tauri::command]
+pub async fn due_cards(app: AppHandle) -> CmdResult<Vec<Card>> {
+    with_db(app, move |c| cards::due(c, library::now())).await
+}
+
+/// `today`: the Unix time the user's local day began.
+#[tauri::command]
+pub async fn card_stats(app: AppHandle, today: u64) -> CmdResult<Stats> {
+    with_db(app, move |c| cards::stats(c, library::now(), today)).await
+}
+
+#[tauri::command]
+pub async fn update_card(app: AppHandle, id: String, patch: CardPatch) -> CmdResult<Card> {
+    with_db(app, move |c| cards::update(c, &id, patch)).await
+}
+
+#[tauri::command]
+pub async fn delete_card(app: AppHandle, id: String) -> CmdResult<()> {
+    with_db(app, move |c| cards::delete(c, &id)).await
+}
+
+/// Seconds until the card returns after each answer, from Again to Easy.
+#[tauri::command]
+pub async fn card_intervals(app: AppHandle, id: String) -> CmdResult<[u64; 4]> {
+    with_db(app, move |c| cards::intervals(c, &id, library::now())).await
+}
+
+#[tauri::command]
+pub async fn review_card(app: AppHandle, id: String, rating: u8) -> CmdResult<Card> {
+    with_db(app, move |c| cards::review(c, &id, rating, library::now())).await
+}
+
+/// Exports every card to a CSV file the user picks; returns the path, or `None` if cancelled.
+#[tauri::command]
+pub async fn export_cards(app: AppHandle) -> CmdResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    blocking(move || {
+        let db = state(&app).library().db().clone();
+        let list = cards::list(&db.conn(), None).map_err(err)?;
+        let Some(path) = app
+            .dialog()
+            .file()
+            .add_filter("CSV", &["csv"])
+            .set_file_name(format!("AiReader-cards-{}.csv", library::today()))
+            .blocking_save_file()
+        else {
+            return Ok(None);
+        };
+        let path = path.into_path().map_err(err)?;
+        std::fs::write(&path, export::cards_csv(&list)).map_err(err)?;
+        Ok(Some(path.display().to_string()))
+    })
+    .await
+}
+
+// --- dictionaries ------------------------------------------------------------------------------
+
+const DICTIONARIES: &str = "dictionaries";
+
+fn dict_records(app: &AppHandle) -> anyhow::Result<Vec<DictRecord>> {
+    let db = state(app).library().db().clone();
+    let conn = db.conn();
+    Ok(crate::db::kv_get(&conn, DICTIONARIES)?.unwrap_or_default())
+}
+
+fn save_dict_records(app: &AppHandle, records: &[DictRecord]) -> anyhow::Result<()> {
+    let db = state(app).library().db().clone();
+    let conn = db.conn();
+    crate::db::kv_set(&conn, DICTIONARIES, &records)
+}
+
+#[tauri::command]
+pub async fn list_dictionaries(app: AppHandle) -> CmdResult<Vec<DictRecord>> {
+    blocking(move || dict_records(&app).map_err(err)).await
+}
+
+/// Adds a dictionary the user picks; returns the list, or `None` if the dialog was cancelled.
+#[tauri::command]
+pub async fn import_dictionary(app: AppHandle) -> CmdResult<Option<Vec<DictRecord>>> {
+    use tauri_plugin_dialog::DialogExt;
+    blocking(move || {
+        let Some(file) = app
+            .dialog()
+            .file()
+            .add_filter(crate::t!("dict_filter"), dictionary::EXTENSIONS)
+            .blocking_pick_file()
+        else {
+            return Ok(None);
+        };
+        let file = file.into_path().map_err(err)?;
+        let record = state(&app).dictionaries.import(&file).map_err(err)?;
+        let mut records = dict_records(&app).map_err(err)?;
+        records.push(record);
+        save_dict_records(&app, &records).map_err(err)?;
+        Ok(Some(records))
+    })
+    .await
+}
+
+/// Saves the list's order and which dictionaries are on; ones left out are deleted.
+#[tauri::command]
+pub async fn set_dictionaries(app: AppHandle, records: Vec<DictRecord>) -> CmdResult<()> {
+    blocking(move || {
+        for old in dict_records(&app).map_err(err)? {
+            if !records.iter().any(|r| r.id == old.id) {
+                state(&app).dictionaries.remove(&old.id).map_err(err)?;
+            }
+        }
+        save_dict_records(&app, &records).map_err(err)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn lookup_word(app: AppHandle, word: String) -> CmdResult<Vec<Definition>> {
+    blocking(move || {
+        let records = dict_records(&app).map_err(err)?;
+        Ok(state(&app).dictionaries.lookup(&records, &word))
     })
     .await
 }

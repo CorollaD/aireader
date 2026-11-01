@@ -19,6 +19,7 @@ use crate::model::{Content, Document, Location};
 const SUMMARY_TOKENS: u64 = 2_048;
 const MERGE_TOKENS: u64 = 4_096;
 const CHAT_TOKENS: u64 = 2_048;
+const DEFINE_TOKENS: u64 = 300;
 /// Chapters shorter than this (in characters) are skipped in book summaries.
 const MIN_UNIT_CHARS: usize = 200;
 
@@ -63,8 +64,13 @@ pub enum AiTask {
         action: Option<ChatAction>,
         history: Vec<ChatTurn>,
     },
-    /// A question about the whole book, answered from retrieved passages and the text around
-    /// the reader's position. `history` ends with the user's newest message.
+    /// A short definition of a word or phrase as used in a sentence, for a flashcard.
+    #[serde(rename_all = "camelCase")]
+    Define {
+        book_title: String,
+        word: String,
+        context: String,
+    },
     /// A mind map (a nested Markdown list) of part of the book or of given text.
     #[serde(rename_all = "camelCase")]
     MindMap {
@@ -77,11 +83,16 @@ pub enum AiTask {
     /// Builds the book's semantic index with the configured embedding model.
     #[serde(rename_all = "camelCase")]
     BuildIndex { book_id: String },
+    /// A question about the whole book, answered from retrieved passages and the text around
+    /// the reader's position. `history` ends with the user's newest message.
     #[serde(rename_all = "camelCase")]
     Ask {
         book_id: String,
         location: Option<Location>,
         history: Vec<ChatTurn>,
+        /// Use only what comes before the reader's position, and reveal nothing later.
+        #[serde(default)]
+        spoiler_free: bool,
     },
 }
 
@@ -756,6 +767,18 @@ pub fn estimate_book(
 
 // --- chat about a selection ------------------------------------------------------------------
 
+/// A short, dictionary-style explanation of `word` as used in `context`.
+pub async fn define(r: &Runner<'_>, book: &str, word: &str, context: &str) -> Result<String> {
+    let prompt = format!(
+        "In the book \"{book}\", the reader looked up \"{word}\" in this sentence:\n\n\
+         <sentence>\n{context}\n</sentence>\n\n\
+         Give a short dictionary-style entry for a flashcard: its pronunciation if that helps, \
+         what it means in this sentence, and any other common meaning worth knowing. At most \
+         three lines, plain text, no heading, and don't repeat the sentence."
+    );
+    r.stream(prompt, DEFINE_TOKENS).await
+}
+
 pub async fn chat(
     r: &Runner<'_>,
     book_title: &str,
@@ -816,8 +839,6 @@ const NEARBY_SHARE: usize = 3;
 const MAX_SOURCES: usize = 12;
 const EXCERPT_CHARS: usize = 90;
 
-/// Picks passages for a question: the ones around the reader's position, then the best keyword
-/// matches, within `budget` tokens. Returned in reading order.
 /// Merges ranked lists of passage indices (reciprocal rank fusion): passages ranked high in
 /// either list, or fairly high in both, come first.
 pub fn fuse(lists: &[&[usize]]) -> Vec<usize> {
@@ -835,17 +856,24 @@ pub fn fuse(lists: &[&[usize]]) -> Vec<usize> {
 
 /// Picks passages for a question: the ones around the reader's position, then the best
 /// matches — keyword search fused with `semantic` (passages ranked by meaning, if the book has
-/// a semantic index) — within `budget` tokens. Returned in reading order.
+/// a semantic index) — within `budget` tokens. Returned in reading order. With `spoiler_free`,
+/// nothing after the reader's position is picked.
 pub fn select_passages(
     index: &BookIndex,
     location: Option<Location>,
     query: &str,
     semantic: &[usize],
     budget: usize,
+    spoiler_free: bool,
 ) -> Vec<usize> {
+    // Without a known position only the opening is safe.
+    let last = spoiler_free.then(|| location.and_then(|l| index.passage_at(l)).unwrap_or(0));
     let mut chosen: Vec<usize> = Vec::new();
     let mut used = 0;
     let mut take = |i: usize, limit: usize, chosen: &mut Vec<usize>| -> bool {
+        if last.is_some_and(|last| i > last) {
+            return true;
+        }
         if chosen.contains(&i) || chosen.len() >= MAX_SOURCES {
             return chosen.len() < MAX_SOURCES;
         }
@@ -895,6 +923,7 @@ pub async fn ask(
     location: Option<Location>,
     history: &[ChatTurn],
     semantic: &[usize],
+    spoiler_free: bool,
 ) -> Result<String> {
     let Some(last) = history.iter().rev().find(|t| t.role != "assistant") else {
         bail!(crate::t!("ai_no_question"))
@@ -908,7 +937,7 @@ pub async fn ask(
         .map(|t| t.text.as_str())
         .collect::<Vec<_>>()
         .join(" ");
-    let picked = select_passages(index, location, &query, semantic, r.budget);
+    let picked = select_passages(index, location, &query, semantic, r.budget, spoiler_free);
     let sources: Vec<Source> = picked
         .iter()
         .enumerate()
@@ -938,6 +967,13 @@ pub async fn ask(
         system.push_str(&format!(
             " The reader is currently in \"{here}\"; \"this chapter\" refers to it."
         ));
+    }
+    if spoiler_free {
+        system.push_str(
+            " The excerpts end where the reader has got to. Do not reveal, hint at or foreshadow \
+             anything that happens later, even if you know this book from elsewhere; if a \
+             question depends on something later, say it hasn't come up yet.",
+        );
     }
     system.push_str("\n\n<excerpts>\n");
     for (s, &i) in sources.iter().zip(&picked) {
@@ -1347,6 +1383,24 @@ mod tests {
     }
 
     #[test]
+    fn spoiler_free_questions_use_nothing_past_the_reader() {
+        let index = index();
+        let at = |chapter: usize| Location::Flow { chapter, block: 0 };
+        // The keyword and semantic matches are both in chapter 3, past the reader.
+        assert_eq!(
+            select_passages(&index, Some(at(1)), "赤壁", &[3], 10_000, true),
+            [0, 1]
+        );
+        // Without the limit they are found.
+        assert!(select_passages(&index, Some(at(1)), "赤壁", &[3], 10_000, false).contains(&3));
+        // An unknown position allows only the opening.
+        assert_eq!(
+            select_passages(&index, None, "桃园 赤壁", &[3], 10_000, true),
+            [0]
+        );
+    }
+
+    #[test]
     fn passages_combine_position_and_matches_in_reading_order() {
         let index = index();
         // Near chapter 3 (passages 2..), plus the keyword match in chapter 0.
@@ -1359,19 +1413,23 @@ mod tests {
             "桃园",
             &[],
             10_000,
+            false,
         );
         assert_eq!(picked[0], 0);
         assert!(picked.contains(&3) && picked.contains(&2));
         assert!(picked.windows(2).all(|w| w[0] < w[1]));
         // A tiny budget still returns the best match and nothing over budget.
-        assert_eq!(select_passages(&index, None, "曹操", &[], 20), [1]);
+        assert_eq!(select_passages(&index, None, "曹操", &[], 20, false), [1]);
         // Semantic matches join keyword ones: "the battle by the river" shares no keyword with
         // passage 3 (赤壁之战), but the semantic ranking found it.
         assert_eq!(
-            select_passages(&index, None, "江上的那场大战", &[3], 10_000),
+            select_passages(&index, None, "江上的那场大战", &[3], 10_000, false),
             [3]
         );
-        assert_eq!(select_passages(&index, None, "曹操", &[3], 10_000), [1, 3]);
+        assert_eq!(
+            select_passages(&index, None, "曹操", &[3], 10_000, false),
+            [1, 3]
+        );
     }
 
     #[test]
@@ -1395,7 +1453,7 @@ mod tests {
             role: "user".into(),
             text: "谁在桃园结义？".into(),
         }];
-        let s = ask(&r, "三国演义", &index(), None, &history, &[])
+        let s = ask(&r, "三国演义", &index(), None, &history, &[], false)
             .await
             .unwrap();
         assert_eq!(s, "见 [1]");
@@ -1410,7 +1468,11 @@ mod tests {
             .unwrap()
             .to_owned();
         assert!(system.contains("[1] (第一回)\n刘备在桃园"));
-        assert!(ask(&r, "书", &index(), None, &[], &[]).await.is_err());
+        assert!(
+            ask(&r, "书", &index(), None, &[], &[], false)
+                .await
+                .is_err()
+        );
     }
 
     #[test]

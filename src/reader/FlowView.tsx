@@ -21,8 +21,9 @@ import { t } from "../i18n";
 import { Icon } from "../icons";
 import type { Settings } from "../settings";
 import type { Block, Highlight, Location, OpenedBook, Span } from "../types";
-import { blockText, resolveHighlights, selectionRange, splitSpans, type BlockMark, type SelectionInfo, type TextRange } from "./anchors";
+import { blockText, rangeIn, resolveHighlights, selectionRange, splitSpans, type BlockMark, type SelectionInfo, type TextRange } from "./anchors";
 import type { Jump } from "./Reader";
+import type { SpeechPosition } from "./useSpeech";
 
 /** Block index meaning "the end of the chapter". */
 const END = -1;
@@ -145,6 +146,8 @@ interface Props {
   onMoved: (moved: (TextRange & { id: string })[]) => void;
   /** An internal link was clicked. */
   onLink: (loc: Location) => void;
+  /** The sentence being read aloud, kept in view and marked. */
+  speaking: SpeechPosition | null;
 }
 
 function useSize(ref: React.RefObject<HTMLElement>) {
@@ -162,7 +165,7 @@ function useSize(ref: React.RefObject<HTMLElement>) {
 }
 
 const FlowView = forwardRef<FlowHandle, Props>(function FlowView(props, ref) {
-  const { book, jump, flash, settings, highlights, onLocation, onSelect, onMarkClick, onMoved, onLink } = props;
+  const { book, jump, flash, settings, highlights, onLocation, onSelect, onMarkClick, onMoved, onLink, speaking } = props;
   // Stable for the link context, so following a link re-renders no blocks.
   const linkRef = useRef(onLink);
   linkRef.current = onLink;
@@ -411,6 +414,35 @@ const FlowView = forwardRef<FlowHandle, Props>(function FlowView(props, ref) {
     document.addEventListener("selectionchange", onChange);
     return () => document.removeEventListener("selectionchange", onChange);
   }, [onSelect]);
+
+  // Reading aloud: follows the sentence through the book and marks it.
+  useEffect(() => {
+    const marks = typeof CSS !== "undefined" ? CSS.highlights : undefined;
+    if (speaking?.kind !== "flow") {
+      marks?.delete("speaking");
+      return;
+    }
+    if (speaking.chapter !== chapter) {
+      goto(speaking.chapter, speaking.block);
+      return;
+    }
+    const el = article.current?.querySelector<HTMLElement>(`[data-block="${speaking.block}"]`);
+    const box = scroller.current;
+    if (!el || !box) return;
+    const range = rangeIn(el, speaking.start, speaking.end);
+    if (range && marks) marks.set("speaking", new Highlight(range));
+    const rect = (range ?? el).getBoundingClientRect();
+    const view = box.getBoundingClientRect();
+    if (paged) {
+      const turn = Math.floor((rect.left - view.left) / stride);
+      if (turn !== 0) setPage((p) => Math.max(0, p + turn));
+    } else if (rect.top < view.top + 24 || rect.bottom > view.bottom - 24) {
+      box.scrollTop += rect.top - view.top - box.clientHeight / 3;
+    }
+    return () => {
+      marks?.delete("speaking");
+    };
+  }, [speaking, chapter, shown, goto, paged, stride]);
 
   const onClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;

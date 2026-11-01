@@ -7,6 +7,7 @@
 //! - `books/.incoming-*/` (files being imported; left-overs are removed on open)
 //! - `covers/<id>.jpg`
 //! - `fonts/<file>` (reading fonts the user added)
+//! - `dictionaries/<id>/` (see [`crate::dictionary`])
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -117,10 +118,22 @@ fn is_font_file(name: &str) -> bool {
             .is_some_and(|(_, ext)| FONT_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
 }
 
+pub fn now_millis() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
+}
+
 /// Today's date as `YYYY-MM-DD` (UTC), for file names.
 pub fn today() -> String {
+    date(now())
+}
+
+/// A Unix time as a `YYYY-MM-DD` date (UTC).
+pub fn date(secs: u64) -> String {
     // Days since 1970-01-01 to a civil date (Howard Hinnant's algorithm).
-    let days = now() as i64 / 86_400 + 719_468;
+    let days = secs as i64 / 86_400 + 719_468;
     let era = days.div_euclid(146_097);
     let doe = days - era * 146_097;
     let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
@@ -441,6 +454,7 @@ impl Library {
             add_dir(&mut zip, "fonts", stored)?;
             if books {
                 add_dir(&mut zip, "books", stored)?;
+                add_dir(&mut zip, "dictionaries", stored)?;
             }
             zip.finish()?.flush()?;
             Ok(())
