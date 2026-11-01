@@ -63,6 +63,12 @@ pub struct Book {
     /// When the book was first read to its end (Unix seconds).
     #[serde(default)]
     pub finished: Option<u64>,
+    /// When the title, author, group or rotation last changed, for syncing.
+    #[serde(default)]
+    pub meta_updated: u64,
+    /// The book came from another device; its file may not have been fetched yet.
+    #[serde(default)]
+    pub synced: bool,
     /// Set when listing if the stored file has disappeared.
     #[serde(default, skip_deserializing)]
     pub missing: bool,
@@ -73,6 +79,8 @@ pub struct Book {
 struct LibraryData {
     books: Vec<Book>,
     groups: Vec<String>,
+    /// When the list of groups last changed, for syncing.
+    groups_updated: u64,
     /// Reader preferences owned by the frontend.
     settings: serde_json::Value,
     /// AI service settings (API keys are kept in the system keychain, not here).
@@ -341,6 +349,7 @@ impl Library {
         Ok(LibraryData {
             books,
             groups,
+            groups_updated: crate::db::kv_get(&conn, "groups_updated")?.unwrap_or_default(),
             settings: crate::db::kv_get(&conn, "settings")?.unwrap_or_default(),
             ai: crate::db::kv_get(&conn, "ai")?.unwrap_or_default(),
         })
@@ -377,6 +386,7 @@ impl Library {
                 params![g, position as i64],
             )?;
         }
+        crate::db::kv_set(conn, "groups_updated", &data.groups_updated)?;
         crate::db::kv_set(conn, "settings", &data.settings)?;
         crate::db::kv_set(conn, "ai", &data.ai)?;
         Ok(())
@@ -592,6 +602,8 @@ impl Library {
             reading_speed: None,
             rotation: 0,
             finished: None,
+            meta_updated: 0,
+            synced: false,
             missing: false,
         };
         Ok(Prepared { book, staged })
@@ -628,6 +640,7 @@ impl Library {
             self.ensure_group(g);
         }
         let book = self.get_mut(id)?;
+        book.meta_updated = now();
         if let Some(title) = patch.title.map(|t| t.trim().to_owned()) {
             if title.is_empty() {
                 bail!(crate::t!("title_empty"));
@@ -650,6 +663,14 @@ impl Library {
     /// Removes books from the shelf and deletes their stored copies, covers, annotations and
     /// AI caches.
     pub fn remove(&mut self, ids: &[String]) {
+        for id in ids {
+            let _ = crate::db::tombstone(&self.db.conn(), "book", id, now());
+        }
+        self.forget(ids);
+    }
+
+    /// Removes books without recording it: the removal came from another device.
+    pub fn forget(&mut self, ids: &[String]) {
         for id in ids {
             let _ = std::fs::remove_dir_all(self.root.join("books").join(id));
             let _ = std::fs::remove_file(self.cover_path(id));
@@ -722,6 +743,7 @@ impl Library {
     fn ensure_group(&mut self, name: &str) {
         if !self.data.groups.iter().any(|g| g == name) {
             self.data.groups.push(name.to_owned());
+            self.data.groups_updated = now();
         }
     }
 
@@ -734,6 +756,7 @@ impl Library {
             bail!(crate::t!("group_exists", name = name));
         }
         self.data.groups.push(name.to_owned());
+        self.data.groups_updated = now();
         Ok(())
     }
 
@@ -755,9 +778,12 @@ impl Library {
             .find(|g| *g == old)
             .with_context(|| crate::t!("group_not_found"))?;
         *g = new.to_owned();
+        let at = now();
+        self.data.groups_updated = at;
         for b in &mut self.data.books {
             if b.group.as_deref() == Some(old) {
                 b.group = Some(new.to_owned());
+                b.meta_updated = at;
             }
         }
         Ok(())
@@ -766,11 +792,119 @@ impl Library {
     /// Deletes a group; its books stay on the shelf.
     pub fn delete_group(&mut self, name: &str) {
         self.data.groups.retain(|g| g != name);
+        let at = now();
+        self.data.groups_updated = at;
         for b in &mut self.data.books {
             if b.group.as_deref() == Some(name) {
                 b.group = None;
+                b.meta_updated = at;
             }
         }
+    }
+
+    // --- syncing ------------------------------------------------------------------------------
+
+    pub fn groups_updated(&self) -> u64 {
+        self.data.groups_updated
+    }
+
+    /// Takes another device's list of groups, if it is newer.
+    pub fn merge_groups(&mut self, groups: &[String], updated: u64) -> bool {
+        if updated <= self.data.groups_updated {
+            return false;
+        }
+        self.data.groups = groups.to_vec();
+        self.data.groups_updated = updated;
+        // A book's own group always stays listed.
+        let used: Vec<String> = self
+            .data
+            .books
+            .iter()
+            .filter_map(|b| b.group.clone())
+            .collect();
+        for g in used {
+            if !self.data.groups.contains(&g) {
+                self.data.groups.push(g);
+            }
+        }
+        true
+    }
+
+    /// Takes in another device's record of a book: what is newer there wins, field by field.
+    /// Returns whether anything changed. Reading time is handled by [`Library::add_seconds`].
+    pub fn merge_book(&mut self, incoming: &Book) -> bool {
+        let group = incoming.group.clone();
+        let changed = match self.data.books.iter_mut().find(|b| b.id == incoming.id) {
+            None => {
+                let mut book = incoming.clone();
+                book.read_seconds = 0;
+                book.synced = true;
+                book.missing = false;
+                // Until the cover itself arrives.
+                book.has_cover = false;
+                self.data.books.push(book);
+                true
+            }
+            Some(b) => {
+                let mut changed = false;
+                if incoming.last_read > b.last_read {
+                    b.position = incoming.position;
+                    b.progress = incoming.progress;
+                    b.last_read = incoming.last_read;
+                    b.reading_speed = incoming.reading_speed;
+                    changed = true;
+                }
+                if incoming.meta_updated > b.meta_updated {
+                    b.title = incoming.title.clone();
+                    b.author = incoming.author.clone();
+                    b.group = incoming.group.clone();
+                    b.rotation = incoming.rotation;
+                    b.meta_updated = incoming.meta_updated;
+                    changed = true;
+                }
+                if b.finished.is_none() && incoming.finished.is_some() {
+                    b.finished = incoming.finished;
+                    changed = true;
+                }
+                changed
+            }
+        };
+        if let Some(g) = group
+            && changed
+            && !self.data.groups.contains(&g)
+        {
+            self.data.groups.push(g);
+        }
+        changed
+    }
+
+    /// Changes a book's reading time by what another device added.
+    pub fn add_seconds(&mut self, id: &str, delta: i64) {
+        if let Ok(book) = self.get_mut(id) {
+            book.read_seconds = book.read_seconds.saturating_add_signed(delta);
+        }
+    }
+
+    /// Records that a book's cover has arrived from another device.
+    pub fn cover_fetched(&mut self, id: &str) {
+        if let Ok(book) = self.get_mut(id) {
+            book.has_cover = true;
+        }
+    }
+
+    /// Puts a book's file in place when the record came from another device without it.
+    pub fn fill_missing(&mut self, staged: Staged) -> Result<()> {
+        let book = self
+            .find_hash(&staged.sha256)
+            .with_context(|| crate::t!("book_not_found"))?
+            .clone();
+        let dest = self.book_path(&book);
+        if !dest.exists() {
+            let dir = self.root.join("books").join(&book.id);
+            std::fs::create_dir_all(&dir)?;
+            std::fs::rename(staged.file(), &dest)?;
+        }
+        Ok(())
     }
 
     pub fn settings(&self) -> &serde_json::Value {

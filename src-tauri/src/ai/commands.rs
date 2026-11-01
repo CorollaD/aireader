@@ -201,6 +201,21 @@ async fn open_book(
     Ok((book, title))
 }
 
+/// Forgets a book's search indexes after its text has changed.
+pub fn text_changed(app: &AppHandle, conn: &rusqlite::Connection, id: &str) -> Result<()> {
+    ai_state(app)
+        .indexes
+        .lock()
+        .unwrap()
+        .retain(|(k, _)| k != id);
+    conn.execute(
+        "DELETE FROM semantic_books WHERE book_id = ?1",
+        rusqlite::params![id],
+    )?;
+    crate::ai::semantic::delete_book_passages(conn, id)?;
+    Ok(())
+}
+
 /// The book's search index, built on first use.
 async fn book_index(app: &AppHandle, id: &str) -> Result<Arc<BookIndex>> {
     {

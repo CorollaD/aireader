@@ -29,6 +29,7 @@ export function Cover({ book, small }: { book: Book; small?: boolean }) {
 }
 
 export const percent = (p: number) => `${Math.round(p * 100)}%`;
+const missingLabel = (book: Book) => t(book.synced ? "book.notDownloaded" : "book.missing");
 
 interface CardProps {
   book: Book;
@@ -58,7 +59,7 @@ export function BookCard({ book, selected, selecting, onOpen, onToggle, onMenu }
       onContextMenu={onMenu}
       title={
         book.missing
-          ? t("book.missingTitle")
+          ? t(book.synced ? "book.notDownloadedTitle" : "book.missingTitle")
           : `${book.title}${book.readSeconds > 0 ? `\n${t("book.readTime", { time: formatDuration(book.readSeconds) })}` : ""}`
       }
     >
@@ -85,7 +86,7 @@ export function BookCard({ book, selected, selecting, onOpen, onToggle, onMenu }
         <div className="book-title">{book.title}</div>
         <div className="book-sub">
           <span className="ellipsis">{book.author ?? t("common.unknownAuthor")}</span>
-          <span>{book.missing ? t("book.missing") : book.progress > 0 ? percent(book.progress) : t("book.unread")}</span>
+          <span>{book.missing ? missingLabel(book) : book.progress > 0 ? percent(book.progress) : t("book.unread")}</span>
         </div>
       </div>
       <button
@@ -134,7 +135,7 @@ export function BookRow({ book, selected, selecting, onOpen, onToggle, onMenu }:
         </div>
       </div>
       <span className="row-cell">{book.format}</span>
-      <span className="row-cell">{book.missing ? t("book.missing") : percent(book.progress)}</span>
+      <span className="row-cell">{book.missing ? missingLabel(book) : percent(book.progress)}</span>
       <span className="row-cell">{book.readSeconds > 0 ? formatDuration(book.readSeconds) : "—"}</span>
       <span className="row-cell">{formatDate(book.lastRead)}</span>
       <span className="row-cell">{formatDate(book.added)}</span>

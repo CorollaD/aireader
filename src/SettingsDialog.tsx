@@ -5,6 +5,7 @@ import { createContext, useContext, useState } from "react";
 import { api, errorText } from "./api";
 import ExportNotes from "./ExportNotes";
 import DictionarySettings from "./study/DictionarySettings";
+import SyncSettings from "./SyncSettings";
 import type { UpdateSettings } from "./App";
 import AiSettingsForm from "./ai/AiSettingsForm";
 import { useAi } from "./ai/AiContext";
@@ -15,7 +16,7 @@ import { shortcuts } from "./reader/shortcuts";
 import { UI_SCALES, type Settings } from "./settings";
 import { Modal } from "./ui";
 
-export type SettingsTab = "general" | "reading" | "dictionary" | "ai" | "shortcuts";
+export type SettingsTab = "general" | "reading" | "dictionary" | "sync" | "ai" | "shortcuts";
 
 /** Opens the Settings dialog (provided by App). */
 export const SettingsOpener = createContext<(tab?: SettingsTab) => void>(() => {});
@@ -25,6 +26,7 @@ const TABS: { key: SettingsTab; icon: IconName; label: () => string }[] = [
   { key: "general", icon: "globe", label: () => t("settings.tabGeneral") },
   { key: "reading", icon: "type", label: () => t("settings.tabReading") },
   { key: "dictionary", icon: "bookOpen", label: () => t("settings.tabDictionary") },
+  { key: "sync", icon: "refresh", label: () => t("settings.tabSync") },
   { key: "ai", icon: "sparkles", label: () => t("settings.tabAi") },
   { key: "shortcuts", icon: "keyboard", label: () => t("settings.tabShortcuts") },
 ];
@@ -85,6 +87,7 @@ export default function SettingsDialog(props: {
           )}
           {tab === "reading" && <ReadingSettings settings={settings} update={update} text paged />}
           {tab === "dictionary" && <DictionarySettings />}
+          {tab === "sync" && <SyncSettings />}
           {tab === "ai" && ai.status && <AiSettingsForm status={ai.status} onSaved={ai.setStatus} />}
           {tab === "shortcuts" && (
             <div className="shortcuts">

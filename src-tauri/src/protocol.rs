@@ -162,6 +162,16 @@ fn serve<R: Runtime>(app: &AppHandle<R>, path: &str) -> anyhow::Result<Served> {
     }
 }
 
+/// A page as a JPEG, for recognising its text.
+pub fn page_jpeg(
+    src: &dyn crate::model::PageSource,
+    page: usize,
+    width: u32,
+) -> anyhow::Result<Vec<u8>> {
+    let img = src.render(page, width.clamp(64, MAX_PAGE_WIDTH))?;
+    Ok(encode(&img, true)?.1.to_vec())
+}
+
 /// Encodes a rendered page: JPEG for pictures (much smaller), PNG for pages of text.
 fn encode(
     img: &crate::model::PageImage,

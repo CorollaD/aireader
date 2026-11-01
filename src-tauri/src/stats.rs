@@ -72,6 +72,46 @@ pub fn move_book(conn: &Connection, from: &str, to: &str) -> Result<()> {
     Ok(())
 }
 
+/// A day's reading of a book on one device, as it is synced.
+#[derive(Clone, Debug, PartialEq, Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncDay {
+    pub day: String,
+    pub book_id: String,
+    pub title: String,
+    pub seconds: i64,
+}
+
+/// This device's rows: other devices' are theirs to publish.
+pub fn own_days(conn: &Connection) -> Result<Vec<SyncDay>> {
+    let mut stmt = conn.prepare(
+        "SELECT day, book_id, title, seconds FROM reading_days WHERE device = ?1 ORDER BY 1, 2",
+    )?;
+    let days = stmt
+        .query_map(params![device_id(conn)?], |r| {
+            Ok(SyncDay {
+                day: r.get(0)?,
+                book_id: r.get(1)?,
+                title: r.get(2)?,
+                seconds: r.get(3)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(days)
+}
+
+/// Replaces another device's rows with what it published.
+pub fn store_device(conn: &Connection, device: &str, days: &[SyncDay]) -> Result<()> {
+    for d in days.iter().filter(|d| parse_day(&d.day).is_some()) {
+        conn.execute(
+            "INSERT OR REPLACE INTO reading_days (device, day, book_id, title, seconds)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![device, d.day, d.book_id, d.title, d.seconds],
+        )?;
+    }
+    Ok(())
+}
+
 fn parse_day(day: &str) -> Option<NaiveDate> {
     NaiveDate::parse_from_str(day, "%Y-%m-%d").ok()
 }

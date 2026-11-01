@@ -573,6 +573,47 @@ const de: Messages = {
   "opds.already": "Bereits im Regal",
   "opds.remove": "Katalog entfernen",
   "opds.removeHint": "„{name}“ und das gespeicherte Passwort entfernen? Heruntergeladene Bücher bleiben im Regal.",
+  "settings.tabSync": "Synchronisierung",
+  "sync.service": "Synchronisieren über",
+  "sync.off": "Aus",
+  "sync.folder": "Ordner",
+  "sync.intro":
+    "Hält Bibliothek, Leseposition, Lesezeichen, Markierungen, KI-Gespräche, Lernkarten und Lesezeit auf deinen Geräten gleich. Einstellungen und API-Schlüssel werden nicht synchronisiert.",
+  "sync.url": "Serveradresse",
+  "sync.username": "Benutzername",
+  "sync.password": "Passwort",
+  "sync.passwordSaved": "Gespeichert. Leer lassen, um es zu behalten",
+  "sync.passwordHint": "Das Passwort liegt im Schlüsselbund des Systems. Manche Dienste brauchen ein App-Passwort statt des Anmeldepassworts.",
+  "sync.insecure":
+    "Diese Adresse ist unverschlüsselt (http): Passwort und Daten werden im Klartext übertragen. Nur in einem vertrauenswürdigen Netz verwenden.",
+  "sync.chosenFolder": "Sync-Ordner",
+  "sync.noFolder": "Keiner gewählt",
+  "sync.chooseFolder": "Ordner wählen",
+  "sync.folderHint":
+    "Wähle einen Ordner, den iCloud Drive, Dropbox, OneDrive o. Ä. synchronisiert. Dateien sind erst lesbar, wenn der Dienst sie auf dieses Gerät geladen hat.",
+  "sync.files": "Auch Buchdateien synchronisieren",
+  "sync.filesHint":
+    "Lädt auch die Bücher selbst hoch, was deutlich mehr Platz braucht. Auf anderen Geräten erscheinen sie als „Nicht geladen“ und kommen beim Öffnen.",
+  "sync.notes":
+    "Die Daten sind nicht verschlüsselt: Wer Zugriff auf diesen Server oder Ordner hat, kann Notizen und Gespräche lesen. Ändert sich ein Eintrag auf zwei Geräten, gewinnt die neuere Änderung, die Uhren müssen also stimmen.",
+  "sync.test": "Verbindung testen",
+  "sync.testOk": "Verbunden: Dateien können gelesen und geschrieben werden",
+  "sync.saved": "Gespeichert",
+  "sync.done": "Synchronisiert",
+  "sync.now": "Jetzt synchronisieren",
+  "sync.running": "Synchronisiert…",
+  "sync.last": "Zuletzt synchronisiert: {time}",
+  "sync.never": "Noch nicht synchronisiert",
+  "book.notDownloaded": "Nicht geladen",
+  "book.notDownloadedTitle": "Ein Buch von einem anderen Gerät: Es wird beim Öffnen geladen",
+  "shelf.downloading": "„{title}“ wird geladen…",
+  "ocr.loading": "Texterkennung für „{title}“ wird vorbereitet… (beim ersten Mal werden etwa 31 MB Modelle geladen)",
+  "ocr.progress": "„{title}“ wird erkannt: {done} von {total} Seiten",
+  "ocr.recognise": "Text erkennen ({n} Seiten)",
+  "ocr.suggest":
+    "{n} Seiten dieses PDFs sind Bilder. Erkenne sie, um den Text zu suchen, auszuwählen und vorlesen zu lassen und der KI zugänglich zu machen. Alles geschieht auf diesem Gerät.",
+  "ocr.start": "Erkennen",
+  "ocr.failed": "Texterkennung fehlgeschlagen: {error}",
 };
 
 export default de;

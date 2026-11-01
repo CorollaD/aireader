@@ -86,6 +86,10 @@ export function formatDate(secs: number | null): string {
   return new Intl.DateTimeFormat(current, { year: "numeric", month: "short", day: "numeric" }).format(new Date(secs * 1000));
 }
 
+export function formatDateTime(secs: number): string {
+  return new Intl.DateTimeFormat(current, { dateStyle: "medium", timeStyle: "short" }).format(new Date(secs * 1000));
+}
+
 export function formatNumber(n: number): string {
   return new Intl.NumberFormat(current, { maximumFractionDigits: 1, notation: n >= 10_000 ? "compact" : "standard" }).format(n);
 }

@@ -673,6 +673,7 @@ pub fn transfer_annotations(
             title: title_at(to, location),
             excerpt,
             created: h.created,
+            updated: 0,
         });
         report.bookmarks += 1;
     }
@@ -862,6 +863,7 @@ mod tests {
                 title: "x".into(),
                 excerpt: String::new(),
                 created: 1,
+                updated: 0,
             }],
             highlights: vec![h, lost],
         };

@@ -18,6 +18,9 @@ pub struct Bookmark {
     pub excerpt: String,
     /// Unix seconds.
     pub created: u64,
+    /// When it last changed; `write` keeps this up to date.
+    #[serde(default)]
+    pub updated: u64,
 }
 
 /// A highlighted text range in a reflowable book, possibly spanning several blocks.
@@ -61,6 +64,40 @@ impl AnnotationStore {
         read(&self.db.conn(), book_id)
     }
 
+    /// Saves what the reader holds. Its copy may be older than a sync that just ran, so nothing
+    /// is deleted unless listed in `removed`, and stored records newer than its copy stay.
+    pub fn apply(
+        &self,
+        book_id: &str,
+        annotations: &Annotations,
+        removed: &[String],
+    ) -> Result<()> {
+        let mut conn = self.db.conn();
+        let tx = conn.transaction()?;
+        let stored = read(&tx, book_id)?;
+        let mut new = annotations.clone();
+        let gone = |id: &String| removed.contains(id);
+        new.bookmarks.retain(|b| !gone(&b.id));
+        new.highlights.retain(|h| !gone(&h.id));
+        for o in stored.bookmarks.into_iter().filter(|o| !gone(&o.id)) {
+            match new.bookmarks.iter_mut().find(|n| n.id == o.id) {
+                Some(n) if n.updated < o.updated => *n = o,
+                Some(_) => {}
+                None => new.bookmarks.push(o),
+            }
+        }
+        for o in stored.highlights.into_iter().filter(|o| !gone(&o.id)) {
+            match new.highlights.iter_mut().find(|n| n.id == o.id) {
+                Some(n) if n.updated < o.updated => *n = o,
+                Some(_) => {}
+                None => new.highlights.push(o),
+            }
+        }
+        write(&tx, book_id, &new)?;
+        tx.commit()?;
+        Ok(())
+    }
+
     /// Replaces the book's annotations.
     pub fn save(&self, book_id: &str, annotations: &Annotations) -> Result<()> {
         let mut conn = self.db.conn();
@@ -78,7 +115,7 @@ impl AnnotationStore {
 pub fn read(conn: &Connection, book_id: &str) -> Result<Annotations> {
     let mut ann = Annotations::default();
     let mut stmt = conn.prepare(
-        "SELECT id, location, title, excerpt, created FROM bookmarks WHERE book_id = ?1 ORDER BY rowid",
+        "SELECT id, location, title, excerpt, created, updated FROM bookmarks WHERE book_id = ?1 ORDER BY rowid",
     )?;
     for row in stmt.query_map(params![book_id], |r| {
         Ok((
@@ -87,15 +124,17 @@ pub fn read(conn: &Connection, book_id: &str) -> Result<Annotations> {
             r.get(2)?,
             r.get(3)?,
             r.get(4)?,
+            r.get(5)?,
         ))
     })? {
-        let (id, location, title, excerpt, created) = row?;
+        let (id, location, title, excerpt, created, updated) = row?;
         ann.bookmarks.push(Bookmark {
             id,
             location: serde_json::from_str(&location)?,
             title,
             excerpt,
             created,
+            updated,
         });
     }
     let mut stmt = conn.prepare(
@@ -122,8 +161,34 @@ pub fn read(conn: &Connection, book_id: &str) -> Result<Annotations> {
     Ok(ann)
 }
 
-/// Replaces a book's annotations (call inside a transaction).
+/// Saves a book's annotations (call inside a transaction): what is gone is recorded as deleted,
+/// for syncing.
 pub fn write(conn: &Connection, book_id: &str, ann: &Annotations) -> Result<()> {
+    let old = read(conn, book_id)?;
+    let now = crate::library::now();
+    for b in old
+        .bookmarks
+        .iter()
+        .filter(|b| !ann.bookmarks.iter().any(|n| n.id == b.id))
+    {
+        crate::db::tombstone(conn, "bookmark", &b.id, now)?;
+    }
+    for h in old
+        .highlights
+        .iter()
+        .filter(|h| !ann.highlights.iter().any(|n| n.id == h.id))
+    {
+        crate::db::tombstone(conn, "highlight", &h.id, now)?;
+    }
+    let mut new = ann.clone();
+    for b in &mut new.bookmarks {
+        b.updated = b.updated.max(b.created);
+    }
+    store(conn, book_id, &new)
+}
+
+/// Replaces a book's annotations as they are (call inside a transaction).
+pub fn store(conn: &Connection, book_id: &str, ann: &Annotations) -> Result<()> {
     conn.execute("DELETE FROM bookmarks WHERE book_id = ?1", params![book_id])?;
     conn.execute(
         "DELETE FROM highlights WHERE book_id = ?1",
@@ -131,8 +196,8 @@ pub fn write(conn: &Connection, book_id: &str, ann: &Annotations) -> Result<()> 
     )?;
     for b in &ann.bookmarks {
         conn.execute(
-            "INSERT OR REPLACE INTO bookmarks (id, book_id, location, title, excerpt, created) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![b.id, book_id, serde_json::to_string(&b.location)?, b.title, b.excerpt, b.created],
+            "INSERT OR REPLACE INTO bookmarks (id, book_id, location, title, excerpt, created, updated) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![b.id, book_id, serde_json::to_string(&b.location)?, b.title, b.excerpt, b.created, b.updated],
         )?;
     }
     for h in &ann.highlights {
@@ -241,6 +306,67 @@ mod tests {
     }
 
     #[test]
+    fn a_stale_save_cannot_undo_a_sync() {
+        let dir = std::env::temp_dir().join(format!("aireader-ann-stale-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Db::open(&dir.join("t.db")).unwrap();
+        let store = AnnotationStore::new(&db);
+        let mut old = hl(0, 1, "text", None);
+        old.id = "edited".into();
+        let mut gone = hl(0, 2, "text", None);
+        gone.id = "gone".into();
+        let mine = Annotations {
+            highlights: vec![old.clone(), gone.clone()],
+            ..Default::default()
+        };
+        store.save("b", &mine).unwrap();
+
+        // A sync brings a newer edit and a new highlight while the reader holds its old copy.
+        let mut newer = old.clone();
+        newer.note = Some("from the other device".into());
+        newer.updated = 50;
+        let mut arrived = hl(0, 3, "text", None);
+        arrived.id = "arrived".into();
+        let conn = db.conn();
+        store_for_test(
+            &conn,
+            "b",
+            vec![newer.clone(), gone.clone(), arrived.clone()],
+        );
+        drop(conn);
+
+        store.apply("b", &mine, &["gone".to_owned()]).unwrap();
+        let mut ids: Vec<String> = store
+            .load("b")
+            .unwrap()
+            .highlights
+            .iter()
+            .map(|h| h.id.clone())
+            .collect();
+        ids.sort();
+        assert_eq!(ids, ["arrived", "edited"], "only what was removed is gone");
+        let saved = store.load("b").unwrap();
+        assert_eq!(
+            saved
+                .highlights
+                .iter()
+                .find(|h| h.id == "edited")
+                .unwrap()
+                .note,
+            newer.note
+        );
+    }
+
+    fn store_for_test(conn: &Connection, book: &str, highlights: Vec<Highlight>) {
+        let ann = Annotations {
+            highlights,
+            ..Default::default()
+        };
+        store(conn, book, &ann).unwrap();
+    }
+
+    #[test]
     fn save_load_delete_round_trip() {
         let dir = std::env::temp_dir().join(format!("aireader-ann-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -259,6 +385,7 @@ mod tests {
                 title: "第 4 页".into(),
                 excerpt: String::new(),
                 created: 1,
+                updated: 1,
             }],
             highlights: vec![hl(0, 1, "text", Some("note"))],
         };

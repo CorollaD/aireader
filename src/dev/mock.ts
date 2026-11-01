@@ -2,7 +2,22 @@
 // (`npm run dev`, then open http://localhost:1420). Never included in production builds.
 
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { AiConfig, AiEvent, AiTask, Annotations, Block, Book, Card, ChatRecord, DictRecord, Location, OpdsCatalog, OpdsEntry, Source } from "../types";
+import type {
+  AiConfig,
+  AiEvent,
+  AiTask,
+  Annotations,
+  Block,
+  Book,
+  Card,
+  ChatRecord,
+  DictRecord,
+  Location,
+  OpdsCatalog,
+  OpdsEntry,
+  Source,
+  TextRun,
+} from "../types";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -25,6 +40,7 @@ function book(id: string, title: string, author: string | null, format: string, 
     readingSpeed: null,
     rotation: 0,
     missing: false,
+    synced: false,
   };
 }
 
@@ -41,9 +57,23 @@ function chapter(i: number): Block[] {
   return blocks;
 }
 
+/** A picture of a page of text, for trying out text recognition. */
+async function samplePage(page: number, width: number): Promise<ArrayBuffer> {
+  const canvas = new OffscreenCanvas(width, Math.round(width * 1.4));
+  const c = canvas.getContext("2d")!;
+  c.fillStyle = "#fff";
+  c.fillRect(0, 0, canvas.width, canvas.height);
+  c.fillStyle = "#222";
+  c.font = `${Math.round(width / 26)}px serif`;
+  for (let i = 0; i < 12; i++) c.fillText(`第${page + 1}页 第${i + 1}行 话说天下大势分久必合合久必分`, width * 0.1, width * 0.12 * (i + 1));
+  return (await canvas.convertToBlob({ type: "image/jpeg" })).arrayBuffer();
+}
+
 export function installMock() {
   mockWindows("main");
   const db = {
+    sync: { backend: "", url: "", username: "", folder: "", files: false },
+    ocr: new Map<number, TextRun[]>(),
     books: [
       book("0001", "三国演义", "罗贯中", "TXT", "小说", 0.42),
       book("0002", "Alice's Adventures in Wonderland", "Lewis Carroll", "EPUB", "小说", 0.1),
@@ -145,6 +175,15 @@ export function installMock() {
         case "import_font":
           return "LXGW WenKai.ttf";
         case "remove_font":
+          return null;
+        case "sync_status":
+          return { config: db.sync, hasPassword: false, lastSync: null, running: false, error: null };
+        case "sync_save":
+          db.sync = a.config as typeof db.sync;
+          return { config: db.sync, hasPassword: Boolean(a.password), lastSync: now(), running: false, error: null };
+        case "sync_test":
+        case "sync_now":
+        case "sync_fetch_book":
           return null;
         case "opds_catalogs":
           return db.catalogs;
@@ -357,7 +396,21 @@ export function installMock() {
           b.lastRead = now();
           return null;
         }
+        case "ocr_status":
+          return { pages: 5, pending: [0, 1, 2].filter((p) => !db.ocr.has(p)) };
+        case "ocr_model": {
+          const url = `https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/${a.name}_onnx_infer.tar`;
+          return fetch(url).then((r) => r.arrayBuffer());
+        }
+        case "ocr_page_image":
+          return samplePage(a.page as number, a.width as number);
+        case "ocr_save_page":
+          db.ocr.set(a.page as number, a.runs as TextRun[]);
+          return null;
+        case "ocr_finish":
+          return null;
         case "get_page_text":
+          if (db.ocr.has(a.page as number)) return db.ocr.get(a.page as number);
           return [
             { text: "Attention Is All You Need", x: 0.25, y: 0.2, w: 0.5, h: 0.03 },
             { text: "The dominant sequence transduction models are based on", x: 0.15, y: 0.4, w: 0.7, h: 0.015 },

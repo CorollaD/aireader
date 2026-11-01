@@ -13,11 +13,13 @@ pub mod fulltext;
 pub mod i18n;
 pub mod library;
 pub mod model;
+pub mod ocr;
 pub mod opds;
 pub mod protocol;
 pub mod recall;
 pub mod search;
 pub mod stats;
+pub mod sync;
 
 use std::path::{Path, PathBuf};
 
@@ -76,7 +78,9 @@ pub fn run() {
             let startup = file_arg(std::env::args_os().skip(1), &cwd);
             app.manage(commands::AppState::new(library, startup));
             app.manage(ai::commands::AiState::default());
+            app.manage(sync::commands::SyncState::default());
             commands::start_indexing(app.handle());
+            sync::commands::start_timer(app.handle());
             Ok(())
         })
         // Closing goes through the frontend first, so it can save what is still pending.
@@ -119,6 +123,16 @@ pub fn run() {
             commands::save_export,
             commands::backup_library,
             commands::opds_catalogs,
+            commands::ocr_status,
+            commands::ocr_model,
+            commands::ocr_page_image,
+            commands::ocr_save_page,
+            commands::ocr_finish,
+            sync::commands::sync_status,
+            sync::commands::sync_save,
+            sync::commands::sync_test,
+            sync::commands::sync_now,
+            sync::commands::sync_fetch_book,
             commands::opds_save_catalog,
             commands::opds_remove_catalog,
             commands::opds_feed,

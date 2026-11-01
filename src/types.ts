@@ -24,6 +24,8 @@ export interface Book {
   /** Page rotation in degrees, for paged books. */
   rotation: number;
   missing: boolean;
+  /** Came from another device; when also `missing`, its file can be downloaded. */
+  synced: boolean;
 }
 
 export interface Shelf {
@@ -107,6 +109,7 @@ export interface Bookmark {
   title: string;
   excerpt: string;
   created: number;
+  updated: number;
 }
 
 /**
@@ -422,4 +425,28 @@ export interface TextRun {
   y: number;
   w: number;
   h: number;
+}
+
+export interface SyncConfig {
+  /** "" (off), "webdav" or "folder". */
+  backend: string;
+  url: string;
+  username: string;
+  folder: string;
+  files: boolean;
+}
+
+export interface SyncStatus {
+  config: SyncConfig;
+  hasPassword: boolean;
+  lastSync: number | null;
+  running: boolean;
+  error: string | null;
+}
+
+/** What a sync brought in (the `sync-changed` event). */
+export interface SyncChanges {
+  books: string[];
+  shelf: boolean;
+  cards: boolean;
 }

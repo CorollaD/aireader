@@ -573,6 +573,46 @@ const es: Messages = {
   "opds.already": "Ya está en tu estantería",
   "opds.remove": "Quitar catálogo",
   "opds.removeHint": "¿Quitar «{name}» y su contraseña guardada? Los libros descargados se conservan.",
+  "settings.tabSync": "Sincronización",
+  "sync.service": "Sincronizar con",
+  "sync.off": "Desactivada",
+  "sync.folder": "Carpeta",
+  "sync.intro":
+    "Mantiene igual en tus dispositivos la biblioteca, la posición de lectura, los marcadores, los resaltados, las conversaciones con IA, las tarjetas y el tiempo de lectura. Los ajustes y las claves API no se sincronizan.",
+  "sync.url": "Dirección del servidor",
+  "sync.username": "Usuario",
+  "sync.password": "Contraseña",
+  "sync.passwordSaved": "Guardada. Déjala vacía para conservarla",
+  "sync.passwordHint":
+    "La contraseña se guarda en el llavero del sistema. Algunos servicios requieren una contraseña de aplicación, no la de inicio de sesión.",
+  "sync.insecure": "Esta dirección no está cifrada (http): la contraseña y los datos viajan sin protección. Úsala solo en una red de confianza.",
+  "sync.chosenFolder": "Carpeta de sincronización",
+  "sync.noFolder": "Sin elegir",
+  "sync.chooseFolder": "Elegir carpeta",
+  "sync.folderHint":
+    "Elige una carpeta que sincronice iCloud Drive, Dropbox, OneDrive o similar. Los archivos solo se pueden leer cuando ese servicio los haya descargado a este dispositivo.",
+  "sync.files": "Sincronizar también los archivos de libros",
+  "sync.filesHint": "Sube también los libros, lo que ocupa mucho más espacio. En otros dispositivos aparecen como «Sin descargar» y llegan al abrirlos.",
+  "sync.notes":
+    "Los datos no se cifran: quien acceda a este servidor o carpeta puede leer tus notas y conversaciones. Si un registro cambió en dos dispositivos, gana el cambio más reciente, así que los relojes deben estar en hora.",
+  "sync.test": "Probar conexión",
+  "sync.testOk": "Conectado: se pueden leer y escribir archivos",
+  "sync.saved": "Guardado",
+  "sync.done": "Sincronizado",
+  "sync.now": "Sincronizar ahora",
+  "sync.running": "Sincronizando…",
+  "sync.last": "Última sincronización: {time}",
+  "sync.never": "Aún sin sincronizar",
+  "book.notDownloaded": "Sin descargar",
+  "book.notDownloadedTitle": "Un libro de otro dispositivo: se descarga al abrirlo",
+  "shelf.downloading": "Descargando «{title}»…",
+  "ocr.loading": "Preparando el reconocimiento de «{title}»… (la primera vez se descargan unos 31 MB de modelos)",
+  "ocr.progress": "Reconociendo «{title}»: {done} de {total} páginas",
+  "ocr.recognise": "Reconocer texto ({n} páginas)",
+  "ocr.suggest":
+    "{n} páginas de este PDF son imágenes. Reconócelas para buscar, seleccionar y escuchar el texto, y para que la IA lo lea. Todo ocurre en este dispositivo.",
+  "ocr.start": "Reconocer",
+  "ocr.failed": "Error en el reconocimiento de texto: {error}",
 };
 
 export default es;

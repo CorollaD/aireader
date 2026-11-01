@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, pageUrl } from "../api";
 import { isTyping } from "../ui";
+import { watchOcrPages } from "../ocr/job";
 import type { Location, OpenedBook, TextRun } from "../types";
 import type { Jump } from "./Reader";
 import { pixelRatio } from "../zoom";
@@ -33,8 +34,9 @@ function useSize(ref: React.RefObject<HTMLElement>) {
   return size;
 }
 
-/** Text runs per book and page, fetched once. */
+/** Text runs per book and page, fetched once, and again when a page gets recognised. */
 const textCache = new Map<string, Promise<TextRun[]>>();
+watchOcrPages((bookId, page) => textCache.delete(`${bookId}:${page}`));
 export function pageText(bookId: string, page: number): Promise<TextRun[]> {
   const key = `${bookId}:${page}`;
   let p = textCache.get(key);
@@ -54,9 +56,14 @@ function TextLayer(props: { bookId: string; index: number; width: number; height
   const layer = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let alive = true;
-    pageText(props.bookId, props.index).then((r) => alive && setRuns(r));
+    const load = () => pageText(props.bookId, props.index).then((r) => alive && setRuns(r));
+    load();
+    const unwatch = watchOcrPages((bookId, page) => {
+      if (bookId === props.bookId && page === props.index) load();
+    });
     return () => {
       alive = false;
+      unwatch();
     };
   }, [props.bookId, props.index]);
   const quarter = props.rotation === 90 || props.rotation === 270;

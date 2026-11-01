@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import LibrarySearch from "./LibrarySearch";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -9,7 +9,7 @@ import { formatList, t, type MessageKey } from "../i18n";
 import { Icon, type IconName } from "../icons";
 import { useOpenSettings } from "../SettingsDialog";
 import type { ShelfSort, Settings } from "../settings";
-import type { Book, BookPatch, CardStats, DuplicateGroup, ImportProgress, Location, Shelf } from "../types";
+import type { Book, BookPatch, CardStats, DuplicateGroup, ImportProgress, Location, Shelf, SyncChanges } from "../types";
 import { startOfToday } from "../study/intervals";
 import { Confirm, Modal, Toast } from "../ui";
 import { BookCard, BookRow } from "./BookCard";
@@ -85,6 +85,8 @@ export default function ShelfView(props: {
   const [importMenu, setImportMenu] = useState(false);
   const [dedupe, setDedupe] = useState<{ groups: DuplicateGroup[]; intro?: string } | null>(null);
   const [dedupeProgress, setDedupeProgress] = useState<ImportProgress | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const fetching = useRef(false);
   const ai = useAi();
   const openSettings = useOpenSettings();
 
@@ -96,12 +98,24 @@ export default function ShelfView(props: {
   }, []);
   useEffect(refresh, [refresh]);
 
-  useEffect(() => {
+  const refreshCards = useCallback(() => {
     api
       .cardStats(startOfToday())
       .then(setCardStats)
       .catch(() => {});
   }, []);
+  useEffect(refreshCards, [refreshCards]);
+
+  // Another device changed something.
+  useEffect(() => {
+    const un = listen<SyncChanges>("sync-changed", ({ payload }) => {
+      if (payload.shelf) refresh();
+      if (payload.cards) refreshCards();
+    });
+    return () => {
+      un.then((f) => f());
+    };
+  }, [refresh, refreshCards]);
 
   const fail = (e: unknown) => setToast(errorText(e));
 
@@ -232,7 +246,29 @@ export default function ShelfView(props: {
       <span className="count">{n}</span>
     </button>
   );
-  const openBook = (b: Book) => (b.missing ? setToast(t("shelf.fileMissing")) : props.onOpen(b.id));
+  /** Makes sure a book's file is here, fetching it if it can be. */
+  const fileReady = async (b: Book) => {
+    if (!b.missing) return true;
+    if (!b.synced) {
+      setToast(t("shelf.fileMissing"));
+      return false;
+    }
+    if (fetching.current) return false;
+    fetching.current = true;
+    setDownloading(b.title);
+    try {
+      await api.syncFetchBook(b.id);
+      refresh();
+      return true;
+    } catch (e) {
+      fail(e);
+      return false;
+    } finally {
+      fetching.current = false;
+      setDownloading(null);
+    }
+  };
+  const openBook = (b: Book) => fileReady(b).then((ok) => ok && props.onOpen(b.id));
 
   return (
     <div className="shelf" onClick={() => (setMenu(null), setImportMenu(false))}>
@@ -477,14 +513,14 @@ export default function ShelfView(props: {
             query={query}
             books={shelf.books}
             onResults={setFoundInBooks}
-            onOpen={(b, location) => (b.missing ? setToast(t("shelf.fileMissing")) : props.onOpen(b.id, { location, query: query.trim() }))}
+            onOpen={(b, location) => fileReady(b).then((ok) => ok && props.onOpen(b.id, { location, query: query.trim() }))}
           />
         </div>
       </main>
 
       {menu && (
         <div className="menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => (setMenu(null), props.onOpen(menu.book.id))} disabled={menu.book.missing}>
+          <button onClick={() => (setMenu(null), openBook(menu.book))} disabled={menu.book.missing && !menu.book.synced}>
             {t("shelf.open")}
           </button>
           <button onClick={() => (setMenu(null), setEditing([menu.book]))}>{t("shelf.editInfo")}</button>
@@ -589,6 +625,7 @@ export default function ShelfView(props: {
         />
       )}
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
+      {downloading !== null && <div className="toast">{t("shelf.downloading", { title: downloading })}</div>}
     </div>
   );
 }

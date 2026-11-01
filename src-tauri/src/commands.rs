@@ -21,7 +21,7 @@ use crate::recall::{self, DailyHighlight};
 use crate::search::{Hit, SearchText};
 use crate::stats;
 
-type CmdResult<T> = Result<T, String>;
+pub(crate) type CmdResult<T> = Result<T, String>;
 
 const MAX_OPEN: usize = 4;
 /// Approximate memory the open books may take together; the least recently used ones are
@@ -29,7 +29,7 @@ const MAX_OPEN: usize = 4;
 const MAX_OPEN_BYTES: usize = 384 << 20;
 const MAX_HITS: usize = 1000;
 
-fn err(e: impl std::fmt::Display) -> String {
+pub(crate) fn err(e: impl std::fmt::Display) -> String {
     let message = format!("{e:#}");
     log::warn!("{message}");
     message
@@ -46,6 +46,8 @@ pub struct OpenBook {
     search: std::sync::OnceLock<SearchText>,
     /// Approximate size in memory, for limiting the cache.
     bytes: usize,
+    /// Recognised text laid over a paged book.
+    pub ocr: Option<Arc<crate::ocr::OcrSource>>,
 }
 
 pub struct AppState {
@@ -110,7 +112,8 @@ impl AppState {
         if !path.exists() {
             anyhow::bail!(crate::t!("book_file_missing", path = path.display()));
         }
-        let doc = formats::open(&path)?;
+        let mut doc = formats::open(&path)?;
+        let ocr = crate::ocr::attach(&mut doc, &self.library().db().conn(), id)?;
         let mut images = HashMap::new();
         let mut chars = Vec::new();
         if let Content::Flow(chapters) = &doc.content {
@@ -138,6 +141,7 @@ impl AppState {
             chars,
             search: std::sync::OnceLock::new(),
             bytes,
+            ocr,
         });
         let mut open = self.open.lock().unwrap();
         open.retain(|(k, _)| k != id);
@@ -156,8 +160,13 @@ impl AppState {
     }
 }
 
-fn state(app: &AppHandle) -> &AppState {
+pub(crate) fn state(app: &AppHandle) -> &AppState {
     app.state::<AppState>().inner()
+}
+
+/// The library, for work that needs the lock itself rather than a guard.
+pub(crate) fn shared_library(app: &AppHandle) -> &Mutex<Library> {
+    &state(app).library
 }
 
 /// Asks the frontend to open `file` (it calls `take_startup_book` on the `open-file` event,
@@ -221,9 +230,12 @@ fn index_pending(app: &AppHandle) -> anyhow::Result<()> {
         };
         let path = state(app).library().book_path(book);
         // A file that can't be parsed (or breaks a parser) is left out, not retried each start.
-        let doc = std::panic::catch_unwind(|| formats::open(&path))
+        let mut doc = std::panic::catch_unwind(|| formats::open(&path))
             .ok()
             .and_then(Result::ok);
+        if let Some(doc) = &mut doc {
+            crate::ocr::attach(doc, &conn, id)?;
+        }
         crate::fulltext::index_book(&mut conn, id, &book.sha256, doc.as_ref())?;
         // Gives the reader's own page rendering room on big libraries.
         std::thread::sleep(std::time::Duration::from_millis(20));
@@ -233,6 +245,8 @@ fn index_pending(app: &AppHandle) -> anyhow::Result<()> {
 
 /// Seconds the frontend gets to save before the app quits anyway.
 const CLOSE_GRACE: std::time::Duration = std::time::Duration::from_secs(3);
+/// With sync on, a last sync runs before quitting, with the window already gone.
+const CLOSE_GRACE_SYNC: std::time::Duration = std::time::Duration::from_secs(8);
 
 /// Starts quitting: the frontend is told (`app-closing`) so it can save pending progress and
 /// settings, then calls `exit_app`. Quits after [`CLOSE_GRACE`] if it doesn't.
@@ -241,10 +255,20 @@ pub fn begin_close(app: &AppHandle) {
     if CLOSING.swap(true, std::sync::atomic::Ordering::SeqCst) {
         return;
     }
+    let syncing = crate::sync::commands::enabled(app);
+    if syncing {
+        for window in app.webview_windows().values() {
+            let _ = window.hide();
+        }
+    }
     let _ = app.emit("app-closing", ());
     let app = app.clone();
     std::thread::spawn(move || {
-        std::thread::sleep(CLOSE_GRACE);
+        std::thread::sleep(if syncing {
+            CLOSE_GRACE_SYNC
+        } else {
+            CLOSE_GRACE
+        });
         app.exit(0);
     });
 }
@@ -316,8 +340,14 @@ fn import_file(
     let root = state(app).library().root().to_owned();
     let staged = library::stage(&root, file)?;
     let hash = staged.sha256.clone();
-    if let Some(existing) = state(app).library().find_hash(&hash) {
-        return Ok(Imported::Existing(existing.id.clone()));
+    {
+        let mut lib = state(app).library();
+        if let Some(existing) = lib.find_hash(&hash) {
+            let id = existing.id.clone();
+            // Known from another device, but its file wasn't here yet.
+            lib.fill_missing(staged)?;
+            return Ok(Imported::Existing(id));
+        }
     }
     let prepared = Library::prepare(staged)?;
     let mut lib = state(app).library();
@@ -791,8 +821,14 @@ pub async fn save_annotations(
     app: AppHandle,
     id: String,
     annotations: Annotations,
+    removed: Vec<String>,
 ) -> CmdResult<()> {
-    blocking(move || annotation_store(&app).save(&id, &annotations).map_err(err)).await
+    blocking(move || {
+        annotation_store(&app)
+            .apply(&id, &annotations, &removed)
+            .map_err(err)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -1488,6 +1524,102 @@ pub async fn reading_report(app: AppHandle, today: String, year: i32) -> CmdResu
 }
 
 /// Text runs of a PDF page for the selectable text layer (empty for scans and comics).
+/// What is left to recognise in a book.
+#[derive(Serialize)]
+pub struct OcrStatus {
+    pages: usize,
+    pending: Vec<usize>,
+}
+
+/// Recognition is for PDFs: a comic's text sits in speech bubbles, in pictures of any shape.
+fn ocr_source(
+    st: &AppState,
+    id: &str,
+) -> anyhow::Result<(Arc<OpenBook>, Arc<crate::ocr::OcrSource>)> {
+    let book = st.open_book(id)?;
+    let is_pdf = st.library().get(id).is_some_and(|b| b.format == "PDF");
+    let source = book.ocr.clone().filter(|_| is_pdf);
+    let source = source.ok_or_else(|| anyhow::anyhow!(crate::t!("not_text_book")))?;
+    Ok((book, source))
+}
+
+#[tauri::command]
+pub async fn ocr_status(app: AppHandle, id: String) -> CmdResult<OcrStatus> {
+    blocking(move || {
+        let (book, source) = ocr_source(state(&app), &id).map_err(err)?;
+        let Content::Paged(src) = &book.doc.content else {
+            return Err(crate::t!("not_text_book"));
+        };
+        Ok(OcrStatus {
+            pages: src.page_count(),
+            pending: source.pending(),
+        })
+    })
+    .await
+}
+
+/// A recognition model, downloaded on first use. Recognising needs nothing else from the network.
+#[tauri::command]
+pub async fn ocr_model(app: AppHandle, name: String) -> CmdResult<tauri::ipc::Response> {
+    let dir = state(&app).library().root().join("ocr");
+    let bytes = crate::ocr::model(&dir, &name).await.map_err(err)?;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+/// A page's picture for recognising, as JPEG bytes.
+#[tauri::command]
+pub async fn ocr_page_image(
+    app: AppHandle,
+    id: String,
+    page: usize,
+    width: u32,
+) -> CmdResult<tauri::ipc::Response> {
+    blocking(move || {
+        let (book, _) = ocr_source(state(&app), &id).map_err(err)?;
+        let Content::Paged(src) = &book.doc.content else {
+            return Err(crate::t!("not_text_book"));
+        };
+        let bytes = crate::protocol::page_jpeg(src.as_ref(), page, width).map_err(err)?;
+        Ok(tauri::ipc::Response::new(bytes))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn ocr_save_page(
+    app: AppHandle,
+    id: String,
+    page: usize,
+    runs: Vec<crate::model::TextRun>,
+) -> CmdResult<()> {
+    blocking(move || {
+        let st = state(&app);
+        let (_, source) = ocr_source(st, &id).map_err(err)?;
+        crate::ocr::save_page(&st.library().db().conn(), &id, page, &runs).map_err(err)?;
+        source.put(page, runs);
+        Ok(())
+    })
+    .await
+}
+
+/// After recognising pages: search indexes are rebuilt with the new text.
+#[tauri::command]
+pub async fn ocr_finish(app: AppHandle, id: String) -> CmdResult<()> {
+    blocking(move || {
+        // The search text of an open book is built once.
+        state(&app).forget(std::slice::from_ref(&id));
+        {
+            let lib = state(&app).library();
+            let conn = lib.db().conn();
+            crate::fulltext::delete_book(&conn, &id).map_err(err)?;
+            crate::ai::commands::text_changed(&app, &conn, &id).map_err(err)?;
+        }
+        start_indexing(&app);
+        Ok(())
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn get_page_text(
     app: AppHandle,

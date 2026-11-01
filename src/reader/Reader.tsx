@@ -19,6 +19,7 @@ import { NoteEditor, SelectionToolbar } from "./Annotate";
 import FlowView, { type FlowHandle, type FlowSelection } from "./FlowView";
 import { describe, isValid, progressOf, sameLocation, START } from "./locations";
 import PagedView, { pageText, type PageSelection } from "./PagedView";
+import { useOcr } from "../ocr/useOcr";
 import ProgressBar from "./ProgressBar";
 import SettingsPanel from "./SettingsPanel";
 import { MOD } from "./shortcuts";
@@ -46,6 +47,24 @@ async function toggleFullscreen() {
 export interface OpenAt {
   location: Location;
   query?: string;
+}
+
+const ocrHiddenKey = (bookId: string) => `ocr-suggestion-hidden:${bookId}`;
+
+function storedFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function setStoredFlag(key: string) {
+  try {
+    localStorage.setItem(key, "1");
+  } catch {
+    // Only a convenience: the suggestion comes back next time.
+  }
 }
 
 export default function Reader(props: { bookId: string; openAt: OpenAt | null; settings: Settings; update: UpdateSettings; onClose: () => void }) {
@@ -87,6 +106,8 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
   const saveTimer = useRef<number>();
 
   const ann = useAnnotations(bookId);
+  const ocr = useOcr(bookId, book?.title ?? "", book?.format === "PDF");
+  const [ocrHidden, setOcrHidden] = useState(() => storedFlag(ocrHiddenKey(bookId)));
   const panels = usePanelWidths(bookId);
   const body = useRef<HTMLDivElement>(null);
   const [bodyWidth, setBodyWidth] = useState(0);
@@ -627,6 +648,11 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
                     <button className={settings.pageLayout === "spread" ? "checked" : ""} onClick={() => update({ pageLayout: "spread" })}>
                       <Icon name="spread" /> {t("rs.spread")}
                     </button>
+                    {ocr.pending.length > 0 && !ocr.running && (
+                      <button onClick={ocr.start}>
+                        <Icon name="type" /> {t("ocr.recognise", { n: ocr.pending.length })}
+                      </button>
+                    )}
                     {book.format === "CBZ" && (
                       <button className={settings.comicRtl ? "checked" : ""} onClick={() => update({ comicRtl: !settings.comicRtl })}>
                         <Icon name="arrowLeft" /> {t("rs.comicRtl")}
@@ -657,6 +683,25 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
           </div>
         </div>
       </header>
+      {ocr.scanned && !ocr.running && !ocrHidden && (
+        <div className="reader-notice">
+          <span className="grow">{t("ocr.suggest", { n: ocr.pending.length })}</span>
+          <button className="link-button" onClick={ocr.start}>
+            {t("ocr.start")}
+          </button>
+          <button
+            className="icon-button"
+            aria-label={t("common.close")}
+            onClick={() => {
+              setStoredFlag(ocrHiddenKey(bookId));
+              setOcrHidden(true);
+            }}
+          >
+            <Icon name="close" />
+          </button>
+        </div>
+      )}
+      {ocr.error && <div className="reader-notice error">{t("ocr.failed", { error: ocr.error })}</div>}
 
       <div className="reader-body" ref={body}>
         {tocShown && (

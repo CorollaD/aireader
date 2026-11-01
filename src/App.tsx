@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { api, fontUrl } from "./api";
 import { onBeforeExit, saveAll } from "./lifecycle";
+import OcrProgressBar from "./ocr/OcrProgressBar";
 import { resolveLanguage, setLanguage, t } from "./i18n";
 import { CUSTOM_FONT, DEFAULT_SETTINGS, normalizeSettings, themeVars, UI_SCALES, type Settings } from "./settings";
 import SettingsDialog, { SettingsOpener, type SettingsTab } from "./SettingsDialog";
@@ -16,6 +17,9 @@ import { applyUiScale } from "./zoom";
 import ErrorBoundary from "./ErrorBoundary";
 
 export type UpdateSettings = (patch: Partial<Settings>) => void;
+
+/** How long the last sync may hold up quitting (the backend gives up a little later). */
+const LAST_SYNC_MS = 5000;
 
 export default function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -49,6 +53,8 @@ export default function App() {
   useEffect(() => {
     const closing = listen("app-closing", async () => {
       await saveAll();
+      // A last sync, if it is on: it mustn't hold up quitting for long.
+      await Promise.race([api.syncNow(true).catch(() => {}), new Promise((done) => setTimeout(done, LAST_SYNC_MS))]);
       api.exitApp().catch(() => {});
     });
     // A book opened from the file manager while the app runs.
@@ -184,6 +190,7 @@ export default function App() {
           )}
         </ErrorBoundary>
         {settingsTab && <SettingsDialog settings={settings} update={update} tab={settingsTab} onTab={setSettingsTab} onClose={() => setSettingsTab(null)} />}
+        <OcrProgressBar />
       </AiProvider>
     </SettingsOpener.Provider>
   );

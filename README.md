@@ -27,6 +27,8 @@
 - 编辑书名、作者和分组；可多选后批量移到某个分组或删除
 - 显示每本书的阅读进度和最近阅读时间
 - 在线书库（OPDS 1.x）：添加 Calibre 或其他书源，浏览、搜索并下载到书架；需要登录的书源支持 Basic 认证，密码存在系统钥匙串
+- 扫描版 PDF 文字识别：在本机用 PP-OCRv6 识别没有文字层的页面（首次使用下载约 31MB 模型），后台运行，可停止，下次接着做；结果用于搜索、选中文字、朗读和 AI
+- 多设备同步：通过 WebDAV（坚果云、Nextcloud、群晖等）或网盘文件夹（iCloud Drive、Dropbox、OneDrive 等）同步书架、进度、书签、高亮、AI 对话、闪卡和阅读时长；书籍文件可选同步，未下载的书在打开时下载。设置和 API Key 不同步；数据不加密，同一条记录以较新的修改为准
 - 备份书库（设置 → 通用）：导出一个 zip，含数据库和封面，可选包含书籍文件
 - 安装后可以在文件管理器中用 AiReader 打开 EPUB、MOBI/AZW3、FB2、CBZ（以及 PDF）；程序已在运行时会在当前窗口打开，不会再启动一个
 
@@ -97,14 +99,15 @@ npm run tauri build                   # 打包安装程序
 
 书库保存在系统应用数据目录下的 `library/` 中（macOS：`~/Library/Application Support/com.aireader.reader/library/`）：
 
-- `aireader.db`（SQLite）：书籍信息、分组、阅读进度与时长、阅读设置和 AI 设置（不含 API Key）、书签高亮与笔记、AI 总结与导图缓存、AI 对话、记忆卡和复习记录、查重分析缓存、全文索引（每本书约 2MB），以及语义检索的向量（rig-sqlite + sqlite-vec）
+- `aireader.db`（SQLite）：书籍信息、分组、阅读进度与时长、阅读设置和 AI 设置（不含 API Key）、书签高亮与笔记、AI 总结与导图缓存、AI 对话、记忆卡和复习记录、查重分析缓存、全文索引（每本书约 2MB）、文字识别结果，以及语义检索的向量（rig-sqlite + sqlite-vec）
 - `books/<id>/`：导入书籍的副本
 - `covers/<id>.jpg`：封面缩略图
 - `fonts/`：导入的阅读字体
 - `dictionaries/<id>/`：添加的词典文件
+- `ocr/`：文字识别模型（第一次识别时下载）
 - `backup-json/`：旧版本的 JSON 数据。新版第一次打开时会把它们导入数据库，原文件移到这里保留
 
-API Key（包括向量模型的 Key）只保存在系统钥匙串中。
+API Key（包括向量模型的 Key）和 WebDAV 密码只保存在系统钥匙串中。
 
 日志写在系统日志目录（macOS：`~/Library/Logs/com.aireader.reader/`），出错时可以附上。
 
@@ -131,6 +134,8 @@ src/                      React 前端
   study/                  查词、记忆卡复习、词典设置
   stats/                  阅读统计页
   opds/                   在线书库
+  ocr/                    扫描版 PDF 文字识别：识别任务、阅读顺序、运行 PaddleOCR.js 的 Worker
+  SyncSettings.tsx        同步设置
   dev/mock.ts             浏览器调试用的模拟后端
   SettingsDialog.tsx      设置窗口；icons.tsx 图标；zoom.ts 界面缩放
   settings.ts             阅读设置与配色方案（背景色预设、根据背景自动计算文字颜色）
@@ -150,6 +155,8 @@ src-tauri/                Rust 后端
   src/stats.rs            按天的阅读时长和统计
   src/recall.rs           每日划线回顾
   src/opds.rs             OPDS 书源解析
+  src/ocr.rs              识别结果的保存、叠加到书上，模型下载
+  src/sync/               同步：导出与合并、WebDAV 和文件夹存储、命令
   src/dictionary.rs       StarDict / MDict 词典（opendict-rs）
   src/export.rs           笔记和记忆卡的导出格式
   src/ai/                 AI：rig 连接与错误处理、设置与钥匙串、检索与语义索引、总结/问答/导图/整理任务

@@ -14,7 +14,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 pub const FILE: &str = "aireader.db";
-const SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 2;
 
 /// Files and folders of the JSON era, moved to `backup-json/` after import.
 const LEGACY: &[&str] = &["library.json", "annotations", "ai", "profiles.json"];
@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS bookmarks (
     location TEXT NOT NULL,
     title TEXT NOT NULL,
     excerpt TEXT NOT NULL,
-    created INTEGER NOT NULL
+    created INTEGER NOT NULL,
+    updated INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS bookmarks_book ON bookmarks (book_id);
 CREATE TABLE IF NOT EXISTS highlights (
@@ -72,6 +73,12 @@ CREATE TABLE IF NOT EXISTS chats (
     updated INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS chats_book ON chats (book_id);
+CREATE TABLE IF NOT EXISTS tombstones (
+    kind TEXT NOT NULL,
+    id TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    PRIMARY KEY (kind, id)
+);
 CREATE TABLE IF NOT EXISTS semantic_books (
     book_id TEXT PRIMARY KEY,
     model TEXT NOT NULL,
@@ -107,6 +114,48 @@ pub struct Db {
     path: PathBuf,
 }
 
+fn has_column(conn: &Connection, table: &str, column: &str) -> Result<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let names = stmt
+        .query_map([], |r| r.get::<_, String>(1))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(names.iter().any(|n| n == column))
+}
+
+/// Brings a database from an earlier version up to date.
+fn migrate(conn: &Connection) -> Result<()> {
+    conn.execute_batch("BEGIN")?;
+    let result = (|| -> Result<()> {
+        // Version 2: records say when they last changed, for syncing.
+        for table in ["bookmarks", "cards"] {
+            if !has_column(conn, table, "updated")? {
+                conn.execute_batch(&format!(
+                    "ALTER TABLE {table} ADD COLUMN updated INTEGER NOT NULL DEFAULT 0;
+                     UPDATE {table} SET updated = created;"
+                ))?;
+            }
+        }
+        conn.execute(
+            "INSERT INTO meta (key, value) VALUES ('schema_version', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![SCHEMA_VERSION.to_string()],
+        )?;
+        Ok(())
+    })();
+    conn.execute_batch(if result.is_ok() { "COMMIT" } else { "ROLLBACK" })?;
+    result
+}
+
+/// Records that something was deleted, so the deletion reaches other devices.
+pub fn tombstone(conn: &Connection, kind: &str, id: &str, at: u64) -> Result<()> {
+    conn.execute(
+        "INSERT INTO tombstones (kind, id, at) VALUES (?1, ?2, ?3)
+         ON CONFLICT(kind, id) DO UPDATE SET at = max(at, excluded.at)",
+        params![kind, id, at as i64],
+    )?;
+    Ok(())
+}
+
 impl Db {
     pub fn open(path: &Path) -> Result<Self> {
         register_sqlite_vec();
@@ -119,10 +168,9 @@ impl Db {
         conn.execute_batch(crate::cards::SCHEMA)?;
         conn.execute_batch(crate::stats::SCHEMA)?;
         conn.execute_batch(crate::recall::SCHEMA)?;
-        conn.execute(
-            "INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', ?1)",
-            params![SCHEMA_VERSION.to_string()],
-        )?;
+        conn.execute_batch(crate::sync::SCHEMA)?;
+        conn.execute_batch(crate::ocr::SCHEMA)?;
+        migrate(&conn)?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
             path: path.to_owned(),
@@ -165,6 +213,7 @@ pub fn delete_book_data(conn: &Connection, book_id: &str) -> Result<()> {
         "ai_cache",
         "chats",
         "semantic_books",
+        "ocr_pages",
     ] {
         conn.execute(
             &format!("DELETE FROM {table} WHERE book_id = ?1"),
@@ -187,7 +236,7 @@ pub fn snapshot(db: &Db, dest: &Path) -> Result<()> {
 }
 
 /// A saved AI conversation about a book. `data` is the frontend's own record (turns, quote).
-#[derive(Debug, Serialize, serde::Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, serde::Deserialize, PartialEq)]
 pub struct ChatRecord {
     pub id: String,
     pub title: String,
@@ -239,7 +288,7 @@ pub fn save_chat(conn: &Connection, book_id: &str, chat: &ChatRecord) -> Result<
 
 pub fn delete_chat(conn: &Connection, id: &str) -> Result<()> {
     conn.execute("DELETE FROM chats WHERE id = ?1", params![id])?;
-    Ok(())
+    tombstone(conn, "chat", id, crate::library::now())
 }
 
 // --- import of JSON-era libraries --------------------------------------------------------------
@@ -323,6 +372,56 @@ pub fn archive_legacy(root: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_older_database_is_upgraded_in_place() {
+        let dir = std::env::temp_dir().join(format!("aireader-migrate-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("t.db");
+        {
+            // Version 1: bookmarks and cards without `updated`.
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                 INSERT INTO meta VALUES ('schema_version', '1');
+                 CREATE TABLE bookmarks (id TEXT PRIMARY KEY, book_id TEXT NOT NULL,
+                   location TEXT NOT NULL, title TEXT NOT NULL, excerpt TEXT NOT NULL,
+                   created INTEGER NOT NULL);
+                 INSERT INTO bookmarks VALUES ('m', 'b', '{\"kind\":\"page\",\"page\":1}', 't', '', 70);
+                 CREATE TABLE cards (id TEXT PRIMARY KEY, book_id TEXT, book_title TEXT NOT NULL,
+                   front TEXT NOT NULL, back TEXT NOT NULL, context TEXT NOT NULL, location TEXT,
+                   created INTEGER NOT NULL, suspended INTEGER NOT NULL DEFAULT 0,
+                   due INTEGER NOT NULL, reps INTEGER NOT NULL DEFAULT 0,
+                   lapses INTEGER NOT NULL DEFAULT 0, memory TEXT NOT NULL);",
+            )
+            .unwrap();
+        }
+        for _ in 0..2 {
+            let db = Db::open(&path).unwrap();
+            let conn = db.conn();
+            let updated: i64 = conn
+                .query_row("SELECT updated FROM bookmarks", [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(updated, 70, "takes the creation time");
+            let version: String = conn
+                .query_row(
+                    "SELECT value FROM meta WHERE key = 'schema_version'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(version, "2");
+            assert!(has_column(&conn, "cards", "updated").unwrap());
+        }
+        assert_eq!(
+            crate::annotations::read(&Db::open(&path).unwrap().conn(), "b")
+                .unwrap()
+                .bookmarks[0]
+                .updated,
+            70
+        );
+    }
 
     #[test]
     fn chats_are_saved_listed_and_removed_with_the_book() {

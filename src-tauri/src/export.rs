@@ -216,6 +216,7 @@ mod tests {
                     title: "第 2 页".into(),
                     excerpt: "摘录".into(),
                     created: 86_400,
+                    updated: 0,
                 }],
                 highlights: vec![Highlight {
                     id: "h".into(),

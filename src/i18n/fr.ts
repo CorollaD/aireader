@@ -575,6 +575,47 @@ const fr: Messages = {
   "opds.already": "Déjà dans la bibliothèque",
   "opds.remove": "Retirer le catalogue",
   "opds.removeHint": "Retirer « {name} » et son mot de passe enregistré ? Les livres téléchargés sont conservés.",
+  "settings.tabSync": "Synchronisation",
+  "sync.service": "Synchroniser via",
+  "sync.off": "Désactivée",
+  "sync.folder": "Dossier",
+  "sync.intro":
+    "Garde identiques sur vos appareils la bibliothèque, la position de lecture, les signets, les surlignages, les conversations IA, les cartes et le temps de lecture. Les réglages et les clés API ne sont pas synchronisés.",
+  "sync.url": "Adresse du serveur",
+  "sync.username": "Identifiant",
+  "sync.password": "Mot de passe",
+  "sync.passwordSaved": "Enregistré. Laissez vide pour le conserver",
+  "sync.passwordHint":
+    "Le mot de passe est conservé dans le trousseau du système. Certains services exigent un mot de passe d'application, pas celui du compte.",
+  "sync.insecure": "Cette adresse n'est pas chiffrée (http) : le mot de passe et les données circulent en clair. À n'utiliser que sur un réseau de confiance.",
+  "sync.chosenFolder": "Dossier de synchronisation",
+  "sync.noFolder": "Aucun",
+  "sync.chooseFolder": "Choisir un dossier",
+  "sync.folderHint":
+    "Choisissez un dossier synchronisé par iCloud Drive, Dropbox, OneDrive ou autre. Les fichiers ne sont lisibles qu'une fois téléchargés sur cet appareil par ce service.",
+  "sync.files": "Synchroniser aussi les fichiers des livres",
+  "sync.filesHint":
+    "Envoie aussi les livres, ce qui prend bien plus de place. Sur les autres appareils, ils apparaissent comme « Non téléchargé » et arrivent à l'ouverture.",
+  "sync.notes":
+    "Les données ne sont pas chiffrées : toute personne ayant accès à ce serveur ou dossier peut lire vos notes et conversations. Si un élément change sur deux appareils, la modification la plus récente l'emporte : les horloges doivent être justes.",
+  "sync.test": "Tester la connexion",
+  "sync.testOk": "Connecté : les fichiers peuvent être lus et écrits",
+  "sync.saved": "Enregistré",
+  "sync.done": "Synchronisé",
+  "sync.now": "Synchroniser maintenant",
+  "sync.running": "Synchronisation…",
+  "sync.last": "Dernière synchronisation : {time}",
+  "sync.never": "Pas encore synchronisé",
+  "book.notDownloaded": "Non téléchargé",
+  "book.notDownloadedTitle": "Un livre d'un autre appareil : il se télécharge à l'ouverture",
+  "shelf.downloading": "Téléchargement de « {title} »…",
+  "ocr.loading": "Préparation de la reconnaissance de « {title} »… (la première fois, environ 31 Mo de modèles sont téléchargés)",
+  "ocr.progress": "Reconnaissance de « {title} » : {done} sur {total} pages",
+  "ocr.recognise": "Reconnaître le texte ({n} pages)",
+  "ocr.suggest":
+    "{n} pages de ce PDF sont des images. Reconnaissez-les pour chercher, sélectionner et écouter le texte, et pour que l'IA le lise. Tout se passe sur cet appareil.",
+  "ocr.start": "Reconnaître",
+  "ocr.failed": "Échec de la reconnaissance de texte : {error}",
 };
 
 export default fr;

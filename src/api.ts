@@ -31,6 +31,8 @@ import type {
   SemanticStatus,
   Shelf,
   Suggestion,
+  SyncConfig,
+  SyncStatus,
   TextRun,
 } from "./types";
 
@@ -73,7 +75,8 @@ export const api = {
   stopIndexing: () => invoke<void>("stop_indexing"),
   saveProgress: (id: string, position: Location, progress: number) => invoke<void>("save_progress", { id, position, progress }),
   getAnnotations: (id: string) => invoke<Annotations>("get_annotations", { id }),
-  saveAnnotations: (id: string, annotations: Annotations) => invoke<void>("save_annotations", { id, annotations }),
+  /** `removed`: ids deleted since the last save. Anything else missing here came from a sync. */
+  saveAnnotations: (id: string, annotations: Annotations, removed: string[]) => invoke<void>("save_annotations", { id, annotations, removed }),
   /** Saved AI conversations about a book, most recent first. */
   listChats: (bookId: string) => invoke<ChatRecord[]>("list_chats", { bookId }),
   saveChat: (bookId: string, chat: ChatRecord) => invoke<void>("save_chat", { bookId, chat }),
@@ -109,6 +112,17 @@ export const api = {
   saveExport: (fileName: string, extension: string, data: string) => invoke<string | null>("save_export", { fileName, extension, data }),
   /** `day`: the local date the time belongs to. */
   addReadingTime: (id: string, seconds: number, speed: number | null, day: string) => invoke<Book>("add_reading_time", { id, seconds, speed, day }),
+  ocrStatus: (id: string) => invoke<{ pages: number; pending: number[] }>("ocr_status", { id }),
+  ocrModel: (name: string) => invoke<ArrayBuffer>("ocr_model", { name }),
+  ocrPageImage: (id: string, page: number, width: number) => invoke<ArrayBuffer>("ocr_page_image", { id, page, width }),
+  ocrSavePage: (id: string, page: number, runs: TextRun[]) => invoke<void>("ocr_save_page", { id, page, runs }),
+  ocrFinish: (id: string) => invoke<void>("ocr_finish", { id }),
+  syncStatus: () => invoke<SyncStatus>("sync_status"),
+  syncSave: (config: SyncConfig, password: string | null) => invoke<SyncStatus>("sync_save", { config, password }),
+  syncTest: (config: SyncConfig, password: string | null) => invoke<void>("sync_test", { config, password }),
+  /** `quick` leaves out covers and book files, for when the app is closing. */
+  syncNow: (quick: boolean) => invoke<void>("sync_now", { quick }),
+  syncFetchBook: (id: string) => invoke<void>("sync_fetch_book", { id }),
   opdsCatalogs: () => invoke<OpdsCatalog[]>("opds_catalogs"),
   /** Adds or updates a catalog; `password` undefined keeps the stored one. */
   opdsSaveCatalog: (catalog: OpdsCatalog, password?: string) => invoke<OpdsCatalog[]>("opds_save_catalog", { catalog, password }),

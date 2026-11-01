@@ -170,7 +170,7 @@ pub trait PageSource: Send + Sync {
 
 /// A run of text on a page. Coordinates are fractions of the unrotated page size, measured
 /// from the top-left corner.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, serde::Deserialize)]
 pub struct TextRun {
     pub text: String,
     pub x: f32,

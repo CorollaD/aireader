@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS cards (
     due INTEGER NOT NULL,
     reps INTEGER NOT NULL DEFAULT 0,
     lapses INTEGER NOT NULL DEFAULT 0,
-    memory TEXT NOT NULL
+    memory TEXT NOT NULL,
+    updated INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS cards_due ON cards (due);
 CREATE INDEX IF NOT EXISTS cards_book ON cards (book_id);
@@ -130,8 +131,8 @@ pub fn add(conn: &Connection, new: NewCard, now: u64) -> Result<Card> {
         ..rs_fsrs::Card::new()
     };
     conn.execute(
-        "INSERT INTO cards (id, book_id, book_title, front, back, context, location, created, due, memory)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "INSERT INTO cards (id, book_id, book_title, front, back, context, location, created, due, memory, updated)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?8)",
         params![
             new.id,
             new.book_id,
@@ -215,12 +216,13 @@ pub fn stats(conn: &Connection, now: u64, today: u64) -> Result<Stats> {
 pub fn update(conn: &Connection, id: &str, patch: CardPatch) -> Result<Card> {
     let old = get(conn, id)?;
     conn.execute(
-        "UPDATE cards SET front = ?2, back = ?3, suspended = ?4 WHERE id = ?1",
+        "UPDATE cards SET front = ?2, back = ?3, suspended = ?4, updated = ?5 WHERE id = ?1",
         params![
             id,
             patch.front.as_deref().map_or(old.front.as_str(), str::trim),
             patch.back.as_deref().map_or(old.back.as_str(), str::trim),
             patch.suspended.unwrap_or(old.suspended),
+            crate::library::now() as i64,
         ],
     )?;
     get(conn, id)
@@ -229,7 +231,7 @@ pub fn update(conn: &Connection, id: &str, patch: CardPatch) -> Result<Card> {
 pub fn delete(conn: &Connection, id: &str) -> Result<()> {
     conn.execute("DELETE FROM card_reviews WHERE card_id = ?1", params![id])?;
     conn.execute("DELETE FROM cards WHERE id = ?1", params![id])?;
-    Ok(())
+    crate::db::tombstone(conn, "card", id, crate::library::now())
 }
 
 fn memory(conn: &Connection, id: &str) -> Result<rs_fsrs::Card> {
@@ -258,13 +260,14 @@ pub fn intervals(conn: &Connection, id: &str, now: u64) -> Result<[u64; 4]> {
 pub fn review(conn: &Connection, id: &str, answer: u8, now: u64) -> Result<Card> {
     let next = FSRS::default().next(memory(conn, id)?, time(now), rating(answer)?);
     conn.execute(
-        "UPDATE cards SET due = ?2, reps = ?3, lapses = ?4, memory = ?5 WHERE id = ?1",
+        "UPDATE cards SET due = ?2, reps = ?3, lapses = ?4, memory = ?5, updated = ?6 WHERE id = ?1",
         params![
             id,
             next.card.due.timestamp(),
             next.card.reps,
             next.card.lapses,
             serde_json::to_string(&next.card)?,
+            now as i64,
         ],
     )?;
     conn.execute(
@@ -272,6 +275,115 @@ pub fn review(conn: &Connection, id: &str, answer: u8, now: u64) -> Result<Card>
         params![id, answer, now as i64],
     )?;
     get(conn, id)
+}
+
+/// A card as it is synced: everything, including what the scheduler remembers about it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCard {
+    pub id: String,
+    pub book_id: Option<String>,
+    pub book_title: String,
+    pub front: String,
+    pub back: String,
+    pub context: String,
+    pub location: Option<String>,
+    pub created: i64,
+    pub suspended: bool,
+    pub due: i64,
+    pub reps: i32,
+    pub lapses: i32,
+    pub memory: String,
+    pub updated: i64,
+}
+
+/// One answer given to a card.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncReview {
+    pub card_id: String,
+    pub rating: i64,
+    pub reviewed: i64,
+}
+
+pub fn sync_cards(conn: &Connection) -> Result<Vec<SyncCard>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, book_id, book_title, front, back, context, location, created, suspended,
+                due, reps, lapses, memory, updated FROM cards ORDER BY id",
+    )?;
+    let cards = stmt
+        .query_map([], |r| {
+            Ok(SyncCard {
+                id: r.get(0)?,
+                book_id: r.get(1)?,
+                book_title: r.get(2)?,
+                front: r.get(3)?,
+                back: r.get(4)?,
+                context: r.get(5)?,
+                location: r.get(6)?,
+                created: r.get(7)?,
+                suspended: r.get(8)?,
+                due: r.get(9)?,
+                reps: r.get(10)?,
+                lapses: r.get(11)?,
+                memory: r.get(12)?,
+                updated: r.get(13)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(cards)
+}
+
+pub fn sync_reviews(conn: &Connection) -> Result<Vec<SyncReview>> {
+    let mut stmt =
+        conn.prepare("SELECT card_id, rating, reviewed FROM card_reviews ORDER BY 1, 3, 2")?;
+    let reviews = stmt
+        .query_map([], |r| {
+            Ok(SyncReview {
+                card_id: r.get(0)?,
+                rating: r.get(1)?,
+                reviewed: r.get(2)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(reviews)
+}
+
+/// Replaces a card with a newer copy from another device.
+pub fn store_synced(conn: &Connection, c: &SyncCard) -> Result<()> {
+    conn.execute(
+        "INSERT OR REPLACE INTO cards (id, book_id, book_title, front, back, context, location,
+           created, suspended, due, reps, lapses, memory, updated)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+        params![
+            c.id,
+            c.book_id,
+            c.book_title,
+            c.front,
+            c.back,
+            c.context,
+            c.location,
+            c.created,
+            c.suspended,
+            c.due,
+            c.reps,
+            c.lapses,
+            c.memory,
+            c.updated
+        ],
+    )?;
+    Ok(())
+}
+
+/// Adds an answer given on another device, once.
+pub fn store_review(conn: &Connection, r: &SyncReview) -> Result<()> {
+    conn.execute(
+        "INSERT INTO card_reviews (card_id, rating, reviewed)
+         SELECT ?1, ?2, ?3 WHERE NOT EXISTS (
+           SELECT 1 FROM card_reviews WHERE card_id = ?1 AND rating = ?2 AND reviewed = ?3)",
+        params![r.card_id, r.rating, r.reviewed],
+    )?;
+    Ok(())
 }
 
 /// A book left the shelf: its cards stay, under the title they were saved with.

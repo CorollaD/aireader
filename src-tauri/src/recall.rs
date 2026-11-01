@@ -99,6 +99,56 @@ pub fn seen(conn: &Connection, id: &str, keep: bool, now: u64) -> Result<()> {
     Ok(())
 }
 
+/// A highlight's review state, as it is synced.
+#[derive(Clone, Debug, PartialEq, Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncReview {
+    pub highlight_id: String,
+    pub due: i64,
+    pub interval_days: i64,
+    pub retired: bool,
+    pub last_seen: i64,
+}
+
+pub fn sync_reviews(conn: &Connection) -> Result<Vec<SyncReview>> {
+    let mut stmt = conn.prepare(
+        "SELECT highlight_id, due, interval_days, retired, last_seen
+         FROM highlight_reviews ORDER BY highlight_id",
+    )?;
+    let list = stmt
+        .query_map([], |r| {
+            Ok(SyncReview {
+                highlight_id: r.get(0)?,
+                due: r.get(1)?,
+                interval_days: r.get(2)?,
+                retired: r.get(3)?,
+                last_seen: r.get(4)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(list)
+}
+
+/// Takes another device's review state if it is newer. A dismissal stays dismissed.
+pub fn merge_review(conn: &Connection, r: &SyncReview) -> Result<()> {
+    conn.execute(
+        "INSERT INTO highlight_reviews (highlight_id, due, interval_days, retired, last_seen)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(highlight_id) DO UPDATE SET
+           due = excluded.due, interval_days = excluded.interval_days,
+           retired = max(retired, excluded.retired), last_seen = excluded.last_seen
+         WHERE excluded.last_seen > last_seen",
+        params![
+            r.highlight_id,
+            r.due,
+            r.interval_days,
+            r.retired,
+            r.last_seen
+        ],
+    )?;
+    Ok(())
+}
+
 /// Forgets highlights that no longer exist.
 pub fn clean(conn: &Connection) -> Result<()> {
     conn.execute(

@@ -26,7 +26,7 @@ opendict-rs = "0.1.0"
 pdfium-render = { version = "0.9.4", default-features = false, features = ["pdfium_latest", "thread_safe"] }
 pulldown-cmark = "0.13.4"
 regex = "1.13.1"
-reqwest = { version = "0.13", default-features = false }
+reqwest = { version = "0.13", default-features = false, features = ["stream"] }
 rig-core = { version = "0.45", features = ["reqwest"] }
 rig-reqwest = "0.45"
 rig-sqlite = "0.45.0"
@@ -44,7 +44,7 @@ tauri-plugin-dialog = "2.8.3"
 tauri-plugin-log = "2.10.1"
 tauri-plugin-single-instance = "2.5.4"
 tauri-plugin-window-state = "2.5.0"
-tokio = { version = "1.54.1", features = ["sync", "rt", "macros", "time"] }
+tokio = { version = "1.54.1", features = ["sync", "rt", "macros", "time", "fs"] }
 tokio-rusqlite = { version = "0.6", default-features = false, features = ["bundled"] }
 unicode-normalization = "0.1.26"
 zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
