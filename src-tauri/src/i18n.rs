@@ -853,6 +853,21 @@ const MESSAGES: &[(&str, [&str; 10])] = &[
         ],
     ),
     (
+        "group_too_deep",
+        [
+            "这个分组有子分组，不能再放到别的分组下面：最多两级",
+            "這個分組有子分組，不能再放到別的分組下面：最多兩級",
+            "This group has subgroups, so it can't go under another group: two levels at most",
+            "Este grupo tiene subgrupos, así que no puede ir dentro de otro: dos niveles como máximo",
+            "Questo gruppo ha sottogruppi e non può stare in un altro: massimo due livelli",
+            "Ce groupe a des sous-groupes et ne peut pas aller dans un autre : deux niveaux au maximum",
+            "Diese Gruppe hat Untergruppen und kann nicht in eine andere: höchstens zwei Ebenen",
+            "このグループにはサブグループがあるため、別のグループの下に置けません（最大 2 階層）",
+            "이 그룹에는 하위 그룹이 있어 다른 그룹 아래로 옮길 수 없습니다. 최대 2단계입니다",
+            "Este grupo tem subgrupos e não pode ficar dentro de outro: dois níveis no máximo",
+        ],
+    ),
+    (
         "notes_none",
         [
             "还没有可导出的笔记",

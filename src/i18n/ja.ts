@@ -654,6 +654,14 @@ const ja: Messages = {
   "opds.searchPrompt": "上の欄でタイトルを検索してください",
   "opds.thin": "追加しましたが本文が少なめです。目次のみか、短い作品の可能性があります",
   "opds.noDownload": "ダウンロードできるファイルがありません。貸出のみの可能性があります",
+  "shelf.newSubgroup": "サブグループを作成",
+  "shelf.newSubgroupOf": "「{name}」にサブグループを作成",
+  "shelf.moveGroup": "移動…",
+  "shelf.parentGroup": "親グループ",
+  "shelf.topLevel": "なし（最上位）",
+  "shelf.expand": "展開",
+  "shelf.collapse": "折りたたむ",
+  "shelf.deleteGroupChildren": "サブグループは 1 階層上がり、独立したグループになります。",
 };
 
 export default ja;

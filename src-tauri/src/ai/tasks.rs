@@ -1177,7 +1177,8 @@ pub async fn organize(
         "You are a library assistant who sorts the books on a shelf into groups. Each book \
          belongs to exactly one group: suggest one group per book, preferring existing groups \
          and keeping the book's current group when it fits; when a new group is needed, give \
-         it a short name in {} (such as Fiction, History, Computing, Economics, Philosophy). For a \
+         it a short name in {} (such as Fiction, History, Computing, Economics, Philosophy). A \
+         name like Parent-Child is a subgroup of Parent: use one when it fits best. For a \
          book with no author, give the author if you are sure of it, otherwise null. Only make \
          suggestions for the listed books, and copy each bookId exactly.",
         r.cfg.answer_language()

@@ -14,6 +14,7 @@ import { startOfToday } from "../study/intervals";
 import { Confirm, Modal, Toast } from "../ui";
 import { BookCard, BookRow } from "./BookCard";
 import { EditDialog } from "./EditDialog";
+import { childName, groupTree, inGroup, labelOf } from "./groups";
 import { DedupeDialog, DedupeProgress } from "./DedupeDialog";
 import { useAi } from "../ai/AiContext";
 import OrganizeDialog from "../ai/OrganizeDialog";
@@ -102,7 +103,8 @@ export default function ShelfView(props: {
   const [menu, setMenu] = useState<Menu | null>(null);
   const [editing, setEditing] = useState<Book[] | null>(null);
   const [deleting, setDeleting] = useState<Book[] | null>(null);
-  const [groupDialog, setGroupDialog] = useState<{ old: string | null } | null>(null);
+  const [groupDialog, setGroupDialog] = useState<{ old: string | null; parent: string | null } | null>(null);
+  const [groupMoving, setGroupMoving] = useState<{ name: string; parent: string | null } | null>(null);
   const [groupDeleting, setGroupDeleting] = useState<string | null>(null);
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -226,10 +228,10 @@ export default function ShelfView(props: {
     if (filter === RECENT) books = books.filter((b) => b.lastRead);
     else if (filter === UNGROUPED) books = books.filter((b) => !b.group);
     else if (filter === PAPERS) books = books.filter(isPaper);
-    else if (filter !== ALL) books = books.filter((b) => b.group === filter);
+    else if (filter !== ALL) books = books.filter((b) => inGroup(b.group, filter, shelf.groups));
     if (q) books = books.filter((b) => b.title.toLowerCase().includes(q) || (b.author ?? "").toLowerCase().includes(q));
     return sortBooks(books, filter === RECENT ? "recent" : settings.shelfSort);
-  }, [shelf.books, filter, query, settings.shelfSort]);
+  }, [shelf.books, shelf.groups, filter, query, settings.shelfSort]);
 
   const selectedBooks = shelf.books.filter((b) => selected.has(b.id));
   const selecting = selected.size > 0;
@@ -275,6 +277,56 @@ export default function ShelfView(props: {
       <span className="count">{n}</span>
     </button>
   );
+  const toggleFold = (name: string) =>
+    update({
+      collapsedGroups: settings.collapsedGroups.includes(name) ? settings.collapsedGroups.filter((g) => g !== name) : [...settings.collapsedGroups, name],
+    });
+
+  const groupRow = (name: string, parent: string | null, children: string[], folded: boolean) => (
+    <div key={name} className={`side-group${parent ? " child" : ""}${children.length > 0 ? " parent" : ""}`}>
+      {children.length > 0 && (
+        <button
+          className="icon side-fold"
+          title={folded ? t("shelf.expand") : t("shelf.collapse")}
+          aria-label={folded ? t("shelf.expand") : t("shelf.collapse")}
+          aria-expanded={!folded}
+          onClick={() => toggleFold(name)}
+        >
+          <Icon name={folded ? "chevronRight" : "chevronDown"} size={13} />
+        </button>
+      )}
+      {sideItem(
+        name,
+        "folder",
+        labelOf(name, parent),
+        count((b) => inGroup(b.group, name, shelf.groups)),
+      )}
+      <span className="side-actions">
+        {!parent && (
+          <button
+            className="icon"
+            title={t("shelf.newSubgroup")}
+            aria-label={t("shelf.newSubgroup")}
+            onClick={() => setGroupDialog({ old: null, parent: name })}
+          >
+            <Icon name="plus" size={14} />
+          </button>
+        )}
+        <button className="icon" title={t("shelf.renameGroup")} aria-label={t("shelf.renameGroup")} onClick={() => setGroupDialog({ old: name, parent })}>
+          <Icon name="edit" size={14} />
+        </button>
+        {children.length === 0 && (
+          <button className="icon" title={t("shelf.moveGroup")} aria-label={t("shelf.moveGroup")} onClick={() => setGroupMoving({ name, parent })}>
+            <Icon name="folder" size={14} />
+          </button>
+        )}
+        <button className="icon" title={t("shelf.deleteGroup")} aria-label={t("shelf.deleteGroup")} onClick={() => setGroupDeleting(name)}>
+          <Icon name="close" size={14} />
+        </button>
+      </span>
+    </div>
+  );
+
   /** Makes sure a book's file is here, fetching it if it can be. */
   const fileReady = async (b: Book) => {
     if (!b.missing) return true;
@@ -333,28 +385,19 @@ export default function ShelfView(props: {
           </button>
           <div className="side-heading">
             <span>{t("shelf.groups")}</span>
-            <button className="icon" title={t("shelf.newGroup")} aria-label={t("shelf.newGroup")} onClick={() => setGroupDialog({ old: null })}>
+            <button className="icon" title={t("shelf.newGroup")} aria-label={t("shelf.newGroup")} onClick={() => setGroupDialog({ old: null, parent: null })}>
               <Icon name="plus" size={14} />
             </button>
           </div>
-          {shelf.groups.map((g) => (
-            <div key={g} className="side-group">
-              {sideItem(
-                g,
-                "folder",
-                g,
-                count((b) => b.group === g),
-              )}
-              <span className="side-actions">
-                <button className="icon" title={t("shelf.renameGroup")} onClick={() => setGroupDialog({ old: g })}>
-                  <Icon name="edit" size={14} />
-                </button>
-                <button className="icon" title={t("shelf.deleteGroup")} onClick={() => setGroupDeleting(g)}>
-                  <Icon name="close" size={14} />
-                </button>
-              </span>
-            </div>
-          ))}
+          {groupTree(shelf.groups).map(({ name, children }) => {
+            const folded = settings.collapsedGroups.includes(name);
+            return (
+              <div key={name}>
+                {groupRow(name, null, children, folded)}
+                {!folded && children.map((child) => groupRow(child, name, [], false))}
+              </div>
+            );
+          })}
           {shelf.groups.length === 0 && <div className="muted small side-empty">{t("shelf.groupsHint")}</div>}
           <div className="side-footer">
             <button className="side-item" onClick={ai.openSettings} title={`${t("ai.settings")}: ${ai.ready ? t("ai.configured") : t("ai.notConfigured")}`}>
@@ -581,16 +624,39 @@ export default function ShelfView(props: {
       )}
       {groupDialog && (
         <GroupDialog
-          old={groupDialog.old}
+          old={groupDialog.old === null ? null : labelOf(groupDialog.old, groupDialog.parent)}
+          parent={groupDialog.parent}
           onClose={() => setGroupDialog(null)}
-          onSave={async (name) => {
+          onSave={async (label) => {
+            const name = childName(groupDialog.parent, label);
             try {
               if (groupDialog.old === null) await api.createGroup(name);
               else {
                 await api.renameGroup(groupDialog.old, name);
-                if (filter === groupDialog.old) setFilter(name.trim());
+                if (filter === groupDialog.old) setFilter(name);
               }
               setGroupDialog(null);
+              refresh();
+            } catch (e) {
+              fail(e);
+            }
+          }}
+        />
+      )}
+      {groupMoving && (
+        <GroupMoveDialog
+          name={groupMoving.name}
+          parent={groupMoving.parent}
+          targets={groupTree(shelf.groups)
+            .map((g) => g.name)
+            .filter((g) => g !== groupMoving.name)}
+          onClose={() => setGroupMoving(null)}
+          onMove={async (target) => {
+            const name = childName(target, labelOf(groupMoving.name, groupMoving.parent));
+            try {
+              await api.renameGroup(groupMoving.name, name);
+              if (filter === groupMoving.name) setFilter(name);
+              setGroupMoving(null);
               refresh();
             } catch (e) {
               fail(e);
@@ -603,7 +669,14 @@ export default function ShelfView(props: {
           title={t("shelf.deleteGroup")}
           danger
           confirmText={t("shelf.deleteGroup")}
-          message={<p>{t("shelf.deleteGroupConfirm", { name: groupDeleting })}</p>}
+          message={
+            <>
+              <p>{t("shelf.deleteGroupConfirm", { name: groupDeleting })}</p>
+              {groupTree(shelf.groups).some((g) => g.name === groupDeleting && g.children.length > 0) && (
+                <p className="muted small">{t("shelf.deleteGroupChildren")}</p>
+              )}
+            </>
+          }
           onConfirm={async () => {
             try {
               await api.deleteGroup(groupDeleting);
@@ -668,11 +741,42 @@ export default function ShelfView(props: {
   );
 }
 
-function GroupDialog(props: { old: string | null; onSave: (name: string) => void; onClose: () => void }) {
+function GroupMoveDialog(props: { name: string; parent: string | null; targets: string[]; onMove: (target: string | null) => void; onClose: () => void }) {
+  const [target, setTarget] = useState(props.parent ?? "");
+  return (
+    <Modal
+      title={t("shelf.moveGroup")}
+      onClose={props.onClose}
+      width={340}
+      footer={
+        <>
+          <button onClick={props.onClose}>{t("common.cancel")}</button>
+          <button className="primary" disabled={target === (props.parent ?? "")} onClick={() => props.onMove(target || null)}>
+            {t("common.ok")}
+          </button>
+        </>
+      }
+    >
+      <label className="field">
+        <span>{t("shelf.parentGroup")}</span>
+        <select value={target} autoFocus onChange={(e) => setTarget(e.target.value)}>
+          <option value="">{t("shelf.topLevel")}</option>
+          {props.targets.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
+      </label>
+    </Modal>
+  );
+}
+
+function GroupDialog(props: { old: string | null; parent: string | null; onSave: (label: string) => void; onClose: () => void }) {
   const [name, setName] = useState(props.old ?? "");
   return (
     <Modal
-      title={props.old === null ? t("shelf.newGroup") : t("shelf.renameGroup")}
+      title={props.old !== null ? t("shelf.renameGroup") : props.parent ? t("shelf.newSubgroupOf", { name: props.parent }) : t("shelf.newGroup")}
       onClose={props.onClose}
       width={340}
       footer={

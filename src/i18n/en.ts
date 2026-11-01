@@ -659,6 +659,14 @@ const en: Messages = {
   "opds.searchPrompt": "Search by title above",
   "opds.thin": "Added, but there isn't much text: it may be only a contents page, or simply a short work",
   "opds.noDownload": "No file to download; it may only be available on loan",
+  "shelf.newSubgroup": "New subgroup",
+  "shelf.newSubgroupOf": "New subgroup in “{name}”",
+  "shelf.moveGroup": "Move to…",
+  "shelf.parentGroup": "Parent group",
+  "shelf.topLevel": "None (top level)",
+  "shelf.expand": "Expand",
+  "shelf.collapse": "Collapse",
+  "shelf.deleteGroupChildren": "Its subgroups move up a level and become groups of their own.",
 };
 
 export default en;

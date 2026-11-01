@@ -653,6 +653,14 @@ const ko: Messages = {
   "opds.searchPrompt": "위에서 제목으로 검색하세요",
   "opds.thin": "추가했지만 내용이 적습니다. 목차만 있거나 짧은 작품일 수 있습니다",
   "opds.noDownload": "내려받을 파일이 없습니다. 대출만 가능할 수 있습니다",
+  "shelf.newSubgroup": "하위 그룹 만들기",
+  "shelf.newSubgroupOf": "'{name}'에 하위 그룹 만들기",
+  "shelf.moveGroup": "이동…",
+  "shelf.parentGroup": "상위 그룹",
+  "shelf.topLevel": "없음 (최상위)",
+  "shelf.expand": "펼치기",
+  "shelf.collapse": "접기",
+  "shelf.deleteGroupChildren": "하위 그룹은 한 단계 올라가 독립된 그룹이 됩니다.",
 };
 
 export default ko;

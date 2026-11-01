@@ -646,6 +646,14 @@ const zhTW: Messages = {
   "opds.searchPrompt": "在右上角輸入標題搜尋",
   "opds.thin": "已加入書架，但內容不多：可能只匯出了目錄，也可能本來就短",
   "opds.noDownload": "沒有可下載的檔案，可能只能借閱",
+  "shelf.newSubgroup": "新增子分組",
+  "shelf.newSubgroupOf": "在「{name}」下新增子分組",
+  "shelf.moveGroup": "移動到…",
+  "shelf.parentGroup": "上層分組",
+  "shelf.topLevel": "無（頂層）",
+  "shelf.expand": "展開",
+  "shelf.collapse": "收合",
+  "shelf.deleteGroupChildren": "子分組會上移一層，變成獨立分組。",
 };
 
 export default zhTW;

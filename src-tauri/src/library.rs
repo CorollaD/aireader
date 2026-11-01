@@ -90,6 +90,38 @@ struct LibraryData {
     ai: crate::ai::config::AiConfig,
 }
 
+const GROUP_SEPARATOR: char = '-';
+
+/// The group `name` sits under: the longest top-level group it continues. Keeps to two levels,
+/// and a name like `Sci-Fi` stays a plain group unless there is a group called `Sci`. The same
+/// rule is in `src/shelf/groups.ts`.
+pub fn group_parent<'a>(name: &str, groups: &'a [String]) -> Option<&'a str> {
+    groups
+        .iter()
+        .filter(|g| {
+            g.as_str() != name
+                && name
+                    .strip_prefix(g.as_str())
+                    .is_some_and(|rest| rest.starts_with(GROUP_SEPARATOR))
+                && group_parent(g, groups).is_none()
+        })
+        .max_by_key(|g| g.len())
+        .map(String::as_str)
+}
+
+fn subgroups(name: &str, groups: &[String]) -> Vec<String> {
+    groups
+        .iter()
+        .filter(|g| group_parent(g, groups) == Some(name))
+        .cloned()
+        .collect()
+}
+
+/// What a subgroup is called under its parent.
+fn group_label<'a>(name: &'a str, parent: &str) -> &'a str {
+    &name[parent.len() + GROUP_SEPARATOR.len_utf8()..]
+}
+
 /// Editable book fields; `None` leaves a field unchanged.
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -785,6 +817,20 @@ impl Library {
         Ok(())
     }
 
+    /// Changes a group's name in the list and on its books.
+    fn relabel_group(&mut self, old: &str, new: &str, at: u64) {
+        if let Some(g) = self.data.groups.iter_mut().find(|g| *g == old) {
+            *g = new.to_owned();
+        }
+        for b in &mut self.data.books {
+            if b.group.as_deref() == Some(old) {
+                b.group = Some(new.to_owned());
+                b.meta_updated = at;
+            }
+        }
+    }
+
+    /// Renames a group, or moves it by naming it under another. Its subgroups follow.
     pub fn rename_group(&mut self, old: &str, new: &str) -> Result<()> {
         let new = new.trim();
         if new.is_empty() {
@@ -796,33 +842,63 @@ impl Library {
         if self.data.groups.iter().any(|g| g == new) {
             bail!(crate::t!("group_exists", name = new));
         }
-        let g = self
-            .data
-            .groups
-            .iter_mut()
-            .find(|g| *g == old)
-            .with_context(|| crate::t!("group_not_found"))?;
-        *g = new.to_owned();
-        let at = now();
-        self.data.groups_updated = at;
-        for b in &mut self.data.books {
-            if b.group.as_deref() == Some(old) {
-                b.group = Some(new.to_owned());
-                b.meta_updated = at;
-            }
+        if !self.data.groups.iter().any(|g| g == old) {
+            bail!(crate::t!("group_not_found"));
         }
+        let children = subgroups(old, &self.data.groups);
+        let mut with_new = self.data.groups.clone();
+        with_new.push(new.to_owned());
+        if !children.is_empty() && group_parent(new, &with_new).is_some() {
+            bail!(crate::t!("group_too_deep"));
+        }
+        let moves: Vec<(String, String)> = children
+            .iter()
+            .map(|child| {
+                (
+                    child.clone(),
+                    format!("{new}{GROUP_SEPARATOR}{}", group_label(child, old)),
+                )
+            })
+            .collect();
+        if let Some((_, taken)) = moves.iter().find(|(_, to)| self.data.groups.contains(to)) {
+            bail!(crate::t!("group_exists", name = taken));
+        }
+        let at = now();
+        self.relabel_group(old, new, at);
+        for (from, to) in &moves {
+            self.relabel_group(from, to, at);
+        }
+        self.data.groups_updated = at;
         Ok(())
     }
 
-    /// Deletes a group; its books stay on the shelf.
+    /// Deletes a group; no book leaves the shelf. Its subgroups move up a level, keeping only
+    /// their own part of the name, and its books go to its parent, or out of any group.
     pub fn delete_group(&mut self, name: &str) {
-        self.data.groups.retain(|g| g != name);
+        let parent = group_parent(name, &self.data.groups).map(str::to_owned);
+        let children = subgroups(name, &self.data.groups);
         let at = now();
+        self.data.groups.retain(|g| g != name);
         self.data.groups_updated = at;
         for b in &mut self.data.books {
             if b.group.as_deref() == Some(name) {
-                b.group = None;
+                b.group = parent.clone();
                 b.meta_updated = at;
+            }
+        }
+        for child in children {
+            let label = group_label(&child, name).to_owned();
+            if self.data.groups.contains(&label) {
+                // A group of that name is there already: its books join it.
+                self.data.groups.retain(|g| *g != child);
+                for b in &mut self.data.books {
+                    if b.group.as_deref() == Some(child.as_str()) {
+                        b.group = Some(label.clone());
+                        b.meta_updated = at;
+                    }
+                }
+            } else {
+                self.relabel_group(&child, &label, at);
             }
         }
     }
@@ -1074,6 +1150,112 @@ mod tests {
         lib.remove(std::slice::from_ref(&id));
         assert!(lib.get(&id).is_none());
         assert!(!root.join("books").join(&id).exists());
+    }
+
+    fn group_library(name: &str) -> Library {
+        let dir =
+            std::env::temp_dir().join(format!("aireader-groups-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        Library::open(&dir).unwrap()
+    }
+
+    fn add_group_book(lib: &mut Library, id: &str, group: &str) {
+        let mut book: Book = serde_json::from_value(serde_json::json!({
+            "id": id, "title": id, "author": null, "format": "TXT", "fileName": "a.txt", "size": 1,
+            "sha256": id, "hasCover": false, "added": 0, "lastRead": null, "progress": 0.0, "position": null,
+        }))
+        .unwrap();
+        book.group = Some(group.to_owned());
+        lib.data.books.push(book);
+    }
+
+    fn strings(names: &[&str]) -> Vec<String> {
+        names.iter().map(|n| n.to_string()).collect()
+    }
+
+    #[test]
+    fn subgroups_need_their_parent_to_exist() {
+        let groups = strings(&["技术", "技术-机器学习", "Sci-Fi"]);
+        assert_eq!(group_parent("技术-机器学习", &groups), Some("技术"));
+        assert_eq!(group_parent("Sci-Fi", &groups), None);
+        let deep = strings(&["A", "A-B", "A-B-C"]);
+        assert_eq!(
+            group_parent("A-B-C", &deep),
+            Some("A"),
+            "two levels at most"
+        );
+    }
+
+    #[test]
+    fn renaming_a_group_takes_its_subgroups_along() {
+        let mut lib = group_library("rename");
+        for g in ["技术", "技术-机器学习", "技术-数据库", "历史"] {
+            lib.create_group(g).unwrap();
+        }
+        add_group_book(&mut lib, "b1", "技术-机器学习");
+        add_group_book(&mut lib, "b2", "技术");
+        lib.rename_group("技术", "计算机").unwrap();
+        assert_eq!(
+            lib.groups(),
+            ["计算机", "计算机-机器学习", "计算机-数据库", "历史"]
+        );
+        assert_eq!(
+            lib.get("b1").unwrap().group.as_deref(),
+            Some("计算机-机器学习")
+        );
+        assert_eq!(lib.get("b2").unwrap().group.as_deref(), Some("计算机"));
+    }
+
+    #[test]
+    fn a_rename_may_not_make_three_levels_or_a_collision() {
+        let mut lib = group_library("deep");
+        for g in ["A", "A-1", "B"] {
+            lib.create_group(g).unwrap();
+        }
+        assert!(lib.rename_group("A", "B-A").is_err(), "A has a subgroup");
+        assert_eq!(lib.groups(), ["A", "A-1", "B"], "nothing changed");
+        lib.create_group("C").unwrap();
+        lib.create_group("C-1").unwrap();
+        assert!(lib.rename_group("A", "C").is_err());
+        lib.rename_group("B", "A-B").unwrap();
+        assert_eq!(
+            group_parent("A-B", lib.groups()),
+            Some("A"),
+            "moving a plain group is fine"
+        );
+    }
+
+    #[test]
+    fn deleting_a_top_group_moves_subgroups_up_and_ungroups_its_books() {
+        let mut lib = group_library("delete");
+        for g in ["技术", "技术-机器学习", "技术-历史", "历史"] {
+            lib.create_group(g).unwrap();
+        }
+        add_group_book(&mut lib, "own", "技术");
+        add_group_book(&mut lib, "sub", "技术-机器学习");
+        add_group_book(&mut lib, "same", "技术-历史");
+        lib.delete_group("技术");
+        assert_eq!(
+            lib.groups(),
+            ["机器学习", "历史"],
+            "an existing name takes the subgroup in"
+        );
+        assert_eq!(lib.get("own").unwrap().group, None);
+        assert_eq!(lib.get("sub").unwrap().group.as_deref(), Some("机器学习"));
+        assert_eq!(lib.get("same").unwrap().group.as_deref(), Some("历史"));
+    }
+
+    #[test]
+    fn deleting_a_subgroup_moves_its_books_to_the_parent() {
+        let mut lib = group_library("delete-sub");
+        for g in ["技术", "技术-机器学习"] {
+            lib.create_group(g).unwrap();
+        }
+        add_group_book(&mut lib, "b", "技术-机器学习");
+        lib.delete_group("技术-机器学习");
+        assert_eq!(lib.groups(), ["技术"]);
+        assert_eq!(lib.get("b").unwrap().group.as_deref(), Some("技术"));
     }
 
     #[test]

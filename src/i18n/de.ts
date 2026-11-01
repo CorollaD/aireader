@@ -662,6 +662,14 @@ const de: Messages = {
   "opds.searchPrompt": "Oben nach Titel suchen",
   "opds.thin": "Hinzugefügt, aber mit wenig Text: vielleicht nur das Inhaltsverzeichnis oder ein kurzes Werk",
   "opds.noDownload": "Keine Datei zum Herunterladen; vielleicht nur ausleihbar",
+  "shelf.newSubgroup": "Neue Untergruppe",
+  "shelf.newSubgroupOf": "Neue Untergruppe in „{name}“",
+  "shelf.moveGroup": "Verschieben nach…",
+  "shelf.parentGroup": "Übergeordnete Gruppe",
+  "shelf.topLevel": "Keine (oberste Ebene)",
+  "shelf.expand": "Aufklappen",
+  "shelf.collapse": "Einklappen",
+  "shelf.deleteGroupChildren": "Die Untergruppen rücken eine Ebene auf und werden eigene Gruppen.",
 };
 
 export default de;

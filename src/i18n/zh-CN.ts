@@ -646,6 +646,14 @@ const zhCN = {
   "opds.searchPrompt": "在右上角输入标题搜索",
   "opds.thin": "已加入书架，但内容不多：可能只导出了目录，也可能本来就短",
   "opds.noDownload": "没有可下载的文件，可能只能借阅",
+  "shelf.newSubgroup": "新建子分组",
+  "shelf.newSubgroupOf": "在「{name}」下新建子分组",
+  "shelf.moveGroup": "移动到…",
+  "shelf.parentGroup": "上级分组",
+  "shelf.topLevel": "无（顶层）",
+  "shelf.expand": "展开",
+  "shelf.collapse": "收起",
+  "shelf.deleteGroupChildren": "子分组会上移一层，变成独立分组。",
 };
 
 export default zhCN;

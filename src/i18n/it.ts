@@ -658,6 +658,14 @@ const it: Messages = {
   "opds.searchPrompt": "Cerca per titolo qui sopra",
   "opds.thin": "Aggiunto, ma c'è poco testo: forse solo l'indice, o un'opera breve",
   "opds.noDownload": "Nessun file da scaricare; forse è solo in prestito",
+  "shelf.newSubgroup": "Nuovo sottogruppo",
+  "shelf.newSubgroupOf": "Nuovo sottogruppo in «{name}»",
+  "shelf.moveGroup": "Sposta in…",
+  "shelf.parentGroup": "Gruppo superiore",
+  "shelf.topLevel": "Nessuno (livello superiore)",
+  "shelf.expand": "Espandi",
+  "shelf.collapse": "Comprimi",
+  "shelf.deleteGroupChildren": "I suoi sottogruppi salgono di un livello e diventano gruppi a sé.",
 };
 
 export default it;

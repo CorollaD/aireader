@@ -257,6 +257,24 @@ input[type="color"] {
 .side-group:hover .side-actions {
   display: flex;
 }
+.side-group.child .side-item {
+  padding-left: 30px;
+}
+/* The arrow takes the place of a parent group's folder icon. */
+.side-group.parent .side-item .icon-svg {
+  visibility: hidden;
+}
+.side-group .side-fold {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  z-index: 1;
+  width: 20px;
+  height: 22px;
+  min-width: 0;
+  padding: 0;
+  transform: translateY(-50%);
+}
 .side-group:hover .count {
   visibility: hidden;
 }

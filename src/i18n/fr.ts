@@ -667,6 +667,14 @@ const fr: Messages = {
   "opds.searchPrompt": "Cherchez par titre ci-dessus",
   "opds.thin": "Ajouté, mais il y a peu de texte : peut-être la table des matières seule, ou une œuvre courte",
   "opds.noDownload": "Aucun fichier à télécharger ; peut-être disponible en prêt seulement",
+  "shelf.newSubgroup": "Nouveau sous-groupe",
+  "shelf.newSubgroupOf": "Nouveau sous-groupe dans « {name} »",
+  "shelf.moveGroup": "Déplacer vers…",
+  "shelf.parentGroup": "Groupe parent",
+  "shelf.topLevel": "Aucun (niveau supérieur)",
+  "shelf.expand": "Développer",
+  "shelf.collapse": "Réduire",
+  "shelf.deleteGroupChildren": "Ses sous-groupes remontent d'un niveau et deviennent des groupes à part entière.",
 };
 
 export default fr;

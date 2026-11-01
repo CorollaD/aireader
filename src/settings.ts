@@ -41,6 +41,8 @@ export interface Settings {
   /** Interface zoom (one of UI_SCALES). */
   uiScale: number;
   shelfSidebar: boolean;
+  /** Groups with their subgroups folded away. */
+  collapsedGroups: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -68,6 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
   uiLanguage: "auto",
   uiScale: 1,
   shelfSidebar: true,
+  collapsedGroups: [],
 };
 
 export const UI_SCALES: { value: number; label: MessageKey }[] = [
