@@ -1,7 +1,8 @@
 //! PDF via PDFium, loaded at runtime from a dynamic library.
 
+use std::mem::ManuallyDrop;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use anyhow::{Result, anyhow};
 use pdfium_render::prelude::*;
@@ -9,6 +10,16 @@ use pdfium_render::prelude::*;
 use crate::model::{Content, Document, Location, PageImage, PageSource, TextRun, TocEntry};
 
 static PDFIUM: OnceLock<Result<Pdfium, String>> = OnceLock::new();
+
+/// PDFium isn't thread-safe, so one whole operation (opening, rendering, reading text, closing)
+/// runs at a time, across all documents. pdfium-render's `thread_safe` lock covers single calls
+/// only; operations of several calls that interleave break each other: a book opened while
+/// another thread renders pages failed with "Unknown" or "FormatError".
+static OPERATION: Mutex<()> = Mutex::new(());
+
+fn exclusive() -> MutexGuard<'static, ()> {
+    OPERATION.lock().unwrap_or_else(|e| e.into_inner())
+}
 static RESOURCE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 /// Registers the app's bundled resource directory, where installers place `lib/<pdfium>`.
@@ -73,8 +84,40 @@ pub fn pdfium() -> Result<&'static Pdfium> {
 }
 
 pub struct PdfSource {
-    doc: PdfDocument<'static>,
+    /// Closed in `drop`, under the lock.
+    doc: ManuallyDrop<PdfDocument<'static>>,
     aspects: Vec<f32>,
+}
+
+impl Drop for PdfSource {
+    fn drop(&mut self) {
+        let _pdfium = exclusive();
+        // SAFETY: dropped once, here, and never used again.
+        unsafe { ManuallyDrop::drop(&mut self.doc) };
+    }
+}
+
+impl PdfSource {
+    fn text_of(&self, index: usize) -> Option<String> {
+        let page = self.doc.pages().get(index as PdfPageIndex).ok()?;
+        let text = page.text().ok()?.all();
+        (!text.trim().is_empty()).then_some(text)
+    }
+
+    fn dpi_of(&self, index: usize) -> Option<f32> {
+        let page = self.doc.pages().get(index as PdfPageIndex).ok()?;
+        // The largest picture on the page is the scan, if this is a scanned book.
+        page.objects()
+            .iter()
+            .filter_map(|object| {
+                let image = object.as_image_object()?;
+                let inches = object.bounds().ok()?.width().value / 72.0;
+                let pixels = image.width().ok()? as f32;
+                (inches > 1.0 && pixels > 0.0).then_some((inches, pixels / inches))
+            })
+            .max_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, dpi)| dpi)
+    }
 }
 
 impl PageSource for PdfSource {
@@ -87,12 +130,12 @@ impl PageSource for PdfSource {
     }
 
     fn page_text(&self, index: usize) -> Option<String> {
-        let page = self.doc.pages().get(index as PdfPageIndex).ok()?;
-        let text = page.text().ok()?.all();
-        (!text.trim().is_empty()).then_some(text)
+        let _pdfium = exclusive();
+        self.text_of(index)
     }
 
     fn text_runs(&self, index: usize) -> Vec<TextRun> {
+        let _pdfium = exclusive();
         let Ok(page) = self.doc.pages().get(index as PdfPageIndex) else {
             return Vec::new();
         };
@@ -133,25 +176,17 @@ impl PageSource for PdfSource {
     }
 
     fn image_dpi(&self, index: usize) -> Option<f32> {
-        let page = self.doc.pages().get(index as PdfPageIndex).ok()?;
-        // The largest picture on the page is the scan, if this is a scanned book.
-        page.objects()
-            .iter()
-            .filter_map(|object| {
-                let image = object.as_image_object()?;
-                let inches = object.bounds().ok()?.width().value / 72.0;
-                let pixels = image.width().ok()? as f32;
-                (inches > 1.0 && pixels > 0.0).then_some((inches, pixels / inches))
-            })
-            .max_by(|a, b| a.0.total_cmp(&b.0))
-            .map(|(_, dpi)| dpi)
+        let _pdfium = exclusive();
+        self.dpi_of(index)
     }
 
     fn photographic(&self, index: usize) -> bool {
-        self.page_text(index).is_none() && self.image_dpi(index).is_some()
+        let _pdfium = exclusive();
+        self.text_of(index).is_none() && self.dpi_of(index).is_some()
     }
 
     fn render(&self, index: usize, width: u32) -> Result<PageImage> {
+        let _pdfium = exclusive();
         let page = self.doc.pages().get(index as PdfPageIndex)?;
         let config = PdfRenderConfig::new()
             .set_target_width(width as Pixels)
@@ -166,14 +201,14 @@ impl PageSource for PdfSource {
 }
 
 pub fn load(path: &Path) -> Result<Document> {
-    let doc = pdfium()?
-        .load_pdf_from_file(path, None)
-        .map_err(|e| match e {
-            PdfiumError::PdfiumLibraryInternalError(PdfiumInternalError::PasswordError) => {
-                anyhow!(crate::t!("pdf_encrypted"))
-            }
-            e => anyhow!(crate::t!("pdf_open_failed", error = e)),
-        })?;
+    let pdfium = pdfium()?;
+    let _pdfium = exclusive();
+    let doc = pdfium.load_pdf_from_file(path, None).map_err(|e| match e {
+        PdfiumError::PdfiumLibraryInternalError(PdfiumInternalError::PasswordError) => {
+            anyhow!(crate::t!("pdf_encrypted"))
+        }
+        e => anyhow!(crate::t!("pdf_open_failed", error = e)),
+    })?;
     let aspects = doc
         .pages()
         .page_sizes()?
@@ -201,7 +236,10 @@ pub fn load(path: &Path) -> Result<Document> {
         collect_bookmarks(Some(root), 0, &mut toc, &mut budget);
     }
 
-    let source = PdfSource { doc, aspects };
+    let source = PdfSource {
+        doc: ManuallyDrop::new(doc),
+        aspects,
+    };
     Ok(Document {
         path: path.to_owned(),
         title,

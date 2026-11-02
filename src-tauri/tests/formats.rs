@@ -340,3 +340,98 @@ fn pdf_render_and_outline() {
     );
     assert!(r.w > 0.3 && r.w < 0.6, "{r:?}");
 }
+
+/// A PDF of `pages` pages, each with a few lines of text and some shapes to draw.
+fn many_page_pdf(pages: usize) -> Vec<u8> {
+    let mut objects = vec![
+        "<< /Type /Catalog /Pages 2 0 R >>".to_owned(),
+        String::new(), // the page tree, filled in below
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_owned(),
+    ];
+    let mut kids = Vec::new();
+    for p in 0..pages {
+        let mut content = String::from("BT /F1 18 Tf 40 760 Td 24 TL\n");
+        for line in 0..20 {
+            content.push_str(&format!(
+                "(Page {p} line {line} of the stress test) Tj T*\n"
+            ));
+        }
+        content.push_str("ET\n");
+        for i in 0..40 {
+            content.push_str(&format!("{} {} 30 30 re S\n", 20 + i * 13, 40 + i * 9));
+        }
+        let page = objects.len() + 1;
+        objects.push(format!(
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents {} 0 R /Resources << /Font << /F1 3 0 R >> >> >>",
+            page + 1
+        ));
+        objects.push(format!(
+            "<< /Length {} >>\nstream\n{content}endstream",
+            content.len()
+        ));
+        kids.push(format!("{page} 0 R"));
+    }
+    objects[1] = format!(
+        "<< /Type /Pages /Kids [{}] /Count {pages} >>",
+        kids.join(" ")
+    );
+    let mut out = b"%PDF-1.4\n".to_vec();
+    let mut offsets = Vec::new();
+    for (i, body) in objects.iter().enumerate() {
+        offsets.push(out.len());
+        out.extend_from_slice(format!("{} 0 obj\n{body}\nendobj\n", i + 1).as_bytes());
+    }
+    let xref = out.len();
+    out.extend_from_slice(
+        format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1).as_bytes(),
+    );
+    for o in offsets {
+        out.extend_from_slice(format!("{o:010} 00000 n \n").as_bytes());
+    }
+    out.extend_from_slice(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n",
+            objects.len() + 1
+        )
+        .as_bytes(),
+    );
+    out
+}
+
+/// Text recognition renders pages on several threads while the reader renders others and books
+/// are opened again: PDFium must not see two of those at once.
+#[test]
+fn pdf_opens_while_other_threads_render() {
+    if let Err(e) = formats::pdf::pdfium() {
+        eprintln!("skipping: {e}");
+        return;
+    }
+    let dir = temp_dir("pdf-threads");
+    let path = dir.join("stress.pdf");
+    std::fs::write(&path, many_page_pdf(40)).unwrap();
+    let doc = formats::open(&path).unwrap();
+    let Content::Paged(src) = doc.content else {
+        panic!("a PDF is paged");
+    };
+    let mut threads = Vec::new();
+    for t in 0..3 {
+        let src = src.clone();
+        threads.push(std::thread::spawn(move || {
+            for p in 0..12 {
+                src.render(t * 12 + p, 1200).expect("render");
+                src.page_text(t * 12 + p);
+            }
+        }));
+    }
+    for _ in 0..4 {
+        let path = path.clone();
+        threads.push(std::thread::spawn(move || {
+            for _ in 0..5 {
+                formats::open(&path).expect("open while others render");
+            }
+        }));
+    }
+    for t in threads {
+        t.join().expect("no thread failed");
+    }
+}
