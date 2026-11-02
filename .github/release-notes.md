@@ -1,13 +1,11 @@
-## What's new in 0.7.2 / 更新内容
+## What's new in 0.7.3 / 更新内容
 
-- **Online voices for reading aloud** / 在线朗读语音：besides the system voices (still the default), read aloud with an OpenAI-compatible service (OpenAI, SiliconFlow, or Kokoro running on your computer), Azure Speech, Volcengine (Doubao) or ElevenLabs. Set it up in Settings → Reading and press Listen to try it; keys stay in the system keychain. / 除了系统语音（仍是默认），还可以用 OpenAI 兼容服务（OpenAI、硅基流动或本机运行的 Kokoro）、Azure 语音、火山引擎（豆包语音）或 ElevenLabs 朗读。在「设置 → 阅读」里配置，点「试听」检查；密钥保存在系统钥匙串。
-- **Creating an account** / 注册账号：the AiReader server sync form now switches between signing in and creating an account. Accounts are only needed for syncing through an AiReader server. / 同步设置里的 AiReader 服务器可以在「登录」和「创建账号」之间切换。只有通过 AiReader 服务器同步时才需要账号。
-- **AI organize fix** / AI 整理修复：large shelves no longer fail with "invalid JSON: EOF while parsing a list"; replies that stop part way are kept and the rest is asked again. / 书很多时不再报「invalid JSON: EOF while parsing a list」；回复中途断掉时保留已有结果，其余的再问一次。
-- **Version number** / 版本号：shown at the bottom of Settings → General. / 显示在「设置 → 通用」底部。
+- **Text recognition fix** / 文字识别修复：recognising a scanned PDF could fail at once with "PdfiumLibraryInternalError(Unknown)" while the book was open. It now works alongside reading. / 打开扫描版 PDF 后开始文字识别，可能立刻报「PdfiumLibraryInternalError(Unknown)」而失败，现已修复，可以边看边识别。
+- **Under the hood** / 底层更新：React 19, Vite 8 and Node.js 26, with the other libraries brought up to date. / 升级到 React 19、Vite 8 和 Node.js 26，其他依赖也更新到最新。
 
 **Phones (preview)** / 手机版（预览）：an Android APK and an iOS Simulator build are attached for testing; they haven't been tried on real phones yet. The APK is signed with a key made for this build, so uninstall an earlier test version before installing it. / 附带 Android APK 和 iOS 模拟器版供测试，尚未在真机上试过。APK 用本次构建生成的密钥签名，安装前请先卸载之前的测试版。
 
-**Known limits** / 已知限制：the online voices have been tested with sample audio only, not yet against each service. / 在线语音只用示例音频测过，还没有逐一连接各服务实测。
+**Known limits** / 已知限制：online reading voices have been tested with sample audio only, not yet against each service. / 在线朗读语音只用示例音频测过，还没有逐一连接各服务实测。
 
 ## Downloads / 下载
 
