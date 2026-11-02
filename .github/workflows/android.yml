@@ -1,13 +1,15 @@
-# Builds an Android APK for testing, by hand from the Actions page or for a version tag. It is
-# signed with a throwaway debug key, so it installs on any phone (allow installs from unknown
-# sources) but can't update a store build; release signing needs a keystore in the secrets.
+# Builds the Android APK: by hand from the Actions page, or as part of a release.
+#
+# Signing: with the secrets ANDROID_KEYSTORE (the .jks file, base64), ANDROID_KEYSTORE_PASSWORD
+# and ANDROID_KEY_ALIAS the APK is signed with that key, so each version updates the last.
+# Without them it is signed with a key made for this build only: it installs (allow apps from
+# unknown sources) but can't update a copy signed with another key.
 
 name: Android
 
 on:
   workflow_dispatch:
-  push:
-    tags: ["v*"]
+  workflow_call:
 
 permissions:
   contents: read
@@ -60,10 +62,38 @@ jobs:
           done
 
       - name: Build APK
-        run: npm run tauri android build -- --debug --apk --target aarch64 --target armv7 --target x86_64
+        run: npm run tauri android build -- --apk --target aarch64 --target armv7 --target x86_64
+
+      - name: Sign
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          unsigned="$(find src-tauri/gen/android/app/build/outputs/apk -name '*-unsigned.apk' | head -n 1)"
+          [ -n "$unsigned" ] || { echo "no unsigned APK was built" >&2; exit 1; }
+          ks="$RUNNER_TEMP/release.jks"
+          if [ -n "$KEYSTORE" ]; then
+            echo "$KEYSTORE" | base64 --decode > "$ks"
+            pass="$KEYSTORE_PASSWORD"; alias="$KEY_ALIAS"
+          else
+            echo "::warning::No signing key in the secrets: this APK can't update one signed with another key."
+            pass="$(openssl rand -hex 16)"; alias=aireader
+            keytool -genkeypair -keystore "$ks" -storepass "$pass" -keypass "$pass" -alias "$alias" \
+              -keyalg RSA -keysize 3072 -validity 10000 -dname "CN=AiReader test build"
+          fi
+          tools="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)"
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          out="$RUNNER_TEMP/AiReader_${version}_android.apk"
+          "$tools/zipalign" -f -p 4 "$unsigned" "$RUNNER_TEMP/aligned.apk"
+          "$tools/apksigner" sign --ks "$ks" --ks-pass "pass:$pass" --ks-key-alias "$alias" --key-pass "pass:$pass" \
+            --out "$out" "$RUNNER_TEMP/aligned.apk"
+          "$tools/apksigner" verify "$out"
+          rm -f "$ks"
+          ls -la "$out"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AiReader-android
-          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          name: android
+          path: ${{ runner.temp }}/AiReader_*_android.apk
           if-no-files-found: error

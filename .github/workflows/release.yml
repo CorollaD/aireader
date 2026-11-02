@@ -151,9 +151,46 @@ jobs:
               -H "Content-Type: application/octet-stream" --input "$f" --jq .name
           done
 
+  android:
+    needs: create-release
+    uses: ./.github/workflows/android.yml
+    secrets: inherit
+
+  ios:
+    needs: create-release
+    uses: ./.github/workflows/ios.yml
+
+  # The phone builds join the draft release next to the desktop installers.
+  mobile:
+    name: Add the phone builds
+    needs: [create-release, android, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "{android,ios}"
+          path: mobile
+          merge-multiple: true
+
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ID: ${{ needs.create-release.outputs.id }}
+        run: |
+          shopt -s nullglob
+          files=(mobile/*.apk mobile/*.zip)
+          [ ${#files[@]} -eq 2 ] || { echo "expected an APK and a Simulator app, got: ${files[*]}" >&2; exit 1; }
+          for f in "${files[@]}"; do
+            name=$(basename "$f")
+            old=$(gh api "repos/$GITHUB_REPOSITORY/releases/$ID/assets" --jq ".[] | select(.name == \"$name\") | .id")
+            [ -z "$old" ] || gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$old"
+            gh api -X POST "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$ID/assets?name=$name" \
+              -H "Content-Type: application/octet-stream" --input "$f" --jq .name
+          done
+
   publish:
     name: Publish the release
-    needs: [create-release, build]
+    needs: [create-release, build, mobile]
     runs-on: ubuntu-latest
     steps:
       - name: Make the draft public
@@ -164,7 +201,7 @@ jobs:
           # Every platform must have uploaded its installers before anything goes public.
           names=$(gh api "repos/$GITHUB_REPOSITORY/releases/$ID" --jq '.assets[].name')
           echo "$names"
-          for pattern in '_aarch64\.dmg$' '_x64\.dmg$' '\.AppImage$' '\.deb$' '\.rpm$' '-setup\.exe$' '\.msi$'; do
+          for pattern in '_aarch64\.dmg$' '_x64\.dmg$' '\.AppImage$' '\.deb$' '\.rpm$' '-setup\.exe$' '\.msi$' '_android\.apk$' '_ios-simulator\.zip$'; do
             if ! grep -qE "$pattern" <<< "$names"; then
               echo "Missing an installer matching $pattern" >&2
               exit 1

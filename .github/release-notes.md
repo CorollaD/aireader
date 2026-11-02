@@ -5,7 +5,7 @@
 - **Your own sync server** / 自建同步服务器：sync through an AiReader server with an account, alongside WebDAV and folders. The server is in the `server` folder of the project, with Docker and HTTPS setup; the app keeps only a sign-in token in the system keychain. / 除了 WebDAV 和文件夹，还可以登录自建的 AiReader 服务器同步。服务端在项目的 `server` 目录，附 Docker 和 HTTPS 部署说明；App 只在系统钥匙串里保存登录令牌。
 - **Sync fix** / 同步修复：two devices set up at the same moment could get the same id and skip each other's data. / 两台在同一时刻配置的设备可能得到相同的编号，互相跳过对方的数据。
 
-**Phones** / 手机版：Android and iOS builds are in progress and not part of this release yet. / Android 和 iOS 版还在开发中，不在本次发布中。
+**Phones (preview)** / 手机版（预览）：an Android APK and an iOS Simulator build are attached for testing; they haven't been tried on real phones yet. / 附带 Android APK 和 iOS 模拟器版供测试，尚未在真机上试过。
 
 **Known limits** / 已知限制：the sync server has been tested on macOS and in Docker, not yet on a public server. / 同步服务器在 macOS 和 Docker 里测试过，还没有在公网服务器上实际运行。
 
@@ -17,6 +17,8 @@
 | macOS, Intel | `AiReader_*_x64.dmg` |
 | Windows 10/11 | `AiReader_*_x64-setup.exe` or `AiReader_*_x64_en-US.msi` |
 | Linux | `.AppImage`, `.deb` (Debian/Ubuntu) or `.rpm` (Fedora) |
+| Android 8+ (preview / 预览) | `AiReader_*_android.apk` |
+| iOS Simulator (preview / 预览) | `AiReader_*_ios-simulator.zip` — unzip, then `xcrun simctl install booted AiReader.app` |
 
 ## First launch / 首次打开
 

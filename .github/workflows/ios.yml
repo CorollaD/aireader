@@ -1,5 +1,5 @@
 # Builds the iOS app for the Simulator (Apple silicon and Intel Macs), by hand from the Actions
-# page or for a version tag. It isn't code-signed, so it runs only in the Simulator: installing
+# page or as part of a release. It isn't code-signed, so it runs only in the Simulator: installing
 # on an iPhone needs an Apple developer account and signing secrets.
 #
 # To try it: unzip the artifact, start a Simulator (Xcode → Open Developer Tool → Simulator),
@@ -9,8 +9,7 @@ name: iOS
 
 on:
   workflow_dispatch:
-  push:
-    tags: ["v*"]
+  workflow_call:
 
 permissions:
   contents: read
@@ -60,10 +59,11 @@ jobs:
           [ -n "$app" ] || { echo "no .app was built" >&2; find src-tauri/gen/apple/build -maxdepth 4; exit 1; }
           echo "built $app"
           lipo -info "$app/$(defaults read "$PWD/$app/Info" CFBundleExecutable)" || true
-          ditto -c -k --keepParent "$app" "$RUNNER_TEMP/AiReader-ios-simulator.zip"
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          ditto -c -k --keepParent "$app" "$RUNNER_TEMP/AiReader_${version}_ios-simulator.zip"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AiReader-ios-simulator
-          path: ${{ runner.temp }}/AiReader-ios-simulator.zip
+          name: ios
+          path: ${{ runner.temp }}/AiReader_*_ios-simulator.zip
           if-no-files-found: error
