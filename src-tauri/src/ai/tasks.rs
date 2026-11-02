@@ -1121,8 +1121,19 @@ fn suggestion_schema() -> serde_json::Value {
     })
 }
 
-/// Parses the model's reply (tolerating text around the JSON) and keeps only valid suggestions.
-pub fn parse_suggestions(reply: &str, books: &[BookBrief]) -> Result<Vec<Suggestion>> {
+/// What one reply suggested.
+#[derive(Debug)]
+pub struct Parsed {
+    /// Suggestions that change something.
+    pub suggestions: Vec<Suggestion>,
+    /// Every listed book the reply answered for, including those it leaves as they are.
+    pub answered: std::collections::HashSet<String>,
+    /// False when the reply was cut off and only its complete entries could be read.
+    pub complete: bool,
+}
+
+/// The whole list in a reply, tolerating text around the JSON.
+fn whole_list(reply: &str) -> Result<Vec<RawSuggestion>> {
     let start = reply
         .find('{')
         .ok_or_else(|| anyhow!("no JSON in the reply"))?;
@@ -1131,10 +1142,37 @@ pub fn parse_suggestions(reply: &str, books: &[BookBrief]) -> Result<Vec<Suggest
         .ok_or_else(|| anyhow!("no JSON in the reply"))?;
     let list: SuggestionList =
         serde_json::from_str(&reply[start..=end]).map_err(|e| anyhow!("invalid JSON: {e}"))?;
+    Ok(list.suggestions)
+}
+
+/// The entries that came through whole in a reply that stopped mid-list, as replies do when
+/// they reach the model's output limit.
+fn complete_entries(reply: &str) -> Vec<RawSuggestion> {
+    reply
+        .match_indices('{')
+        .filter_map(|(i, _)| {
+            serde_json::Deserializer::from_str(&reply[i..])
+                .into_iter::<RawSuggestion>()
+                .next()?
+                .ok()
+        })
+        .collect()
+}
+
+/// Parses the model's reply and keeps only valid suggestions. A reply cut off part way still
+/// counts for the entries it finished.
+pub fn parse_suggestions(reply: &str, books: &[BookBrief]) -> Result<Parsed> {
+    let (raw, complete) = match whole_list(reply) {
+        Ok(list) => (list, true),
+        Err(e) => match complete_entries(reply) {
+            entries if entries.is_empty() => return Err(e),
+            entries => (entries, false),
+        },
+    };
     let by_id: HashMap<&str, &BookBrief> = books.iter().map(|b| (b.id.as_str(), b)).collect();
     let mut seen = std::collections::HashSet::new();
     let mut out = Vec::new();
-    for s in list.suggestions {
+    for s in raw {
         let Some(book) = by_id.get(s.book_id.as_str()) else {
             continue;
         };
@@ -1163,8 +1201,15 @@ pub fn parse_suggestions(reply: &str, books: &[BookBrief]) -> Result<Vec<Suggest
             author,
         });
     }
-    Ok(out)
+    Ok(Parsed {
+        suggestions: out,
+        answered: seen,
+        complete,
+    })
 }
+
+/// Rounds of asking again for the books a cut-off reply didn't reach.
+const ORGANIZE_ROUNDS: usize = 3;
 
 pub async fn organize(
     r: &Runner<'_>,
@@ -1172,6 +1217,28 @@ pub async fn organize(
     existing_groups: &[String],
     native_schema: bool,
 ) -> Result<Vec<Suggestion>> {
+    let mut out = Vec::new();
+    let mut pending = books.to_vec();
+    for _ in 0..ORGANIZE_ROUNDS {
+        let parsed = organize_once(r, &pending, existing_groups, native_schema).await?;
+        out.extend(parsed.suggestions);
+        if parsed.complete {
+            break;
+        }
+        pending.retain(|b| !parsed.answered.contains(&b.id));
+        if pending.is_empty() {
+            break;
+        }
+    }
+    Ok(out)
+}
+
+async fn organize_once(
+    r: &Runner<'_>,
+    books: &[BookBrief],
+    existing_groups: &[String],
+    native_schema: bool,
+) -> Result<Parsed> {
     let schema = suggestion_schema();
     let mut system = format!(
         "You are a library assistant who sorts the books on a shelf into groups. Each book \
@@ -1667,7 +1734,7 @@ mod tests {
             {"bookId":"zzz","group":"x","author":null},
             {"bookId":"a","group":"重复","author":null}
         ]} 完毕"#;
-        let s = parse_suggestions(reply, &briefs()).unwrap();
+        let s = parse_suggestions(reply, &briefs()).unwrap().suggestions;
         // b is already in 计算机 and has an author, so it gets no suggestion.
         assert_eq!(
             s,
@@ -1681,12 +1748,47 @@ mod tests {
         let legacy =
             r#"{"suggestions":[{"bookId":"b","groups":["", "编程", "计算机"],"author":null}]}"#;
         assert_eq!(
-            parse_suggestions(legacy, &briefs()).unwrap()[0]
+            parse_suggestions(legacy, &briefs()).unwrap().suggestions[0]
                 .group
                 .as_deref(),
             Some("编程")
         );
         assert!(parse_suggestions("没有 JSON", &briefs()).is_err());
+    }
+
+    #[test]
+    fn a_cut_off_reply_keeps_its_complete_entries() {
+        let cut =
+            r#"{"suggestions":[{"bookId":"a","group":"小说","author":null},{"bookId":"b","gro"#;
+        let parsed = parse_suggestions(cut, &briefs()).unwrap();
+        assert!(!parsed.complete);
+        assert_eq!(parsed.suggestions.len(), 1);
+        assert_eq!(parsed.answered, ["a".to_owned()].into());
+    }
+
+    #[tokio::test]
+    async fn organize_asks_again_for_books_a_cut_off_reply_missed() {
+        let model = MockCompletionModel::from_turns([
+            MockTurn::text(
+                r#"{"suggestions":[{"bookId":"a","group":"小说","author":null},{"bookId":"#,
+            ),
+            MockTurn::text(r#"{"suggestions":[{"bookId":"b","group":"编程","author":null}]}"#),
+        ]);
+        let r = Runner {
+            model: model.clone().erase(),
+            cfg: cfg(),
+            budget: 1_000,
+            emit: &|_| {},
+        };
+        let s = organize(&r, &briefs(), &[], false).await.unwrap();
+        assert_eq!(s.len(), 2);
+        let requests = model.requests();
+        assert_eq!(requests.len(), 2);
+        let second = format!("{:?}", requests[1]);
+        assert!(
+            second.contains("Rust 编程") && !second.contains("三国演义"),
+            "only the missed book is asked about again"
+        );
     }
 
     #[tokio::test]

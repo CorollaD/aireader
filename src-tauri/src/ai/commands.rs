@@ -478,7 +478,8 @@ pub fn ai_cancel(app: AppHandle, task_id: String) {
     }
 }
 
-const ORGANIZE_BATCH: usize = 40;
+/// Books per request: short replies stay well inside models' output limits.
+const ORGANIZE_BATCH: usize = 20;
 const EXCERPT_CHARS: usize = 160;
 
 /// Group/author suggestions for the given books. Nothing is changed until the user applies them.
