@@ -30,6 +30,7 @@ import { presetOf } from "./presets";
 import Markdown from "./Markdown";
 import StudyTab from "./StudyTab";
 import { MindMapPreview, MindMapViewer, outlineMarkdown, saveMindMap } from "./MindMap";
+import { Select } from "../Select";
 
 /** A passage the conversation is about (from the selection toolbar). */
 export interface Quote {
@@ -1090,24 +1091,19 @@ function ModelSwitch({ disabled }: { disabled: boolean }) {
   const models = [...new Set([current, ...(presetOf(status.config.provider)?.models ?? [])])].filter(Boolean);
   if (models.length < 2) return null;
   return (
-    <select
+    <Select
+      ghost
       className="model-switch"
       value={current}
       disabled={disabled}
-      title={t("ai.model")}
-      aria-label={t("ai.model")}
-      onChange={(e) => {
+      label={t("ai.model")}
+      options={models.map((m) => ({ value: m, label: m }))}
+      onChange={(model) => {
         api
-          .aiSetConfig({ ...status.config, model: e.target.value })
+          .aiSetConfig({ ...status.config, model })
           .then(ai.setStatus)
           .catch(() => {});
       }}
-    >
-      {models.map((m) => (
-        <option key={m} value={m}>
-          {m}
-        </option>
-      ))}
-    </select>
+    />
   );
 }

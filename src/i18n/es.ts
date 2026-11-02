@@ -34,13 +34,9 @@ const es: Messages = {
   "bg.cream": "Crema",
   "bg.parchment": "Pergamino",
   "bg.green": "Verde suave",
-  "bg.mint": "Menta",
   "bg.sky": "Cielo",
-  "bg.blossom": "Flor de cerezo",
-  "bg.lightGray": "Gris claro",
   "bg.darkGray": "Gris oscuro",
   "bg.night": "Noche",
-  "bg.navy": "Azul marino",
   "bg.black": "Negro",
   "font.sans": "Sans",
   "font.serif": "Serif",
@@ -388,8 +384,8 @@ const es: Messages = {
   "dd.incomplete": "alrededor del {n} % de la copia más completa",
   "dd.read": "leído {p}",
   "dd.scoreTitle": "Puntuación de calidad: texto, nitidez del escaneo, formato, índice, cubierta e integridad",
-  "dd.footer": "{n} copias más saldrán de la estantería (tus archivos originales no se tocan)",
-  "dd.apply": "Aplicar a {n} grupos",
+  "dd.footer": "Saldrán de la estantería: {n} (tus archivos originales no se tocan)",
+  "dd.apply": "Aplicar ({n})",
   "dd.done": "Se quitaron {n} libros duplicados; se movieron {h} subrayados y {b} marcadores",
 
   "reader.collapseSidebar": "Ocultar barra lateral",
@@ -670,6 +666,10 @@ const es: Messages = {
   "shelf.expand": "Expandir",
   "shelf.collapse": "Contraer",
   "shelf.deleteGroupChildren": "Sus subgrupos suben un nivel y pasan a ser grupos propios.",
+  "settings.theme": "Apariencia",
+  "settings.themeSystem": "Sistema",
+  "settings.themeLight": "Claro",
+  "settings.themeDark": "Oscuro",
 };
 
 export default es;

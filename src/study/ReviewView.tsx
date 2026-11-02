@@ -12,6 +12,7 @@ import { Toast, isTyping } from "../ui";
 import { formatInterval, startOfToday } from "./intervals";
 import DailyHighlights from "./DailyHighlights";
 import LookupDialog, { type LookupRequest } from "./LookupDialog";
+import { dragRegion } from "../titlebar";
 
 /** Cards due again within this time come back in the same session. */
 const LEARN_AHEAD_SECONDS = 20 * 60;
@@ -36,7 +37,7 @@ export default function ReviewView(props: { settings: Settings; onBack: () => vo
 
   return (
     <div className="review-view">
-      <header className="review-head">
+      <header className="review-head" {...dragRegion}>
         <button onClick={props.onBack}>
           <Icon name="arrowLeft" size={15} /> {t("reader.shelf")}
         </button>
@@ -52,7 +53,7 @@ export default function ReviewView(props: { settings: Settings; onBack: () => vo
           </button>
         </div>
         <span className="spacer" />
-        {stats && <span className="muted small">{t("cards.stats", { due: stats.due, done: stats.reviewedToday, total: stats.total })}</span>}
+        {stats && <span className="muted small review-stats">{t("cards.stats", { due: stats.due, done: stats.reviewedToday, total: stats.total })}</span>}
       </header>
       {tab === "review" && <Review {...props} onChanged={refreshStats} />}
       {tab === "highlights" && <DailyHighlights settings={props.settings} onOpen={props.onOpen} />}
@@ -229,7 +230,7 @@ function CardList(props: { settings: Settings; onChanged: () => void }) {
           <div className="card-row-main">
             <div className="book-title">{c.front}</div>
             <div className="muted small ellipsis">{c.back}</div>
-            <div className="muted small">
+            <div className="card-row-meta">
               {c.bookTitle} · {t("cards.nextReview", { date: formatDate(c.due) })}
             </div>
           </div>

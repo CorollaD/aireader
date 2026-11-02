@@ -17,15 +17,16 @@ describe("settings", () => {
     expect(isDark("#ffffff")).toBe(false);
     const light = themeVars({ ...DEFAULT_SETTINGS, background: "#ffffff" });
     const dark = themeVars({ ...DEFAULT_SETTINGS, background: "#1e1e1e" });
-    expect(light["color-scheme"]).toBe("light");
-    expect(dark["color-scheme"]).toBe("dark");
+    expect(light["--reading-scheme"]).toBe("light");
+    expect(dark["--reading-scheme"]).toBe("dark");
     // Text contrasts with the background.
-    expect(isDark(light["--fg"])).toBe(true);
-    expect(isDark(dark["--fg"])).toBe(false);
-    expect(themeVars({ ...DEFAULT_SETTINGS, textColor: "#123456" })["--fg"]).toBe("#123456");
+    expect(isDark(light["--reading-fg"])).toBe(true);
+    expect(isDark(dark["--reading-fg"])).toBe(false);
+    expect(themeVars({ ...DEFAULT_SETTINGS, textColor: "#123456" })["--reading-fg"]).toBe("#123456");
     // An added font comes first, the chosen family after it.
     const custom = themeVars({ ...DEFAULT_SETTINGS, customFont: "Kai.ttf" })["--reader-font"];
     expect(custom.startsWith(`"${CUSTOM_FONT}", `)).toBe(true);
     expect(normalizeSettings({ customFont: 3 }).customFont).toBeNull();
+    expect(normalizeSettings({ uiTheme: "neon" }).uiTheme).toBe("system");
   });
 });

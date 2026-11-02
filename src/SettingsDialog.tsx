@@ -9,12 +9,13 @@ import SyncSettings from "./SyncSettings";
 import type { UpdateSettings } from "./App";
 import AiSettingsForm from "./ai/AiSettingsForm";
 import { useAi } from "./ai/AiContext";
-import { LANGUAGES, systemLanguage, t } from "./i18n";
+import { LANGUAGES, systemLanguage, t, type MessageKey } from "./i18n";
 import { Icon, type IconName } from "./icons";
 import { ReadingSettings } from "./reader/SettingsPanel";
 import { shortcuts } from "./reader/shortcuts";
-import { UI_SCALES, type Settings } from "./settings";
+import { UI_SCALES, type Settings, type UiTheme } from "./settings";
 import { Modal } from "./ui";
+import { Select } from "./Select";
 
 export type SettingsTab = "general" | "reading" | "dictionary" | "sync" | "ai" | "shortcuts";
 
@@ -29,6 +30,12 @@ const TABS: { key: SettingsTab; icon: IconName; label: () => string }[] = [
   { key: "sync", icon: "refresh", label: () => t("settings.tabSync") },
   { key: "ai", icon: "sparkles", label: () => t("settings.tabAi") },
   { key: "shortcuts", icon: "keyboard", label: () => t("settings.tabShortcuts") },
+];
+
+const THEMES: [UiTheme, MessageKey][] = [
+  ["system", "settings.themeSystem"],
+  ["light", "settings.themeLight"],
+  ["dark", "settings.themeDark"],
 ];
 
 export default function SettingsDialog(props: {
@@ -58,14 +65,25 @@ export default function SettingsDialog(props: {
             <>
               <div className="panel-section">
                 <div className="panel-label">{t("settings.language")}</div>
-                <select value={settings.uiLanguage} onChange={(e) => update({ uiLanguage: e.target.value })}>
-                  <option value="auto">{t("settings.languageAuto", { name: system.name })}</option>
-                  {LANGUAGES.map((l) => (
-                    <option key={l.code} value={l.code}>
-                      {l.name}
-                    </option>
+                <Select
+                  value={settings.uiLanguage}
+                  label={t("settings.language")}
+                  options={[
+                    { value: "auto", label: t("settings.languageAuto", { name: system.name }) },
+                    ...LANGUAGES.map((l) => ({ value: l.code as string, label: l.name })),
+                  ]}
+                  onChange={(uiLanguage) => update({ uiLanguage })}
+                />
+              </div>
+              <div className="panel-section">
+                <div className="panel-label">{t("settings.theme")}</div>
+                <div className="segmented">
+                  {THEMES.map(([value, label]) => (
+                    <button key={value} className={settings.uiTheme === value ? "on" : ""} onClick={() => update({ uiTheme: value })}>
+                      {t(label)}
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
               <div className="panel-section">
                 <div className="panel-label">{t("settings.uiScale")}</div>

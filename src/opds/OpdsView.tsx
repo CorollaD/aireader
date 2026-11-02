@@ -8,6 +8,8 @@ import type { OpdsCatalog, OpdsDownload, OpdsEntry, OpdsFeed } from "../types";
 import { Confirm, Modal, Toast } from "../ui";
 import SourcesDialog from "./SourcesDialog";
 import type { Source } from "./sources";
+import { Select } from "../Select";
+import { dragRegion } from "../titlebar";
 
 /** A page of a catalog on the way back up. */
 interface Crumb {
@@ -121,9 +123,11 @@ function EntryRow(props: {
       setState({});
     }
   };
+  // A link to another list rather than a book: no cover to hold space for.
+  const nav = !!entry.link && !entry.cover && entry.downloads.length === 0;
   return (
-    <div className="opds-entry">
-      <RemoteCover catalogId={props.catalogId} url={entry.cover} />
+    <div className={`opds-entry${nav ? " nav" : ""}`}>
+      {nav ? <Icon name="folder" size={16} /> : <RemoteCover catalogId={props.catalogId} url={entry.cover} />}
       <div className="opds-main">
         {entry.link ? (
           <button className="opds-link" onClick={() => props.onFollow(entry)}>
@@ -265,19 +269,13 @@ export default function OpdsView(props: { onBack: () => void; onOpen: (bookId: s
 
   return (
     <div className="review-view">
-      <header className="review-head">
+      <header className="review-head" {...dragRegion}>
         <button onClick={props.onBack}>
           <Icon name="arrowLeft" size={15} /> {t("reader.shelf")}
         </button>
         <span className="review-title">{t("opds.title")}</span>
         {catalogs && catalogs.length > 0 && (
-          <select value={current ?? ""} aria-label={t("opds.title")} onChange={(e) => open(e.target.value)}>
-            {catalogs.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title}
-              </option>
-            ))}
-          </select>
+          <Select ghost value={current ?? ""} label={t("opds.title")} options={catalogs.map((c) => ({ value: c.id, label: c.title }))} onChange={open} />
         )}
         <span className="spacer" />
         {catalog && (

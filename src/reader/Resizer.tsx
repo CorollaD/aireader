@@ -9,7 +9,7 @@ export type Panel = "toc" | "ai" | "search";
 const DEFAULTS: Record<Panel, number> = { toc: 270, ai: 360, search: 300 };
 const LIMITS: Record<Panel, [number, number]> = { toc: [200, 480], ai: [300, 720], search: [240, 520] };
 /** The text keeps at least this much room; panels shrink first. */
-const MIN_TEXT = 360;
+export const MIN_TEXT = 360;
 
 type Widths = Record<Panel, number>;
 

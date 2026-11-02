@@ -1,11 +1,13 @@
 // Reading statistics: headline numbers, a calendar of the year and the year in review.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, errorText } from "../api";
 import { formatDate, formatDuration, language, t } from "../i18n";
 import { Icon } from "../icons";
 import type { ReadingReport } from "../types";
 import { LEVELS, levelOf, localDay, weeksOf } from "./calendar";
+import { Select } from "../Select";
+import { dragRegion } from "../titlebar";
 
 function Tile(props: { label: string; value: string; hero?: boolean }) {
   return (
@@ -23,6 +25,11 @@ function Calendar({ year, report }: { year: number; report: ReadingReport }) {
   const [hover, setHover] = useState<{ day: string; left: number; top: number } | null>(null);
   const weeks = useMemo(() => weeksOf(year), [year]);
   const seconds = useMemo(() => new Map(report.days.map((d) => [d.day, d.seconds])), [report]);
+  const scroller = useRef<HTMLDivElement>(null);
+  // In a narrow window the recent weeks are the ones worth seeing first.
+  useEffect(() => {
+    if (scroller.current) scroller.current.scrollLeft = scroller.current.scrollWidth;
+  }, [year]);
   const monthName = (m: number) => new Date(year, m, 1).toLocaleDateString(language(), { month: "short" });
   const describe = (day: string) => {
     const s = seconds.get(day) ?? 0;
@@ -30,7 +37,13 @@ function Calendar({ year, report }: { year: number; report: ReadingReport }) {
   };
   return (
     <div className="calendar-wrap">
-      <div className="calendar" role="img" aria-label={t("stats.calendarLabel", { year, days: report.days.length })} onMouseLeave={() => setHover(null)}>
+      <div
+        ref={scroller}
+        className="calendar"
+        role="img"
+        aria-label={t("stats.calendarLabel", { year, days: report.days.length })}
+        onMouseLeave={() => setHover(null)}
+      >
         {weeks.map((w, x) => (
           <div key={x} className="calendar-week">
             <span className="calendar-month">{w.month !== null ? monthName(w.month) : ""}</span>
@@ -124,20 +137,20 @@ export default function StatsView(props: { onBack: () => void; onOpen: (bookId: 
   const top = report?.books[0]?.seconds ?? 0;
   return (
     <div className="review-view">
-      <header className="review-head">
+      <header className="review-head" {...dragRegion}>
         <button onClick={props.onBack}>
           <Icon name="arrowLeft" size={15} /> {t("reader.shelf")}
         </button>
         <span className="review-title">{t("stats.title")}</span>
         <span className="spacer" />
         {years.length > 1 && (
-          <select value={year} aria-label={t("stats.year")} onChange={(e) => setYear(Number(e.target.value))}>
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+          <Select
+            ghost
+            value={String(year)}
+            label={t("stats.year")}
+            options={years.map((y) => ({ value: String(y), label: String(y) }))}
+            onChange={(y) => setYear(Number(y))}
+          />
         )}
       </header>
       {error && <div className="center-msg error">{error}</div>}

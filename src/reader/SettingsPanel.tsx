@@ -1,16 +1,25 @@
 // Reading appearance controls, shown in the reader's "Aa" popover and in the Settings dialog.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { UpdateSettings } from "../App";
 import { api, errorText } from "../api";
 import { t } from "../i18n";
 import { BACKGROUNDS, FONT_STACKS, isDark, type FontFamily, type Settings } from "../settings";
+import { Select } from "../Select";
 
 function Slider(props: { label: string; value: number; min: number; max: number; step: number; format: (v: number) => string; onChange: (v: number) => void }) {
   return (
     <label className="slider">
       <span>{props.label}</span>
-      <input type="range" min={props.min} max={props.max} step={props.step} value={props.value} onChange={(e) => props.onChange(Number(e.target.value))} />
+      <input
+        type="range"
+        style={{ "--fill": `${((props.value - props.min) / (props.max - props.min)) * 100}%` } as CSSProperties}
+        min={props.min}
+        max={props.max}
+        step={props.step}
+        value={props.value}
+        onChange={(e) => props.onChange(Number(e.target.value))}
+      />
       <span className="slider-value">{props.format(props.value)}</span>
     </label>
   );
@@ -47,14 +56,13 @@ function CustomFont(props: { value: string | null; onChange: (name: string | nul
   const label = (name: string) => name.replace(/\.[^.]+$/, "");
   return (
     <div className="custom-font">
-      <select value={props.value ?? ""} onChange={(e) => props.onChange(e.target.value || null)} aria-label={t("rs.customFont")}>
-        <option value="">{t("rs.customFontNone")}</option>
-        {fonts.map((f) => (
-          <option key={f} value={f}>
-            {label(f)}
-          </option>
-        ))}
-      </select>
+      <Select
+        full
+        value={props.value ?? ""}
+        label={t("rs.customFont")}
+        options={[{ value: "", label: t("rs.customFontNone") }, ...fonts.map((f) => ({ value: f, label: label(f) }))]}
+        onChange={(font) => props.onChange(font || null)}
+      />
       <button onClick={add}>{t("rs.addFont")}</button>
       {props.value && (
         <button onClick={remove} title={t("rs.removeFont")}>

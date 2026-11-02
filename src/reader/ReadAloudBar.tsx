@@ -5,6 +5,7 @@ import { t } from "../i18n";
 import { Icon } from "../icons";
 import type { Settings } from "../settings";
 import type { SpeechState } from "./useSpeech";
+import { Select } from "../Select";
 
 const RATES = [0.75, 1, 1.25, 1.5, 2];
 
@@ -36,32 +37,21 @@ export default function ReadAloudBar(props: {
       <button className="icon-button" title={t("reader.nextSentence")} aria-label={t("reader.nextSentence")} onClick={() => props.onStep(1)}>
         <Icon name="skipForward" size={16} />
       </button>
-      <select
-        value={settings.ttsRate}
-        onChange={(e) => update({ ttsRate: Number(e.target.value) })}
-        aria-label={t("reader.speechRate")}
-        title={t("reader.speechRate")}
-      >
-        {RATES.map((r) => (
-          <option key={r} value={r}>
-            {r}×
-          </option>
-        ))}
-      </select>
-      <select
+      <Select
+        ghost
+        value={String(settings.ttsRate)}
+        label={t("reader.speechRate")}
+        options={RATES.map((r) => ({ value: String(r), label: `${r}×` }))}
+        onChange={(rate) => update({ ttsRate: Number(rate) })}
+      />
+      <Select
+        ghost
         className="read-aloud-voice"
         value={settings.ttsVoice ?? ""}
-        onChange={(e) => update({ ttsVoice: e.target.value || null })}
-        aria-label={t("reader.speechVoice")}
-        title={t("reader.speechVoice")}
-      >
-        <option value="">{t("reader.voiceAuto")}</option>
-        {voices.map((v) => (
-          <option key={v.voiceURI} value={v.voiceURI}>
-            {v.name} ({v.lang})
-          </option>
-        ))}
-      </select>
+        label={t("reader.speechVoice")}
+        options={[{ value: "", label: t("reader.voiceAuto") }, ...voices.map((v) => ({ value: v.voiceURI, label: `${v.name} (${v.lang})` }))]}
+        onChange={(voice) => update({ ttsVoice: voice || null })}
+      />
       <button className="icon-button" title={t("common.close")} aria-label={t("common.close")} onClick={props.onStop}>
         <Icon name="close" size={16} />
       </button>

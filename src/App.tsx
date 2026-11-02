@@ -15,6 +15,7 @@ import Reader, { type OpenAt } from "./reader/Reader";
 import { AiProvider } from "./ai/AiContext";
 import { applyUiScale } from "./zoom";
 import ErrorBoundary from "./ErrorBoundary";
+import { watchTitleBar } from "./titlebar";
 
 export type UpdateSettings = (patch: Partial<Settings>) => void;
 
@@ -94,11 +95,24 @@ export default function App() {
     };
   }, [settings.customFont]);
 
-  // Apply theme variables to the document root so dialogs and scrollbars follow it.
+  // The reading page's colours, on the root so that everything inside it can use them.
   useEffect(() => {
     const root = document.documentElement;
     for (const [k, v] of Object.entries(themeVars(settings))) root.style.setProperty(k, v);
   }, [settings]);
+
+  // The interface's theme, following the system's if asked to.
+  useEffect(() => {
+    const dark = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      document.documentElement.dataset.theme = settings.uiTheme === "system" ? (dark.matches ? "dark" : "light") : settings.uiTheme;
+    };
+    apply();
+    dark.addEventListener("change", apply);
+    return () => dark.removeEventListener("change", apply);
+  }, [settings.uiTheme]);
+
+  useEffect(() => watchTitleBar(), []);
 
   const flushSettings = useCallback(() => {
     window.clearTimeout(saveTimer.current);

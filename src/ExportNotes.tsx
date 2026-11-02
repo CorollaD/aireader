@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { api, errorText, type NotesFormat } from "./api";
 import { t, type MessageKey } from "./i18n";
+import { Select } from "./Select";
 
 const FORMATS: { key: NotesFormat; label: MessageKey; hint: MessageKey }[] = [
   { key: "markdown", label: "export.markdown", hint: "export.markdownHint" },
@@ -37,13 +38,7 @@ export default function ExportNotes(props: { bookId?: string; onDone?: (path: st
   return (
     <div className="export-notes">
       <div className="inline-add">
-        <select value={format} onChange={(e) => setFormat(e.target.value as NotesFormat)} aria-label={t("export.format")}>
-          {FORMATS.map((f) => (
-            <option key={f.key} value={f.key}>
-              {t(f.label)}
-            </option>
-          ))}
-        </select>
+        <Select value={format} label={t("export.format")} options={FORMATS.map((f) => ({ value: f.key, label: t(f.label) }))} onChange={setFormat} />
         <button className="primary" disabled={busy} onClick={run}>
           {busy ? t("export.exporting") : t("side.export")}
         </button>

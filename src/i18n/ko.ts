@@ -34,13 +34,9 @@ const ko: Messages = {
   "bg.cream": "크림",
   "bg.parchment": "양피지",
   "bg.green": "눈 보호 녹색",
-  "bg.mint": "민트",
   "bg.sky": "하늘",
-  "bg.blossom": "벚꽃",
-  "bg.lightGray": "밝은 회색",
   "bg.darkGray": "어두운 회색",
   "bg.night": "야간",
-  "bg.navy": "남색",
   "bg.black": "검정",
   "font.sans": "고딕",
   "font.serif": "명조",
@@ -661,6 +657,10 @@ const ko: Messages = {
   "shelf.expand": "펼치기",
   "shelf.collapse": "접기",
   "shelf.deleteGroupChildren": "하위 그룹은 한 단계 올라가 독립된 그룹이 됩니다.",
+  "settings.theme": "모양",
+  "settings.themeSystem": "시스템",
+  "settings.themeLight": "라이트",
+  "settings.themeDark": "다크",
 };
 
 export default ko;

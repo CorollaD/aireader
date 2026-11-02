@@ -67,8 +67,8 @@ export function DedupeDialog(props: {
                   <label className="dedupe-head">
                     <input type="checkbox" checked={selected[i]} onChange={(e) => setSelected((s) => s.map((v, j) => (j === i ? e.target.checked : v)))} />
                     <strong className="ellipsis">{first?.title}</strong>
-                    {!g.confident && <span className="badge-soft warn">{t("dd.guess")}</span>}
                   </label>
+                  {!g.confident && <p className="dedupe-warn">{t("dd.guess")}</p>}
                   {g.copies.map((c, k) => {
                     const book = props.books.get(c.id);
                     if (!book) return null;

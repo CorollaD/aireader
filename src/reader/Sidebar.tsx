@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { TocEntry } from "../types";
 import type { Bookmark, Card, Highlight, Location, OpenedBook } from "../types";
 import { formatDate, t } from "../i18n";
-import { Icon } from "../icons";
+import { Icon, type IconName } from "../icons";
 import { MOD } from "./shortcuts";
 import { atOrBefore } from "./locations";
 
@@ -49,23 +49,27 @@ export default function Sidebar(props: Props) {
     if (tab === "toc") list.current?.querySelector(".toc-item.active")?.scrollIntoView({ block: "nearest" });
   }, [currentToc, tab]);
 
-  const tabs: [SidebarTab, string, number | null][] = [
-    ["toc", t("side.toc"), null],
-    ["bookmarks", t("side.bookmarks"), props.bookmarks.length],
-    ...(flow ? ([["notes", t("side.notes"), props.highlights.length]] as [SidebarTab, string, number][]) : []),
-    ["cards", t("side.cards"), props.cards.length],
+  const tabs: [SidebarTab, string, IconName, number | null][] = [
+    ["toc", t("side.toc"), "list", null],
+    ["bookmarks", t("side.bookmarks"), "bookmark", props.bookmarks.length],
+    ...(flow ? ([["notes", t("side.notes"), "note", props.highlights.length]] as [SidebarTab, string, IconName, number][]) : []),
+    ["cards", t("side.cards"), "layers", props.cards.length],
   ];
 
   return (
     <aside className="toc" style={{ width: props.width }}>
       <div className="side-tabs">
-        {tabs.map(([key, label, count]) => (
-          <button key={key} className={tab === key ? "on" : ""} onClick={() => props.onTab(key)}>
-            {label}
-            {count ? <span className="tab-count">{count}</span> : null}
-          </button>
-        ))}
-        <button className="icon tab-icon" title={`${t("reader.collapseSidebar")} (T)`} aria-label={t("reader.collapseSidebar")} onClick={props.onCollapse}>
+        <div className="ai-switch" role="tablist">
+          {tabs.map(([key, label, icon, count]) => (
+            <button key={key} role="tab" aria-selected={tab === key} className={tab === key ? "on" : ""} title={label} onClick={() => props.onTab(key)}>
+              <Icon name={icon} size={14} />
+              <span className="tab-label">{label}</span>
+              {count ? <span className="tab-count">{count}</span> : null}
+            </button>
+          ))}
+        </div>
+        <span className="spacer" />
+        <button className="icon-button" title={`${t("reader.collapseSidebar")} (T)`} aria-label={t("reader.collapseSidebar")} onClick={props.onCollapse}>
           <Icon name="panelLeft" />
         </button>
       </div>

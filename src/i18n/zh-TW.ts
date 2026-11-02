@@ -34,13 +34,9 @@ const zhTW: Messages = {
   "bg.cream": "米白",
   "bg.parchment": "羊皮紙",
   "bg.green": "護眼綠",
-  "bg.mint": "薄荷",
   "bg.sky": "天青",
-  "bg.blossom": "櫻粉",
-  "bg.lightGray": "淺灰",
   "bg.darkGray": "深灰",
   "bg.night": "夜間",
-  "bg.navy": "深藍",
   "bg.black": "墨黑",
   "font.sans": "黑體",
   "font.serif": "明體",
@@ -654,6 +650,10 @@ const zhTW: Messages = {
   "shelf.expand": "展開",
   "shelf.collapse": "收合",
   "shelf.deleteGroupChildren": "子分組會上移一層，變成獨立分組。",
+  "settings.theme": "外觀",
+  "settings.themeSystem": "跟隨系統",
+  "settings.themeLight": "淺色",
+  "settings.themeDark": "深色",
 };
 
 export default zhTW;

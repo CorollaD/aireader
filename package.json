@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@paddleocr/paddleocr-js": "0.4.2",
+    "@radix-ui/react-select": "2.2.6",
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-dialog": "^2.8.3",
     "@techstark/opencv-js": "4.10.0-release.1",
@@ -33,6 +34,6 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.72.1",
     "vite": "^6.4.5",
-    "vitest": "^3.2.7"
+    "vitest": "^5.0.5"
   }
 }

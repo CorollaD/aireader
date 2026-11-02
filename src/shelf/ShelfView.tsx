@@ -8,6 +8,7 @@ import type { UpdateSettings } from "../App";
 import { formatList, t, type MessageKey } from "../i18n";
 import { Icon, type IconName } from "../icons";
 import { useOpenSettings } from "../SettingsDialog";
+import { Select } from "../Select";
 import type { ShelfSort, Settings } from "../settings";
 import type { Book, BookPatch, CardStats, DuplicateGroup, ImportProgress, Location, Shelf, SyncChanges } from "../types";
 import { startOfToday } from "../study/intervals";
@@ -20,6 +21,7 @@ import { useAi } from "../ai/AiContext";
 import OrganizeDialog from "../ai/OrganizeDialog";
 import CiteDialog from "../paper/CiteDialog";
 import PaperDialog from "../paper/PaperDialog";
+import { dragRegion } from "../titlebar";
 
 const EXTENSIONS = [
   "epub",
@@ -355,7 +357,9 @@ export default function ShelfView(props: {
     <div className="shelf" onClick={() => (setMenu(null), setImportMenu(false))}>
       {settings.shelfSidebar && (
         <aside className="sidebar">
-          <div className="brand">AiReader</div>
+          <div className="brand" {...dragRegion}>
+            AiReader
+          </div>
           {sideItem(ALL, "library", t("shelf.all"), shelf.books.length)}
           {shelf.books.some(isPaper) && sideItem(PAPERS, "note", t("shelf.papers"), count(isPaper))}
           {sideItem(
@@ -372,7 +376,7 @@ export default function ShelfView(props: {
           )}
           <button className="side-item" onClick={props.onReview}>
             <Icon name="layers" />
-            <span className="ellipsis">{t("cards.review")}</span>
+            <span className="ellipsis grow">{t("cards.review")}</span>
             {!!cardStats?.due && <span className="count">{cardStats.due}</span>}
           </button>
           <button className="side-item" onClick={props.onStats}>
@@ -418,7 +422,7 @@ export default function ShelfView(props: {
       )}
 
       <main className="shelf-main">
-        <header className="shelf-bar">
+        <header className="shelf-bar" {...dragRegion}>
           <button
             className={`icon-button${settings.shelfSidebar ? " on" : ""}`}
             title={t("shelf.toggleSidebar")}
@@ -431,18 +435,14 @@ export default function ShelfView(props: {
             <Icon name="search" />
             <input placeholder={t("shelf.searchPlaceholder")} value={query} onChange={(e) => setQuery(e.target.value)} />
           </label>
-          <select
+          <Select
+            ghost
             value={settings.shelfSort}
-            onChange={(e) => update({ shelfSort: e.target.value as ShelfSort })}
+            label={t("shelf.sort")}
             disabled={filter === RECENT}
-            title={t("shelf.sort")}
-          >
-            {SORTS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {t(s.label)}
-              </option>
-            ))}
-          </select>
+            options={SORTS.map((o) => ({ value: o.key, label: t(o.label) }))}
+            onChange={(shelfSort) => update({ shelfSort })}
+          />
           <div className="segmented">
             <button
               className={`icon-button${settings.shelfView === "grid" ? " on" : ""}`}
@@ -561,7 +561,7 @@ export default function ShelfView(props: {
               ))}
             </div>
           ) : (
-            <div className="book-list">
+            <div className={`book-list${selecting ? " selecting" : ""}`}>
               <div className="book-row header">
                 <span className="check-space" />
                 <span className="row-cover" />
@@ -759,14 +759,13 @@ function GroupMoveDialog(props: { name: string; parent: string | null; targets: 
     >
       <label className="field">
         <span>{t("shelf.parentGroup")}</span>
-        <select value={target} autoFocus onChange={(e) => setTarget(e.target.value)}>
-          <option value="">{t("shelf.topLevel")}</option>
-          {props.targets.map((g) => (
-            <option key={g} value={g}>
-              {g}
-            </option>
-          ))}
-        </select>
+        <Select
+          full
+          value={target}
+          label={t("shelf.parentGroup")}
+          options={[{ value: "", label: t("shelf.topLevel") }, ...props.targets.map((g) => ({ value: g, label: g }))]}
+          onChange={setTarget}
+        />
       </label>
     </Modal>
   );

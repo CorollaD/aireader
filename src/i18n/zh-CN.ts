@@ -34,13 +34,9 @@ const zhCN = {
   "bg.cream": "米白",
   "bg.parchment": "羊皮纸",
   "bg.green": "护眼绿",
-  "bg.mint": "薄荷",
   "bg.sky": "天青",
-  "bg.blossom": "樱粉",
-  "bg.lightGray": "浅灰",
   "bg.darkGray": "深灰",
   "bg.night": "夜间",
-  "bg.navy": "深蓝",
   "bg.black": "墨黑",
   "font.sans": "黑体",
   "font.serif": "宋体",
@@ -654,6 +650,10 @@ const zhCN = {
   "shelf.expand": "展开",
   "shelf.collapse": "收起",
   "shelf.deleteGroupChildren": "子分组会上移一层，变成独立分组。",
+  "settings.theme": "外观",
+  "settings.themeSystem": "跟随系统",
+  "settings.themeLight": "浅色",
+  "settings.themeDark": "深色",
 };
 
 export default zhCN;

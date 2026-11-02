@@ -3,7 +3,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, errorText } from "../api";
 import { onBeforeExit } from "../lifecycle";
 import type { UpdateSettings } from "../App";
-import type { Settings } from "../settings";
+import { isDark, type Settings } from "../settings";
+import { dragRegion } from "../titlebar";
 import type { Card, Highlight, HighlightColor, Hit, Location, OpenedBook, Reference } from "../types";
 import { isTyping, Modal, Toast } from "../ui";
 import { t } from "../i18n";
@@ -31,7 +32,7 @@ import { useAnnotations } from "./useAnnotations";
 import { useReadingStats } from "./useReadingStats";
 import { useSpeech, useVoices } from "./useSpeech";
 import ReadAloudBar from "./ReadAloudBar";
-import { Resizer, fitWidth, minWidth, usePanelWidths, type Panel } from "./Resizer";
+import { MIN_TEXT, Resizer, fitWidth, minWidth, usePanelWidths, type Panel } from "./Resizer";
 
 /** A navigation request; `n` makes repeated jumps to the same place distinct. */
 export interface Jump {
@@ -380,6 +381,20 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
 
   // --- keyboard ------------------------------------------------------------------------------
 
+  // Which panels are open.
+  const aiShown = aiOpen && !focus;
+  const searchShown = search.open && searchable && !focus;
+  const rightPanel: Panel | null = aiShown ? "ai" : searchShown ? "search" : null;
+  // Too narrow for both panels and the text: the one just opened on the right wins for now.
+  const tocYields = !!rightPanel && bodyWidth > 0 && bodyWidth < minWidth("toc") + minWidth(rightPanel) + MIN_TEXT;
+  const tocShown = settings.showToc && !focus && !tocYields;
+  const toggleToc = () => {
+    if (!tocYields) return update({ showToc: !settings.showToc });
+    setAiOpen(false);
+    setSearch((s) => ({ ...s, open: false }));
+    update({ showToc: true });
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const cmd = e.metaKey || e.ctrlKey;
@@ -433,7 +448,7 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
       } else if (typing || cmd || e.altKey) {
         return;
       } else if (key === "t") {
-        update({ showToc: !settings.showToc });
+        toggleToc();
       } else if (key === "f") {
         setFocus((f) => !f);
       } else if (e.key === "?") {
@@ -450,6 +465,7 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
     location,
     settings.fontSize,
     settings.showToc,
+    tocYields,
     panel,
     moreMenu,
     search.open,
@@ -486,35 +502,30 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
 
   const chapterTitle = location?.kind === "flow" ? book.chapters[location.chapter]?.title : null;
 
-  // Panels and their widths; the text always keeps room, so panels shrink in narrow windows.
-  const tocShown = settings.showToc && !focus;
-  const aiShown = aiOpen && !focus;
-  const searchShown = search.open && searchable && !focus;
-  const rightPanel: Panel | null = aiShown ? "ai" : searchShown ? "search" : null;
+  // Panel widths; the text always keeps room, so panels shrink in narrow windows.
   const tocWidth = tocShown ? fitWidth("toc", panels.widths.toc, bodyWidth - (rightPanel ? minWidth(rightPanel) : 0)) : 0;
   const rightWidth = rightPanel ? fitWidth(rightPanel, panels.widths[rightPanel], bodyWidth - tocWidth) : 0;
   const mark = activeMark ? ann.data.highlights.find((h) => h.id === activeMark.id) : null;
   const noteHighlight = noteFor ? ann.data.highlights.find((h) => h.id === noteFor) : null;
 
   return (
-    <div className={`reader${focus ? " focus" : ""}`} onClick={() => (setPanel(false), setMoreMenu(false))}>
+    <div
+      className={`reader${focus ? " focus" : ""}`}
+      data-theme={isDark(settings.background) ? "dark" : undefined}
+      onClick={() => (setPanel(false), setMoreMenu(false))}
+    >
       {focus && <div className="focus-hotzone" />}
-      <header className="reader-bar">
+      <header className="reader-bar" {...dragRegion}>
         <div className="bar-group">
           <button className="icon-button wide" onClick={props.onClose} title={`${t("reader.backToShelf")} (Esc)`}>
             <Icon name="arrowLeft" />
             <span className="label">{t("reader.shelf")}</span>
           </button>
-          <button
-            className={`icon-button${settings.showToc ? " on" : ""}`}
-            onClick={() => update({ showToc: !settings.showToc })}
-            title={`${t("reader.sidebar")} (T)`}
-            aria-label={t("reader.sidebar")}
-          >
+          <button className={`icon-button${tocShown ? " on" : ""}`} onClick={toggleToc} title={`${t("reader.sidebar")} (T)`} aria-label={t("reader.sidebar")}>
             <Icon name="panelLeft" />
           </button>
           <button
-            className="icon-button"
+            className="icon-button nav-tool"
             onClick={back}
             disabled={history.back.length === 0}
             title={`${t("reader.back")} (Alt+←)`}
@@ -523,7 +534,7 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
             <Icon name="chevronLeft" />
           </button>
           <button
-            className="icon-button"
+            className="icon-button nav-tool"
             onClick={forward}
             disabled={history.forward.length === 0}
             title={`${t("reader.forward")} (Alt+→)`}
@@ -553,9 +564,9 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
               <button className="icon-button" onClick={() => setZoom((z) => Math.min(5, z * 1.2))} title={t("reader.zoomIn")} aria-label={t("reader.zoomIn")}>
                 <Icon name="plus" />
               </button>
-              <span className="tool-sep" />
+              <span className="tool-sep fit-tool" />
               <button
-                className={`icon-button${settings.pageFit === "width" ? " on" : ""}`}
+                className={`icon-button fit-tool${settings.pageFit === "width" ? " on" : ""}`}
                 onClick={() => (update({ pageFit: "width" }), setZoom(1))}
                 title={t("rs.fitWidth")}
                 aria-label={t("rs.fitWidth")}
@@ -563,7 +574,7 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
                 <Icon name="fitWidth" />
               </button>
               <button
-                className={`icon-button${settings.pageFit === "page" ? " on" : ""}`}
+                className={`icon-button fit-tool${settings.pageFit === "page" ? " on" : ""}`}
                 onClick={() => (update({ pageFit: "page" }), setZoom(1))}
                 title={t("rs.fitPage")}
                 aria-label={t("rs.fitPage")}
@@ -571,14 +582,14 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
                 <Icon name="fitPage" />
               </button>
               <button
-                className={`icon-button${settings.pageFit === "height" ? " on" : ""}`}
+                className={`icon-button fit-tool${settings.pageFit === "height" ? " on" : ""}`}
                 onClick={() => (update({ pageFit: "height" }), setZoom(1))}
                 title={t("rs.fitHeight")}
                 aria-label={t("rs.fitHeight")}
               >
                 <Icon name="fitHeight" />
               </button>
-              <button className="icon-button" onClick={rotate} title={t("reader.rotate")} aria-label={t("reader.rotate")}>
+              <button className="icon-button fit-tool" onClick={rotate} title={t("reader.rotate")} aria-label={t("reader.rotate")}>
                 <Icon name="rotate" />
               </button>
             </div>
@@ -659,6 +670,21 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
               <div className="menu dropdown" onClick={(e) => (e.stopPropagation(), setMoreMenu(false))}>
                 {book.kind === "paged" && (
                   <>
+                    <div className="narrow-tools">
+                      <button className={settings.pageFit === "width" ? "checked" : ""} onClick={() => (update({ pageFit: "width" }), setZoom(1))}>
+                        <Icon name="fitWidth" /> {t("rs.fitWidth")}
+                      </button>
+                      <button className={settings.pageFit === "page" ? "checked" : ""} onClick={() => (update({ pageFit: "page" }), setZoom(1))}>
+                        <Icon name="fitPage" /> {t("rs.fitPage")}
+                      </button>
+                      <button className={settings.pageFit === "height" ? "checked" : ""} onClick={() => (update({ pageFit: "height" }), setZoom(1))}>
+                        <Icon name="fitHeight" /> {t("rs.fitHeight")}
+                      </button>
+                      <button onClick={rotate}>
+                        <Icon name="rotate" /> {t("reader.rotate")}
+                      </button>
+                      <hr />
+                    </div>
                     <button className={settings.pageLayout === "continuous" ? "checked" : ""} onClick={() => update({ pageLayout: "continuous" })}>
                       <Icon name="list" /> {t("rs.continuous")}
                     </button>
@@ -716,7 +742,7 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
       {ocr.scanned && !ocr.running && !ocrHidden && (
         <div className="reader-notice">
           <span className="grow">{t("ocr.suggest", { n: ocr.pending.length })}</span>
-          <button className="link-button" onClick={ocr.start}>
+          <button className="primary" onClick={ocr.start}>
             {t("ocr.start")}
           </button>
           <button

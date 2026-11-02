@@ -34,13 +34,9 @@ const en: Messages = {
   "bg.cream": "Cream",
   "bg.parchment": "Parchment",
   "bg.green": "Soft green",
-  "bg.mint": "Mint",
   "bg.sky": "Sky",
-  "bg.blossom": "Blossom",
-  "bg.lightGray": "Light gray",
   "bg.darkGray": "Dark gray",
   "bg.night": "Night",
-  "bg.navy": "Navy",
   "bg.black": "Black",
   "font.sans": "Sans",
   "font.serif": "Serif",
@@ -388,8 +384,8 @@ const en: Messages = {
   "dd.incomplete": "about {n}% of the fullest copy",
   "dd.read": "read {p}",
   "dd.scoreTitle": "Quality score: text, scan sharpness, format, contents, cover and completeness",
-  "dd.footer": "{n} other copies will leave the shelf (your original files are not touched)",
-  "dd.apply": "Apply to {n} groups",
+  "dd.footer": "Leaving the shelf: {n} (your original files are not touched)",
+  "dd.apply": "Apply ({n})",
   "dd.done": "Removed {n} duplicate books; moved {h} highlights and {b} bookmarks",
 
   "reader.collapseSidebar": "Hide sidebar",
@@ -667,6 +663,10 @@ const en: Messages = {
   "shelf.expand": "Expand",
   "shelf.collapse": "Collapse",
   "shelf.deleteGroupChildren": "Its subgroups move up a level and become groups of their own.",
+  "settings.theme": "Appearance",
+  "settings.themeSystem": "System",
+  "settings.themeLight": "Light",
+  "settings.themeDark": "Dark",
 };
 
 export default en;

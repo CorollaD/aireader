@@ -3,6 +3,7 @@ import { Modal } from "../ui";
 import type { Book, BookPatch } from "../types";
 import { t } from "../i18n";
 import { childName, groupTree, labelOf } from "./groups";
+import { Select } from "../Select";
 
 // Values of the group picker besides group names.
 const NONE = "\u0000none";
@@ -66,22 +67,21 @@ export function EditDialog(props: { books: Book[]; groups: string[]; onSave: (pa
       )}
       <label className="field">
         <span>{t("edit.groups")}</span>
-        <select value={choice} onChange={(e) => setChoice(e.target.value)} autoFocus={!single}>
-          {mixed && <option value={KEEP}>{t("edit.keepGroup")}</option>}
-          <option value={NONE}>{t("shelf.ungrouped")}</option>
-          {groupTree(props.groups).flatMap(({ name, children }) => [
-            <option key={name} value={name}>
-              {name}
-            </option>,
-            ...children.map((child) => (
-              <option key={child} value={child}>
-                {"\u3000"}
-                {labelOf(child, name)}
-              </option>
-            )),
-          ])}
-          <option value={NEW}>{t("edit.newGroupOption")}</option>
-        </select>
+        <Select
+          full
+          value={choice}
+          label={t("edit.groups")}
+          options={[
+            ...(mixed ? [{ value: KEEP, label: t("edit.keepGroup") }] : []),
+            { value: NONE, label: t("shelf.ungrouped") },
+            ...groupTree(props.groups).flatMap(({ name, children }) => [
+              { value: name, label: name },
+              ...children.map((child) => ({ value: child, label: labelOf(child, name), indent: true })),
+            ]),
+            { value: NEW, label: t("edit.newGroupOption") },
+          ]}
+          onChange={setChoice}
+        />
         {choice === NEW && (
           <input
             className="inline-add"
@@ -93,14 +93,14 @@ export function EditDialog(props: { books: Book[]; groups: string[]; onSave: (pa
           />
         )}
         {choice === NEW && (
-          <select className="inline-add" value={newParent} aria-label={t("shelf.parentGroup")} onChange={(e) => setNewParent(e.target.value)}>
-            <option value="">{t("shelf.topLevel")}</option>
-            {groupTree(props.groups).map(({ name }) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+          <Select
+            full
+            className="inline-add"
+            value={newParent}
+            label={t("shelf.parentGroup")}
+            options={[{ value: "", label: t("shelf.topLevel") }, ...groupTree(props.groups).map(({ name }) => ({ value: name, label: name }))]}
+            onChange={setNewParent}
+          />
         )}
       </label>
       {single && (

@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
 import { coverUrl } from "../api";
 import type { Book } from "../types";
 import { formatDate, formatDuration, t } from "../i18n";
@@ -16,12 +16,8 @@ export function Cover({ book, small }: { book: Book; small?: boolean }) {
   if (book.hasCover && !failed) {
     return <img className="cover-img" src={coverUrl(book)} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setFailed(true)} />;
   }
-  const h = hue(book.title);
   return (
-    <div
-      className={small ? "cover-placeholder small" : "cover-placeholder"}
-      style={{ background: `linear-gradient(160deg, hsl(${h} 45% 52%), hsl(${(h + 40) % 360} 50% 34%))` }}
-    >
+    <div className={small ? "cover-placeholder small" : "cover-placeholder"} style={{ "--cover-hue": hue(book.title) } as CSSProperties}>
       {!small && <span className="cover-title">{book.title}</span>}
       {!small && book.author && <span className="cover-author">{book.author}</span>}
     </div>

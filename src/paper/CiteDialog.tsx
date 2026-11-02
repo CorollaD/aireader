@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api, errorText, type CitationFormat } from "../api";
 import { t } from "../i18n";
 import { Modal } from "../ui";
+import { Select } from "../Select";
 
 const FORMATS: { key: CitationFormat; label: string }[] = [
   { key: "gbt7714", label: "GB/T 7714" },
@@ -80,13 +81,7 @@ export default function CiteDialog(props: { ids: string[]; onClose: () => void }
     <Modal title={t("cite.title", { n: ids.length })} width={600} onClose={props.onClose} footer={footer}>
       <label className="field">
         <span>{t("export.format")}</span>
-        <select value={format} onChange={(e) => choose(e.target.value as CitationFormat)}>
-          {FORMATS.map((f) => (
-            <option key={f.key} value={f.key}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+        <Select full value={format} label={t("export.format")} options={FORMATS.map((f) => ({ value: f.key, label: f.label }))} onChange={choose} />
       </label>
       <textarea className="cite-text" readOnly value={text} rows={9} aria-label={t("cite.title", { n: ids.length })} />
       <p className="muted small hint">{t("cite.hint")}</p>

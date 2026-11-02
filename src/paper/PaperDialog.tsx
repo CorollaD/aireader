@@ -7,6 +7,7 @@ import { t } from "../i18n";
 import type { Book, PaperInfo } from "../types";
 import { Modal } from "../ui";
 import PaperPreview from "./PaperPreview";
+import { Select } from "../Select";
 
 const KINDS = ["article", "conference", "preprint", "book", "other"] as const;
 
@@ -118,13 +119,13 @@ export default function PaperDialog(props: { bookId?: string; onClose: () => voi
           <>
             <label className="field">
               <span>{t("paper.kind")}</span>
-              <select value={info.kind} onChange={(e) => patch({ kind: e.target.value })}>
-                {KINDS.map((k) => (
-                  <option key={k} value={k}>
-                    {t(`paper.kind.${k}`)}
-                  </option>
-                ))}
-              </select>
+              <Select
+                full
+                value={info.kind}
+                label={t("paper.kind")}
+                options={KINDS.map((k) => ({ value: k as string, label: t(`paper.kind.${k}`) }))}
+                onChange={(kind) => patch({ kind })}
+              />
             </label>
             <label className="field">
               <span>{t("paper.title")}</span>

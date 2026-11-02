@@ -34,13 +34,9 @@ const fr: Messages = {
   "bg.cream": "Crème",
   "bg.parchment": "Parchemin",
   "bg.green": "Vert doux",
-  "bg.mint": "Menthe",
   "bg.sky": "Ciel",
-  "bg.blossom": "Fleur de cerisier",
-  "bg.lightGray": "Gris clair",
   "bg.darkGray": "Gris foncé",
   "bg.night": "Nuit",
-  "bg.navy": "Bleu marine",
   "bg.black": "Noir",
   "font.sans": "Sans",
   "font.serif": "Serif",
@@ -390,8 +386,8 @@ const fr: Messages = {
   "dd.incomplete": "environ {n} % de la copie la plus complète",
   "dd.read": "lu {p}",
   "dd.scoreTitle": "Score de qualité : texte, netteté du scan, format, sommaire, couverture et complétude",
-  "dd.footer": "{n} autres copies quitteront la bibliothèque (vos fichiers d'origine ne sont pas touchés)",
-  "dd.apply": "Appliquer à {n} groupes",
+  "dd.footer": "Quitteront la bibliothèque : {n} (vos fichiers d'origine ne sont pas touchés)",
+  "dd.apply": "Appliquer ({n})",
   "dd.done": "{n} livres en double retirés ; {h} surlignages et {b} signets déplacés",
 
   "reader.collapseSidebar": "Masquer la barre latérale",
@@ -675,6 +671,10 @@ const fr: Messages = {
   "shelf.expand": "Développer",
   "shelf.collapse": "Réduire",
   "shelf.deleteGroupChildren": "Ses sous-groupes remontent d'un niveau et deviennent des groupes à part entière.",
+  "settings.theme": "Apparence",
+  "settings.themeSystem": "Système",
+  "settings.themeLight": "Clair",
+  "settings.themeDark": "Sombre",
 };
 
 export default fr;

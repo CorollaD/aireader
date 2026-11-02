@@ -12,6 +12,7 @@ const EMBED_MODELS: Record<string, string[]> = {
   custom: ["BAAI/bge-m3", "text-embedding-v3"],
 };
 import { ANSWER_LANGUAGES, PROVIDERS, baseUrlPlaceholder, presetOf, providerLabel } from "./presets";
+import { Select } from "../Select";
 
 export default function AiSettingsForm(props: { status: AiStatus; onSaved: (s: AiStatus) => void }) {
   const [config, setConfig] = useState<AiConfig>(() => ({
@@ -97,13 +98,13 @@ export default function AiSettingsForm(props: { status: AiStatus; onSaved: (s: A
     <div className="settings-form">
       <label className="field">
         <span>{t("ai.provider")}</span>
-        <select value={config.provider} onChange={(e) => pickProvider(e.target.value)}>
-          {PROVIDERS.map((p) => (
-            <option key={p.id} value={p.id}>
-              {providerLabel(p)}
-            </option>
-          ))}
-        </select>
+        <Select
+          full
+          value={config.provider}
+          label={t("ai.provider")}
+          options={PROVIDERS.map((p) => ({ value: p.id, label: providerLabel(p) }))}
+          onChange={pickProvider}
+        />
       </label>
       <label className="field">
         <span>{t("ai.model")}</span>
@@ -160,13 +161,13 @@ export default function AiSettingsForm(props: { status: AiStatus; onSaved: (s: A
       )}
       <label className="field">
         <span>{t("ai.language")}</span>
-        <select value={config.language} onChange={(e) => setConfig((c) => ({ ...c, language: e.target.value }))}>
-          {[...new Set([...ANSWER_LANGUAGES, config.language])].map((l) => (
-            <option key={l} value={l}>
-              {l === "auto" ? t("ai.languageAuto") : l}
-            </option>
-          ))}
-        </select>
+        <Select
+          full
+          value={config.language}
+          label={t("ai.language")}
+          options={[...new Set([...ANSWER_LANGUAGES, config.language])].map((l) => ({ value: l, label: l === "auto" ? t("ai.languageAuto") : l }))}
+          onChange={(language) => setConfig((c) => ({ ...c, language }))}
+        />
       </label>
       <p className="muted small">{preset?.local ? t("ai.localNote") : t("ai.cloudNote")}</p>
 
@@ -174,19 +175,21 @@ export default function AiSettingsForm(props: { status: AiStatus; onSaved: (s: A
       <p className="muted small hint">{t("ai.embedHint")}</p>
       <label className="field">
         <span>{t("ai.provider")}</span>
-        <select
+        <Select
+          full
           value={embed.provider}
-          onChange={(e) => {
-            const provider = e.target.value;
+          label={t("ai.provider")}
+          options={[
+            { value: "", label: t("ai.embedNone") },
+            { value: "ollama", label: t("ai.local", { name: "Ollama" }) },
+            { value: "openai", label: "OpenAI" },
+            { value: "custom", label: t("ai.custom") },
+          ]}
+          onChange={(provider) => {
             setEmbed({ provider, model: EMBED_MODELS[provider]?.[0] ?? "", baseUrl: null });
             setEmbedKey(undefined);
           }}
-        >
-          <option value="">{t("ai.embedNone")}</option>
-          <option value="ollama">{t("ai.local", { name: "Ollama" })}</option>
-          <option value="openai">OpenAI</option>
-          <option value="custom">{t("ai.custom")}</option>
-        </select>
+        />
       </label>
       {embed.provider && (
         <>

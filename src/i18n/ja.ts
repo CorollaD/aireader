@@ -34,13 +34,9 @@ const ja: Messages = {
   "bg.cream": "クリーム",
   "bg.parchment": "羊皮紙",
   "bg.green": "目に優しい緑",
-  "bg.mint": "ミント",
   "bg.sky": "スカイ",
-  "bg.blossom": "桜",
-  "bg.lightGray": "ライトグレー",
   "bg.darkGray": "ダークグレー",
   "bg.night": "夜間",
-  "bg.navy": "ネイビー",
   "bg.black": "ブラック",
   "font.sans": "ゴシック",
   "font.serif": "明朝",
@@ -662,6 +658,10 @@ const ja: Messages = {
   "shelf.expand": "展開",
   "shelf.collapse": "折りたたむ",
   "shelf.deleteGroupChildren": "サブグループは 1 階層上がり、独立したグループになります。",
+  "settings.theme": "外観",
+  "settings.themeSystem": "システム",
+  "settings.themeLight": "ライト",
+  "settings.themeDark": "ダーク",
 };
 
 export default ja;

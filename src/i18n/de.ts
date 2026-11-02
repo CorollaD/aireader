@@ -34,13 +34,9 @@ const de: Messages = {
   "bg.cream": "Creme",
   "bg.parchment": "Pergament",
   "bg.green": "Sanftes Grün",
-  "bg.mint": "Mint",
   "bg.sky": "Himmel",
-  "bg.blossom": "Kirschblüte",
-  "bg.lightGray": "Hellgrau",
   "bg.darkGray": "Dunkelgrau",
   "bg.night": "Nacht",
-  "bg.navy": "Marineblau",
   "bg.black": "Schwarz",
   "font.sans": "Sans",
   "font.serif": "Serif",
@@ -389,8 +385,8 @@ const de: Messages = {
   "dd.incomplete": "etwa {n} % der vollständigsten Kopie",
   "dd.read": "{p} gelesen",
   "dd.scoreTitle": "Qualitätswert: Text, Schärfe des Scans, Format, Inhaltsverzeichnis, Cover und Vollständigkeit",
-  "dd.footer": "{n} weitere Kopien verlassen das Regal (deine Originaldateien bleiben unverändert)",
-  "dd.apply": "Auf {n} Gruppen anwenden",
+  "dd.footer": "Werden aus dem Regal entfernt: {n} (deine Originaldateien bleiben unverändert)",
+  "dd.apply": "Anwenden ({n})",
   "dd.done": "{n} doppelte Bücher entfernt; {h} Markierungen und {b} Lesezeichen übernommen",
 
   "reader.collapseSidebar": "Seitenleiste ausblenden",
@@ -670,6 +666,10 @@ const de: Messages = {
   "shelf.expand": "Aufklappen",
   "shelf.collapse": "Einklappen",
   "shelf.deleteGroupChildren": "Die Untergruppen rücken eine Ebene auf und werden eigene Gruppen.",
+  "settings.theme": "Darstellung",
+  "settings.themeSystem": "System",
+  "settings.themeLight": "Hell",
+  "settings.themeDark": "Dunkel",
 };
 
 export default de;
