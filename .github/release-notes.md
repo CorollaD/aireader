@@ -1,13 +1,13 @@
-## What's new in 0.6.1 / 更新内容
+## What's new in 0.7.0 / 更新内容
 
-- **OPDS 2** / 支持 OPDS 2：catalogs in the JSON format work alongside OPDS 1, and catalogs can log in with Digest (used by some Calibre servers). / JSON 格式的书源和 OPDS 1 一样可用，并支持 Digest 登录（部分 Calibre 服务器使用）。
-- **Open sources** / 开放书源：add catalogs in one click from Online catalogs → Open sources: Project Gutenberg, Internet Archive, OpenEdition and more. / 在「在线书库 → 开放书源」里一键添加 Project Gutenberg、Internet Archive、OpenEdition 等。
-- **Wikisource** / 维基文库：search seven languages, including Chinese classics, and download as EPUB. Very long works may export only their contents page; you'll be told. / 搜索七种语言，含中文古籍，并下载为 EPUB。大部头可能只导出目录，届时会有提示。
-- **Gutenberg by language** / Gutenberg 分语言：browse Chinese, German, French, Spanish and Italian books. / 浏览中、德、法、西、意语的书。
-- **Library websites** / 图书馆网站：21 libraries without an app interface open in your browser, such as CBETA, Gallica and Aozora Bunko. / 21 个没有应用接口的图书馆可在浏览器打开，如 CBETA、Gallica、青空文库。
-- **New formats** / 新格式：DjVu (including text recognition for scans), ODT, RTF and saved HTML pages. / DjVu（扫描件可做文字识别）、ODT、RTF 和保存的 HTML 网页。
+- **New look** / 全新界面：a cleaner, neutral design with one accent colour, across the shelf, reader, AI panel and every dialog. / 更简洁的中性设计，只用一种强调色，覆盖书架、阅读、AI 面板和所有对话框。
+- **Light and dark** / 浅色和深色：choose System, Light or Dark in Settings → General. The interface theme is now separate from the reading background. / 在「设置 → 通用」里选择跟随系统、浅色或深色。界面主题现在和阅读背景分开设置。
+- **Reading themes** / 阅读主题：eight redesigned backgrounds. With a dark background, the toolbar and sidebar turn dark too. / 重新设计的 8 种背景；背景为深色时，工具栏和侧栏也会变深。
+- **macOS title bar** / macOS 标题栏：the window buttons now sit on the top bar, and the top bar drags the window. / 红绿灯融进顶栏，顶栏可以拖动窗口。
+- **Small windows** / 小窗口：the text no longer gets squeezed. AI and search panels float over it, the shelf toolbar wraps to two rows, and PDF tools move to the More menu. / 正文不再被挤压：AI 和搜索面板浮在正文上，书架工具栏折成两行，PDF 工具收进「更多」菜单。
+- **Subgroups** / 子分组：a group can have subgroups, named like `Parent-Child`. Opening the parent includes the books in its subgroups. / 分组可以建子分组，名字形如 `父-子`，点父分组时包含子分组的书。
 
-**Known limits** / 已知限制：the new formats have had limited testing with real-world files. Internet Archive downloads can be slow or fail on some networks, and its search mostly lists books for loan; use its Open Access section. Text recognition has only been run on an Intel Mac. / 新格式用真实文件测试得还不多。Internet Archive 在部分网络下可能很慢或下载失败，搜索结果多为借阅书，请从 Open Access 分组进入。文字识别只在 Intel Mac 上实际运行过。
+**Known limits** / 已知限制：the new look has only been run on macOS (Intel); Windows and Linux builds have not been tried by hand. Reading background presets went from twelve to eight; a colour you already chose from a removed preset keeps working as a custom colour. / 新界面只在 macOS（Intel）上实际运行过，Windows 和 Linux 版本未手动试用。阅读背景预设从 12 种减为 8 种；已选用的被移除预设会作为自定义颜色继续生效。
 
 ## Downloads / 下载
 
