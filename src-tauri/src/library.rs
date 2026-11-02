@@ -294,6 +294,9 @@ pub fn stage(root: &Path, src: &Path) -> Result<Staged> {
     };
     let mut out = std::fs::File::create(staged.file()).with_context(|| crate::t!("copy_failed"))?;
     staged.sha256 = copy_hashed(src, Some(&mut out))?;
+    if formats::detect(src).is_ok_and(|f| f == formats::Format::Markdown) {
+        formats::markdown::copy_images(src, &staged.dir);
+    }
     Ok(staged)
 }
 

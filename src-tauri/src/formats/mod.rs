@@ -23,8 +23,8 @@ use crate::model::{Block, Content, Document};
 
 /// File extensions offered in the open dialog and accepted when importing folders.
 pub const EXTENSIONS: &[&str] = &[
-    "epub", "pdf", "txt", "md", "markdown", "mobi", "azw", "azw3", "prc", "fb2", "docx", "cbz",
-    "djvu", "djv", "rtf", "odt", "html", "htm", "xhtml",
+    "epub", "pdf", "txt", "md", "markdown", "mdown", "mobi", "azw", "azw3", "prc", "fb2", "docx",
+    "cbz", "djvu", "djv", "rtf", "odt", "html", "htm", "xhtml",
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

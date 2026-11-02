@@ -31,6 +31,7 @@ const EXTENSIONS = [
   "txt",
   "md",
   "markdown",
+  "mdown",
   "mobi",
   "azw",
   "azw3",
