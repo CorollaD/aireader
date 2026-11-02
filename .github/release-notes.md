@@ -1,13 +1,13 @@
-## What's new in 0.7.1 / 更新内容
+## What's new in 0.7.2 / 更新内容
 
-- **Accent colours** / 强调色：pick one of seven in Settings → General: indigo, blue, teal, violet, rose, orange or graphite. / 在「设置 → 通用」里选择七种之一：靛蓝、蓝、青、紫、玫红、橙、石墨。
-- **New icon and finer details** / 新图标与细节：a new app icon; frosted menus and toolbars; AI features marked with a gradient. / 新的应用图标；菜单和工具栏改为毛玻璃；AI 功能用渐变标出。
-- **Your own sync server** / 自建同步服务器：sync through an AiReader server with an account, alongside WebDAV and folders. The server is in the `server` folder of the project, with Docker and HTTPS setup; the app keeps only a sign-in token in the system keychain. / 除了 WebDAV 和文件夹，还可以登录自建的 AiReader 服务器同步。服务端在项目的 `server` 目录，附 Docker 和 HTTPS 部署说明；App 只在系统钥匙串里保存登录令牌。
-- **Sync fix** / 同步修复：two devices set up at the same moment could get the same id and skip each other's data. / 两台在同一时刻配置的设备可能得到相同的编号，互相跳过对方的数据。
+- **Online voices for reading aloud** / 在线朗读语音：besides the system voices (still the default), read aloud with an OpenAI-compatible service (OpenAI, SiliconFlow, or Kokoro running on your computer), Azure Speech, Volcengine (Doubao) or ElevenLabs. Set it up in Settings → Reading and press Listen to try it; keys stay in the system keychain. / 除了系统语音（仍是默认），还可以用 OpenAI 兼容服务（OpenAI、硅基流动或本机运行的 Kokoro）、Azure 语音、火山引擎（豆包语音）或 ElevenLabs 朗读。在「设置 → 阅读」里配置，点「试听」检查；密钥保存在系统钥匙串。
+- **Creating an account** / 注册账号：the AiReader server sync form now switches between signing in and creating an account. Accounts are only needed for syncing through an AiReader server. / 同步设置里的 AiReader 服务器可以在「登录」和「创建账号」之间切换。只有通过 AiReader 服务器同步时才需要账号。
+- **AI organize fix** / AI 整理修复：large shelves no longer fail with "invalid JSON: EOF while parsing a list"; replies that stop part way are kept and the rest is asked again. / 书很多时不再报「invalid JSON: EOF while parsing a list」；回复中途断掉时保留已有结果，其余的再问一次。
+- **Version number** / 版本号：shown at the bottom of Settings → General. / 显示在「设置 → 通用」底部。
 
-**Phones (preview)** / 手机版（预览）：an Android APK and an iOS Simulator build are attached for testing; they haven't been tried on real phones yet. / 附带 Android APK 和 iOS 模拟器版供测试，尚未在真机上试过。
+**Phones (preview)** / 手机版（预览）：an Android APK and an iOS Simulator build are attached for testing; they haven't been tried on real phones yet. The APK is signed with a key made for this build, so uninstall an earlier test version before installing it. / 附带 Android APK 和 iOS 模拟器版供测试，尚未在真机上试过。APK 用本次构建生成的密钥签名，安装前请先卸载之前的测试版。
 
-**Known limits** / 已知限制：the sync server has been tested on macOS and in Docker, not yet on a public server. / 同步服务器在 macOS 和 Docker 里测试过，还没有在公网服务器上实际运行。
+**Known limits** / 已知限制：the online voices have been tested with sample audio only, not yet against each service. / 在线语音只用示例音频测过，还没有逐一连接各服务实测。
 
 ## Downloads / 下载
 
