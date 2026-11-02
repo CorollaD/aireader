@@ -2,6 +2,8 @@
 //! to its own rows, so totals from several devices can be added up without counting twice.
 
 use std::collections::BTreeMap;
+use std::collections::hash_map::RandomState;
+use std::hash::{BuildHasher, Hasher};
 
 use anyhow::Result;
 use chrono::{Datelike, Duration, NaiveDate};
@@ -29,14 +31,24 @@ pub fn device_id(conn: &Connection) -> Result<String> {
     if let Some(id) = crate::db::kv_get(conn, DEVICE)? {
         return Ok(id);
     }
-    let seed = format!("{}-{}", crate::library::now_millis(), std::process::id());
-    let id: String = Sha256::digest(seed.as_bytes())
+    let id = new_device_id();
+    crate::db::kv_set(conn, DEVICE, &id)?;
+    Ok(id)
+}
+
+fn new_device_id() -> String {
+    // The clock alone isn't enough: devices that share an id skip each other's data when syncing.
+    let random = RandomState::new().build_hasher().finish();
+    let seed = format!(
+        "{}-{}-{random}",
+        crate::library::now_millis(),
+        std::process::id()
+    );
+    Sha256::digest(seed.as_bytes())
         .iter()
         .take(8)
         .map(|b| format!("{b:02x}"))
-        .collect();
-    crate::db::kv_set(conn, DEVICE, &id)?;
-    Ok(id)
+        .collect()
 }
 
 /// Adds reading time to a day (`YYYY-MM-DD`, the reader's local date). The title is kept so the
@@ -255,6 +267,12 @@ mod tests {
 
     fn day(s: &str) -> NaiveDate {
         parse_day(s).unwrap()
+    }
+
+    #[test]
+    fn device_ids_made_at_the_same_moment_differ() {
+        let ids: std::collections::HashSet<_> = (0..1000).map(|_| new_device_id()).collect();
+        assert_eq!(ids.len(), 1000);
     }
 
     #[test]
