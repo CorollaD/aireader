@@ -1,13 +1,13 @@
-## What's new in 0.7.0 / 更新内容
+## What's new in 0.7.1 / 更新内容
 
-- **New look** / 全新界面：a cleaner, neutral design with one accent colour, across the shelf, reader, AI panel and every dialog. / 更简洁的中性设计，只用一种强调色，覆盖书架、阅读、AI 面板和所有对话框。
-- **Light and dark** / 浅色和深色：choose System, Light or Dark in Settings → General. The interface theme is now separate from the reading background. / 在「设置 → 通用」里选择跟随系统、浅色或深色。界面主题现在和阅读背景分开设置。
-- **Reading themes** / 阅读主题：eight redesigned backgrounds. With a dark background, the toolbar and sidebar turn dark too. / 重新设计的 8 种背景；背景为深色时，工具栏和侧栏也会变深。
-- **macOS title bar** / macOS 标题栏：the window buttons now sit on the top bar, and the top bar drags the window. / 红绿灯融进顶栏，顶栏可以拖动窗口。
-- **Small windows** / 小窗口：the text no longer gets squeezed. AI and search panels float over it, the shelf toolbar wraps to two rows, and PDF tools move to the More menu. / 正文不再被挤压：AI 和搜索面板浮在正文上，书架工具栏折成两行，PDF 工具收进「更多」菜单。
-- **Subgroups** / 子分组：a group can have subgroups, named like `Parent-Child`. Opening the parent includes the books in its subgroups. / 分组可以建子分组，名字形如 `父-子`，点父分组时包含子分组的书。
+- **Accent colours** / 强调色：pick one of seven in Settings → General: indigo, blue, teal, violet, rose, orange or graphite. / 在「设置 → 通用」里选择七种之一：靛蓝、蓝、青、紫、玫红、橙、石墨。
+- **New icon and finer details** / 新图标与细节：a new app icon; frosted menus and toolbars; AI features marked with a gradient. / 新的应用图标；菜单和工具栏改为毛玻璃；AI 功能用渐变标出。
+- **Your own sync server** / 自建同步服务器：sync through an AiReader server with an account, alongside WebDAV and folders. The server is in the `server` folder of the project, with Docker and HTTPS setup; the app keeps only a sign-in token in the system keychain. / 除了 WebDAV 和文件夹，还可以登录自建的 AiReader 服务器同步。服务端在项目的 `server` 目录，附 Docker 和 HTTPS 部署说明；App 只在系统钥匙串里保存登录令牌。
+- **Sync fix** / 同步修复：two devices set up at the same moment could get the same id and skip each other's data. / 两台在同一时刻配置的设备可能得到相同的编号，互相跳过对方的数据。
 
-**Known limits** / 已知限制：the new look has only been run on macOS (Intel); Windows and Linux builds have not been tried by hand. Reading background presets went from twelve to eight; a colour you already chose from a removed preset keeps working as a custom colour. / 新界面只在 macOS（Intel）上实际运行过，Windows 和 Linux 版本未手动试用。阅读背景预设从 12 种减为 8 种；已选用的被移除预设会作为自定义颜色继续生效。
+**Phones** / 手机版：Android and iOS builds are in progress and not part of this release yet. / Android 和 iOS 版还在开发中，不在本次发布中。
+
+**Known limits** / 已知限制：the sync server has been tested on macOS and in Docker, not yet on a public server. / 同步服务器在 macOS 和 Docker 里测试过，还没有在公网服务器上实际运行。
 
 ## Downloads / 下载
 
