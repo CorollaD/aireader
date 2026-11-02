@@ -1,5 +1,5 @@
-//! Where synced files live: a WebDAV server, or a folder some other program keeps in sync
-//! (iCloud Drive, Dropbox, OneDrive…). Paths are relative and use `/`.
+//! Where synced files live: an AiReader server, a WebDAV server, or a folder some other
+//! program keeps in sync (iCloud Drive, Dropbox, OneDrive…). Paths are relative and use `/`.
 
 use std::path::{Path, PathBuf};
 
@@ -23,6 +23,176 @@ pub struct RemoteFile {
 pub enum Remote {
     Folder(PathBuf),
     WebDav(WebDav),
+    Server(AiServer),
+}
+
+/// An account on an AiReader server (the `server` folder of this repository), signed in with a
+/// token. Each account has a private folder that works like the WebDAV one.
+pub struct AiServer {
+    client: Client,
+    /// The API root, ending with `/api/v1/`.
+    api: String,
+    token: String,
+}
+
+/// Where the API of a server address is.
+fn api_root(url: &str) -> Result<String> {
+    let base = url.trim().trim_end_matches('/');
+    let base = base.strip_suffix("/api/v1").unwrap_or(base);
+    if !matches!(
+        Url::parse(base).map(|u| u.scheme().to_owned()).as_deref(),
+        Ok("http" | "https")
+    ) {
+        bail!(crate::t!("opds_bad_address"));
+    }
+    Ok(format!("{base}/api/v1/"))
+}
+
+fn server_client() -> Result<Client> {
+    Ok(Client::builder()
+        .user_agent(USER_AGENT)
+        .connect_timeout(CONNECT_TIMEOUT)
+        .read_timeout(STALL_TIMEOUT)
+        .build()?)
+}
+
+/// An error for a failed response from an AiReader server.
+fn server_failed(status: StatusCode) -> anyhow::Error {
+    match status.as_u16() {
+        401 => anyhow!(crate::t!("sync_signed_out")),
+        _ => failed(status),
+    }
+}
+
+fn network_error(e: reqwest::Error) -> anyhow::Error {
+    log::warn!("sync request failed: {e}");
+    anyhow!(crate::t!("sync_network"))
+}
+
+impl AiServer {
+    pub fn new(url: &str, token: &str) -> Result<Self> {
+        Ok(Self {
+            client: server_client()?,
+            api: api_root(url)?,
+            token: token.to_owned(),
+        })
+    }
+
+    async fn send(
+        &self,
+        method: Method,
+        endpoint: &str,
+        path: &str,
+        build: impl FnOnce(reqwest::RequestBuilder) -> reqwest::RequestBuilder,
+    ) -> Result<Response> {
+        let mut url = Url::parse(&format!("{}{endpoint}", self.api))?;
+        url.query_pairs_mut().append_pair("path", path);
+        let request = self.client.request(method, url).bearer_auth(&self.token);
+        build(request).send().await.map_err(network_error)
+    }
+
+    async fn ok(&self, response: Response) -> Result<Response> {
+        if response.status().is_success() {
+            Ok(response)
+        } else {
+            Err(server_failed(response.status()))
+        }
+    }
+}
+
+/// A signed-in account.
+pub struct ServerSession {
+    pub token: String,
+    pub username: String,
+}
+
+/// What a server says about itself; also tells an AiReader server from anything else.
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerInfo {
+    pub registration: bool,
+    pub min_password: usize,
+}
+
+pub async fn server_info(url: &str) -> Result<ServerInfo> {
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Reply {
+        server: String,
+        registration: bool,
+        min_password: usize,
+    }
+    let response = server_client()?
+        .get(format!("{}info", api_root(url)?))
+        .send()
+        .await
+        .map_err(network_error)?;
+    let reply: Option<Reply> = response.json().await.ok();
+    match reply {
+        Some(r) if r.server == "aireader" => Ok(ServerInfo {
+            registration: r.registration,
+            min_password: r.min_password,
+        }),
+        _ => bail!(crate::t!("sync_not_server")),
+    }
+}
+
+/// Signs in, or creates the account first when `register` is set.
+pub async fn server_sign_in(
+    url: &str,
+    username: &str,
+    password: &str,
+    register: bool,
+) -> Result<ServerSession> {
+    #[derive(serde::Deserialize)]
+    struct Reply {
+        token: String,
+        username: String,
+    }
+    let endpoint = if register { "register" } else { "login" };
+    let response = server_client()?
+        .post(format!("{}{endpoint}", api_root(url)?))
+        .json(&serde_json::json!({ "username": username, "password": password }))
+        .send()
+        .await
+        .map_err(network_error)?;
+    let status = response.status();
+    if status.is_success() {
+        let reply: Reply = response
+            .json()
+            .await
+            .map_err(|_| anyhow!(crate::t!("sync_not_server")))?;
+        return Ok(ServerSession {
+            token: reply.token,
+            username: reply.username,
+        });
+    }
+    // The server explains a refused name or password; other failures read as usual.
+    let message = response
+        .json::<serde_json::Value>()
+        .await
+        .ok()
+        .and_then(|v| v["message"].as_str().map(str::to_owned));
+    Err(match status.as_u16() {
+        401 => anyhow!(crate::t!("sync_wrong_password")),
+        403 if register => anyhow!(crate::t!("sync_registration_closed")),
+        409 => anyhow!(crate::t!("sync_name_taken")),
+        429 => anyhow!(crate::t!("sync_locked")),
+        400 if message.is_some() => anyhow!(message.unwrap_or_default()),
+        404 => anyhow!(crate::t!("sync_not_server")),
+        _ => server_failed(status),
+    })
+}
+
+/// Ends a sign-in on the server. Best effort: the token is forgotten locally either way.
+pub async fn server_sign_out(url: &str, token: &str) {
+    let Ok(api) = api_root(url) else { return };
+    let Ok(client) = server_client() else { return };
+    let _ = client
+        .post(format!("{api}logout"))
+        .bearer_auth(token)
+        .send()
+        .await;
 }
 
 pub struct WebDav {
@@ -184,6 +354,24 @@ impl Remote {
                 let xml = response.text().await?;
                 parse_listing(&xml, &url_path)
             }
+            Remote::Server(server) => {
+                #[derive(serde::Deserialize)]
+                struct Entry {
+                    name: String,
+                    dir: bool,
+                    tag: String,
+                }
+                let response = server.send(Method::GET, "list", dir, |r| r).await?;
+                let entries: Vec<Entry> = server.ok(response).await?.json().await?;
+                Ok(entries
+                    .into_iter()
+                    .map(|e| RemoteFile {
+                        name: e.name,
+                        dir: e.dir,
+                        tag: e.tag,
+                    })
+                    .collect())
+            }
         }
     }
 
@@ -196,6 +384,10 @@ impl Remote {
                     return Err(failed(response.status()));
                 }
                 Ok(response.bytes().await?.to_vec())
+            }
+            Remote::Server(server) => {
+                let response = server.send(Method::GET, "file", path, |r| r).await?;
+                Ok(server.ok(response).await?.bytes().await?.to_vec())
             }
         }
     }
@@ -217,6 +409,12 @@ impl Remote {
                 }
                 Ok(())
             }
+            Remote::Server(server) => {
+                let response = server
+                    .send(Method::PUT, "file", path, |r| r.body(bytes))
+                    .await?;
+                server.ok(response).await.map(|_| ())
+            }
         }
     }
 
@@ -237,6 +435,10 @@ impl Remote {
                     _ => Err(failed(response.status())),
                 }
             }
+            Remote::Server(server) => {
+                let response = server.send(Method::POST, "mkdir", path, |r| r).await?;
+                server.ok(response).await.map(|_| ())
+            }
         }
     }
 
@@ -249,6 +451,10 @@ impl Remote {
                     return Ok(());
                 }
                 Err(failed(response.status()))
+            }
+            Remote::Server(server) => {
+                let response = server.send(Method::DELETE, "file", path, |r| r).await?;
+                server.ok(response).await.map(|_| ())
             }
         }
     }
@@ -278,6 +484,17 @@ impl Remote {
                 }
                 Ok(())
             }
+            Remote::Server(server) => {
+                let file = tokio::fs::File::open(source).await?;
+                let size = file.metadata().await?.len();
+                let response = server
+                    .send(Method::PUT, "file", path, |r| {
+                        r.header(reqwest::header::CONTENT_LENGTH, size)
+                            .body(reqwest::Body::from(file))
+                    })
+                    .await?;
+                server.ok(response).await.map(|_| ())
+            }
         }
     }
 
@@ -294,6 +511,15 @@ impl Remote {
                 if !response.status().is_success() {
                     return Err(failed(response.status()));
                 }
+                let mut out = std::fs::File::create(dest)?;
+                while let Some(chunk) = response.chunk().await? {
+                    out.write_all(&chunk)?;
+                }
+                Ok(())
+            }
+            Remote::Server(server) => {
+                let response = server.send(Method::GET, "file", path, |r| r).await?;
+                let mut response = server.ok(response).await?;
                 let mut out = std::fs::File::create(dest)?;
                 while let Some(chunk) = response.chunk().await? {
                     out.write_all(&chunk)?;

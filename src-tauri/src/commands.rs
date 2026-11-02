@@ -915,6 +915,9 @@ pub async fn export_notes(
             return Err(crate::t!("notes_none"));
         }
         let ext = format.extension();
+        // Desktops write one file per book into a folder; phones can't pick folders, so there
+        // every book goes into one file below.
+        #[cfg(desktop)]
         if id.is_none() && !format.single_file() {
             let Some(dir) = app.dialog().file().blocking_pick_folder() else {
                 return Ok(None);
@@ -934,7 +937,11 @@ pub async fn export_notes(
         let content = match format {
             NotesFormat::Csv => export::to_csv(&books),
             NotesFormat::Json => export::to_json(&books).map_err(err)?,
-            _ => export::book_markdown(&books[0], format),
+            _ => books
+                .iter()
+                .map(|b| export::book_markdown(b, format))
+                .collect::<Vec<_>>()
+                .join("\n\n"),
         };
         let name = match name.rsplit_once('.') {
             Some((stem, _)) => format!("{stem}.{ext}"),

@@ -111,6 +111,9 @@ export default function App() {
     dark.addEventListener("change", apply);
     return () => dark.removeEventListener("change", apply);
   }, [settings.uiTheme]);
+  useEffect(() => {
+    document.documentElement.dataset.accent = settings.accent;
+  }, [settings.accent]);
 
   useEffect(() => watchTitleBar(), []);
 

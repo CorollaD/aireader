@@ -595,6 +595,15 @@ const en: Messages = {
   "sync.running": "Syncing…",
   "sync.last": "Last synced: {time}",
   "sync.never": "Not synced yet",
+  "sync.server": "AiReader server",
+  "sync.signIn": "Sign in",
+  "sync.register": "Create account",
+  "sync.signOut": "Sign out",
+  "sync.signedInAs": "Signed in as {name}",
+  "sync.signedOut": "Signed out; sync is off",
+  "sync.serverHint":
+    "Your own AiReader sync server (see the server folder of the project). Its owner creates accounts; if the server allows it, you can create one here.",
+  "sync.serverPasswordHint": "The password is only used to sign in and isn't stored: the app keeps a sign-in token in the system keychain.",
   "book.notDownloaded": "Not downloaded",
   "book.notDownloadedTitle": "A book from another device: it downloads when you open it",
   "shelf.downloading": "Downloading “{title}”…",
@@ -667,6 +676,14 @@ const en: Messages = {
   "settings.themeSystem": "System",
   "settings.themeLight": "Light",
   "settings.themeDark": "Dark",
+  "settings.accent": "Accent color",
+  "accent.indigo": "Indigo",
+  "accent.blue": "Blue",
+  "accent.teal": "Teal",
+  "accent.violet": "Violet",
+  "accent.rose": "Rose",
+  "accent.orange": "Orange",
+  "accent.graphite": "Graphite",
 };
 
 export default en;

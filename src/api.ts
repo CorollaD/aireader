@@ -33,6 +33,7 @@ import type {
   SemanticStatus,
   Shelf,
   Suggestion,
+  ServerInfo,
   SyncConfig,
   SyncStatus,
   TextRun,
@@ -135,6 +136,10 @@ export const api = {
   /** `quick` leaves out covers and book files, for when the app is closing. */
   syncNow: (quick: boolean) => invoke<void>("sync_now", { quick }),
   syncFetchBook: (id: string) => invoke<void>("sync_fetch_book", { id }),
+  syncServerInfo: (url: string) => invoke<ServerInfo>("sync_server_info", { url }),
+  /** Signs in (or creates the account, with `register`) and switches sync to the server. */
+  syncServerSignIn: (config: SyncConfig, password: string, register: boolean) => invoke<SyncStatus>("sync_server_sign_in", { config, password, register }),
+  syncServerSignOut: () => invoke<SyncStatus>("sync_server_sign_out"),
   opdsCatalogs: () => invoke<OpdsCatalog[]>("opds_catalogs"),
   /** Adds or updates a catalog; `password` undefined keeps the stored one. */
   opdsSaveCatalog: (catalog: OpdsCatalog, password?: string) => invoke<OpdsCatalog[]>("opds_save_catalog", { catalog, password }),

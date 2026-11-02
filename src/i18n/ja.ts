@@ -592,6 +592,15 @@ const ja: Messages = {
   "sync.running": "同期中…",
   "sync.last": "前回の同期：{time}",
   "sync.never": "まだ同期していません",
+  "sync.server": "AiReader サーバー",
+  "sync.signIn": "サインイン",
+  "sync.register": "アカウントを作成",
+  "sync.signOut": "サインアウト",
+  "sync.signedInAs": "{name} としてサインイン中",
+  "sync.signedOut": "サインアウトしました。同期はオフです",
+  "sync.serverHint":
+    "自分で用意する AiReader 同期サーバー（プロジェクトの server フォルダを参照）。アカウントは管理者が作成します。サーバーが許可していれば、ここで作成することもできます。",
+  "sync.serverPasswordHint": "パスワードはサインインにだけ使い、保存しません。アプリはシステムのキーチェーンにサインイン用トークンだけを保存します。",
   "book.notDownloaded": "未ダウンロード",
   "book.notDownloadedTitle": "他のデバイスの本です。開くとダウンロードします",
   "shelf.downloading": "「{title}」をダウンロード中…",
@@ -662,6 +671,14 @@ const ja: Messages = {
   "settings.themeSystem": "システム",
   "settings.themeLight": "ライト",
   "settings.themeDark": "ダーク",
+  "settings.accent": "アクセントカラー",
+  "accent.indigo": "インディゴ",
+  "accent.blue": "ブルー",
+  "accent.teal": "ティール",
+  "accent.violet": "バイオレット",
+  "accent.rose": "ローズ",
+  "accent.orange": "オレンジ",
+  "accent.graphite": "グラファイト",
 };
 
 export default ja;

@@ -196,10 +196,19 @@ export function installMock() {
         case "remove_font":
           return null;
         case "sync_status":
-          return { config: db.sync, hasPassword: false, lastSync: null, running: false, error: null };
+          return { config: db.sync, hasPassword: false, signedIn: db.sync.backend === "server", lastSync: null, running: false, error: null };
         case "sync_save":
           db.sync = a.config as typeof db.sync;
-          return { config: db.sync, hasPassword: Boolean(a.password), lastSync: now(), running: false, error: null };
+          return { config: db.sync, hasPassword: Boolean(a.password), signedIn: db.sync.backend === "server", lastSync: now(), running: false, error: null };
+        case "sync_server_info":
+          return { registration: true, minPassword: 8 };
+        case "sync_server_sign_in":
+          if (a.password === "wrong") throw "Wrong username or password";
+          db.sync = { ...(a.config as typeof db.sync), backend: "server" };
+          return { config: db.sync, hasPassword: false, signedIn: true, lastSync: now(), running: false, error: null };
+        case "sync_server_sign_out":
+          db.sync = { ...db.sync, backend: "" };
+          return { config: db.sync, hasPassword: false, signedIn: false, lastSync: now(), running: false, error: null };
         case "sync_test":
         case "sync_now":
         case "sync_fetch_book":

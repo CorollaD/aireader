@@ -22,6 +22,8 @@ import OrganizeDialog from "../ai/OrganizeDialog";
 import CiteDialog from "../paper/CiteDialog";
 import PaperDialog from "../paper/PaperDialog";
 import { dragRegion } from "../titlebar";
+import brandMark from "../../src-tauri/icons/icon.svg?url";
+import { mobile } from "../platform";
 
 const EXTENSIONS = [
   "epub",
@@ -98,6 +100,9 @@ export default function ShelfView(props: {
   const { settings, update } = props;
   const [shelf, setShelf] = useState<Shelf>({ books: [], groups: [] });
   const [filter, setFilter] = useState(ALL);
+  // Phones show the sidebar as a drawer over the shelf, opened on demand.
+  const [drawer, setDrawer] = useState(false);
+  const sidebarShown = mobile ? drawer : settings.shelfSidebar;
   const [query, setQuery] = useState("");
   const [foundInBooks, setFoundInBooks] = useState(false);
   const [cardStats, setCardStats] = useState<CardStats | null>(null);
@@ -273,7 +278,7 @@ export default function ShelfView(props: {
 
   const count = (pred: (b: Book) => boolean) => shelf.books.filter(pred).length;
   const sideItem = (key: string, icon: IconName, label: string, n: number) => (
-    <button key={key} className={`side-item${filter === key ? " active" : ""}`} onClick={() => setFilter(key)}>
+    <button key={key} className={`side-item${filter === key ? " active" : ""}`} onClick={() => (setFilter(key), setDrawer(false))}>
       <Icon name={icon} />
       <span className="ellipsis grow">{label}</span>
       <span className="count">{n}</span>
@@ -355,9 +360,15 @@ export default function ShelfView(props: {
 
   return (
     <div className="shelf" onClick={() => (setMenu(null), setImportMenu(false))}>
-      {settings.shelfSidebar && (
-        <aside className="sidebar">
+      {mobile && drawer && <div className="drawer-backdrop" onClick={() => setDrawer(false)} />}
+      {sidebarShown && (
+        <aside
+          className="sidebar"
+          // On phones, going anywhere from the drawer closes it; folding a group doesn't.
+          onClick={(e) => mobile && (e.target as HTMLElement).closest("button:not(.side-fold)") && setDrawer(false)}
+        >
           <div className="brand" {...dragRegion}>
+            <img className="brand-mark" src={brandMark} alt="" draggable={false} />
             AiReader
           </div>
           {sideItem(ALL, "library", t("shelf.all"), shelf.books.length)}
@@ -424,10 +435,10 @@ export default function ShelfView(props: {
       <main className="shelf-main">
         <header className="shelf-bar" {...dragRegion}>
           <button
-            className={`icon-button${settings.shelfSidebar ? " on" : ""}`}
+            className={`icon-button${sidebarShown ? " on" : ""}`}
             title={t("shelf.toggleSidebar")}
             aria-label={t("shelf.toggleSidebar")}
-            onClick={() => update({ shelfSidebar: !settings.shelfSidebar })}
+            onClick={() => (mobile ? setDrawer((d) => !d) : update({ shelfSidebar: !settings.shelfSidebar }))}
           >
             <Icon name="panelLeft" />
           </button>
@@ -508,7 +519,7 @@ export default function ShelfView(props: {
               </div>
             )}
           </div>
-          {!settings.shelfSidebar && (
+          {!sidebarShown && (
             <button className="icon-button" title={t("settings.title")} aria-label={t("settings.title")} onClick={() => openSettings()}>
               <Icon name="settings" />
             </button>

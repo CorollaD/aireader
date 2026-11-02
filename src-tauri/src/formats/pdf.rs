@@ -31,6 +31,8 @@ fn library_dirs() -> Vec<PathBuf> {
         .and_then(|p| p.parent().map(Path::to_owned))
     {
         dirs.push(exe_dir.join("lib"));
+        // iOS: inside the app bundle, next to the executable.
+        dirs.push(exe_dir.join("Frameworks"));
         dirs.push(exe_dir.join("../Frameworks"));
         dirs.push(exe_dir.join("../Resources/lib"));
         dirs.push(exe_dir.join("../lib"));

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/></linearGradient>
+    <linearGradient id="hi" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <filter id="sh" filterUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024"><feGaussianBlur stdDeviation="18"/></filter>
+  </defs>
+  <rect x="100" y="114" width="824" height="824" rx="186" fill="#1e1b4b" fill-opacity=".35" filter="url(#sh)"/>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#hi)"/>
+  <path d="M512 378 C440 334 334 322 252 344 L252 700 C334 680 440 690 512 734 Z" fill="#fff"/>
+  <path d="M512 378 C584 334 690 322 772 344 L772 700 C690 680 584 690 512 734 Z" fill="#fff" fill-opacity=".82"/>
+  <path transform="translate(742 232) scale(78)" d="M0 -1 C0.1 -0.28 0.28 -0.1 1 0 C0.28 0.1 0.1 0.28 0 1 C-0.1 0.28 -0.28 0.1 -1 0 C-0.28 -0.1 -0.1 -0.28 0 -1 Z" fill="#fff"/>
+  <path transform="translate(640 196) scale(30)" d="M0 -1 C0.1 -0.28 0.28 -0.1 1 0 C0.28 0.1 0.1 0.28 0 1 C-0.1 0.28 -0.28 0.1 -1 0 C-0.28 -0.1 -0.1 -0.28 0 -1 Z" fill="#fff" fill-opacity=".75"/>
+</svg>

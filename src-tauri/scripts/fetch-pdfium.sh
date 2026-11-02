@@ -30,6 +30,12 @@ case "$target" in
   x86_64-unknown-linux-gnu) pkg=pdfium-linux-x64; lib=libpdfium.so ;;
   aarch64-unknown-linux-gnu) pkg=pdfium-linux-arm64; lib=libpdfium.so ;;
   x86_64-pc-windows-msvc) pkg=pdfium-win-x64; lib=pdfium.dll ;;
+  aarch64-linux-android) pkg=pdfium-android-arm64; lib=libpdfium.so ;;
+  armv7-linux-androideabi) pkg=pdfium-android-arm; lib=libpdfium.so ;;
+  x86_64-linux-android) pkg=pdfium-android-x64; lib=libpdfium.so ;;
+  aarch64-apple-ios) pkg=pdfium-ios-device-arm64; lib=libpdfium.dylib ;;
+  aarch64-apple-ios-sim) pkg=pdfium-ios-simulator-arm64; lib=libpdfium.dylib ;;
+  x86_64-apple-ios) pkg=pdfium-ios-simulator-x64; lib=libpdfium.dylib ;;
   *) echo "Unsupported target: $target" >&2; exit 1 ;;
 esac
 
@@ -44,6 +50,12 @@ if [ "$version" = 8111 ]; then
     pdfium-linux-x64) sha256=bdc60126399f39fe768566a18d4be055a7b3681bc9e248e8a6656b4f6cae0aa2 ;;
     pdfium-linux-arm64) sha256=042de247138f96341534cccf24ed21c2550a7245b936bb4a60d2340120000f05 ;;
     pdfium-win-x64) sha256=3452d11031050ec65e57f180215b57b9e6d465e3fbedafa8a77ad90885c7d23e ;;
+    pdfium-android-arm64) sha256=727cb2645ece75d28d0b72f2ec05b82858ca3bfb6712cd333ffc248807016e2c ;;
+    pdfium-android-arm) sha256=fc6a54e286a46a52e45d5bd52803f59f3b86dfcff73ba8f458939872f5466de3 ;;
+    pdfium-android-x64) sha256=e2c31cffe42ee3a34e2b9d6c6c254ddf5da1541ce2d82216171e9354c86f0a7c ;;
+    pdfium-ios-device-arm64) sha256=7c7b64cf4c89eb229b8bedbeee5addb6272e168808a968315c3dea56cab99144 ;;
+    pdfium-ios-simulator-arm64) sha256=0793ce9127cafc36a95856e64ee1a0865f5173a5a8e11552340669727e1ab331 ;;
+    pdfium-ios-simulator-x64) sha256=15ebe67fe8c68810ef7cbc8c039caa790ad6b88dbc6531748bd44f3b907c0954 ;;
   esac
 fi
 # Records which package is in lib/, so switching targets fetches the right one.

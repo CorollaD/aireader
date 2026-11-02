@@ -591,6 +591,15 @@ const ko: Messages = {
   "sync.running": "동기화 중…",
   "sync.last": "마지막 동기화: {time}",
   "sync.never": "아직 동기화하지 않았습니다",
+  "sync.server": "AiReader 서버",
+  "sync.signIn": "로그인",
+  "sync.register": "계정 만들기",
+  "sync.signOut": "로그아웃",
+  "sync.signedInAs": "{name}(으)로 로그인됨",
+  "sync.signedOut": "로그아웃했습니다. 동기화가 꺼졌습니다",
+  "sync.serverHint":
+    "직접 운영하는 AiReader 동기화 서버입니다(프로젝트의 server 폴더 참고). 계정은 관리자가 만들며, 서버가 허용하면 여기서 만들 수도 있습니다.",
+  "sync.serverPasswordHint": "비밀번호는 로그인에만 쓰이고 저장되지 않습니다. 앱은 시스템 키체인에 로그인 토큰만 저장합니다.",
   "book.notDownloaded": "내려받지 않음",
   "book.notDownloadedTitle": "다른 기기의 책입니다. 열면 내려받습니다",
   "shelf.downloading": "'{title}' 내려받는 중…",
@@ -661,6 +670,14 @@ const ko: Messages = {
   "settings.themeSystem": "시스템",
   "settings.themeLight": "라이트",
   "settings.themeDark": "다크",
+  "settings.accent": "강조 색상",
+  "accent.indigo": "인디고",
+  "accent.blue": "파랑",
+  "accent.teal": "청록",
+  "accent.violet": "보라",
+  "accent.rose": "장미",
+  "accent.orange": "주황",
+  "accent.graphite": "그래파이트",
 };
 
 export default ko;

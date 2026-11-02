@@ -13,7 +13,7 @@ import { LANGUAGES, systemLanguage, t, type MessageKey } from "./i18n";
 import { Icon, type IconName } from "./icons";
 import { ReadingSettings } from "./reader/SettingsPanel";
 import { shortcuts } from "./reader/shortcuts";
-import { UI_SCALES, type Settings, type UiTheme } from "./settings";
+import { ACCENTS, UI_SCALES, type Settings, type UiTheme } from "./settings";
 import { Modal } from "./ui";
 import { Select } from "./Select";
 
@@ -82,6 +82,23 @@ export default function SettingsDialog(props: {
                     <button key={value} className={settings.uiTheme === value ? "on" : ""} onClick={() => update({ uiTheme: value })}>
                       {t(label)}
                     </button>
+                  ))}
+                </div>
+              </div>
+              <div className="panel-section">
+                <div className="panel-label">{t("settings.accent")}</div>
+                <div className="accent-swatches" role="radiogroup" aria-label={t("settings.accent")}>
+                  {ACCENTS.map((a) => (
+                    <button
+                      key={a}
+                      role="radio"
+                      aria-checked={settings.accent === a}
+                      data-accent={a}
+                      className={`accent-swatch${settings.accent === a ? " on" : ""}`}
+                      title={t(`accent.${a}`)}
+                      aria-label={t(`accent.${a}`)}
+                      onClick={() => update({ accent: a })}
+                    />
                   ))}
                 </div>
               </div>

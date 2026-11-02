@@ -35,8 +35,11 @@ fn file_arg(args: impl IntoIterator<Item = impl Into<PathBuf>>, cwd: &Path) -> O
         .find(|p| p.is_file())
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    let builder = builder
         // Must come first: a second launch (e.g. opening a book from the file manager while
         // the app runs) hands its file to this instance and quits, so only one process ever
         // writes the library.
@@ -57,7 +60,8 @@ pub fn run() {
                         | tauri_plugin_window_state::StateFlags::MAXIMIZED,
                 )
                 .build(),
-        )
+        );
+    let app = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         // Logs go to the terminal and to the app's log folder (e.g. ~/Library/Logs/<identifier>).
@@ -145,6 +149,9 @@ pub fn run() {
             sync::commands::sync_test,
             sync::commands::sync_now,
             sync::commands::sync_fetch_book,
+            sync::commands::sync_server_info,
+            sync::commands::sync_server_sign_in,
+            sync::commands::sync_server_sign_out,
             commands::opds_save_catalog,
             commands::opds_remove_catalog,
             commands::opds_feed,

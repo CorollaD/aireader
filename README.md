@@ -35,7 +35,7 @@
 - 扫描版 PDF 文字识别：在本机用 PP-OCRv6 识别没有文字层的页面（首次使用下载约 31MB 模型），后台运行，可停止，下次接着做；结果用于搜索、选中文字、朗读和 AI
 - 论文阅读：输入 DOI、arXiv 号、链接或标题导入开放获取的论文，查询并保存文献信息；点正文里的 `[12]` 查看参考文献，AI 论文速读（问题、方法、结果、局限）。联网查询都由手动触发，只发送输入的内容或那一条参考文献
 - 引用导出：BibTeX、RIS、CSL-JSON，以及 GB/T 7714、APA、MLA、Chicago、IEEE 格式的文字引用，可复制或批量保存为文件
-- 多设备同步：通过 WebDAV（坚果云、Nextcloud、群晖等）或网盘文件夹（iCloud Drive、Dropbox、OneDrive 等）同步书架、进度、书签、高亮、AI 对话、闪卡和阅读时长；书籍文件可选同步，未下载的书在打开时下载。设置和 API Key 不同步；数据不加密，同一条记录以较新的修改为准
+- 多设备同步：通过自建的 AiReader 服务器（账号登录，见 [server/README.md](server/README.md)）、WebDAV（坚果云、Nextcloud、群晖等）或网盘文件夹（iCloud Drive、Dropbox、OneDrive 等）同步书架、进度、书签、高亮、AI 对话、闪卡和阅读时长；书籍文件可选同步，未下载的书在打开时下载。设置和 API Key 不同步；数据不加密，同一条记录以较新的修改为准
 - 备份书库（设置 → 通用）：导出一个 zip，含数据库和封面，可选包含书籍文件
 - 安装后可以在文件管理器中用 AiReader 打开 EPUB、MOBI/AZW3、FB2、CBZ（以及 PDF）；程序已在运行时会在当前窗口打开，不会再启动一个
 
@@ -72,7 +72,7 @@
 **界面**
 - 界面语言：简体中文、繁體中文、English、Español、Italiano、Français、Deutsch、日本語、한국어、Português；默认跟随系统，可以随时切换
 - 界面大小：小 / 标准 / 大 / 特大（书架中也可以用 ⌘/Ctrl +、-、0 调整）；正文字号单独设置，不受影响
-- 外观：跟随系统、浅色、深色，与阅读背景分开设置
+- 外观：跟随系统、浅色、深色，与阅读背景分开设置；7 种强调色（靛蓝、蓝、青、紫、玫红、橙、石墨）
 - 设置窗口（⌘/Ctrl+,）：通用、阅读、词典、同步、AI、快捷键
 - 窗口变窄时工具栏自动收纳（PDF 的适应和旋转进「更多」菜单），AI 和搜索面板浮在正文上，正文不被挤压
 - macOS 上窗口没有单独的标题栏，顶栏可以拖动窗口；Windows 和 Linux 保留系统标题栏
@@ -104,6 +104,13 @@ npm run tauri build                   # 打包安装程序
 每次推送和 Pull Request 都会运行 `.github/workflows/check.yml`：前端 lint、测试和构建，`cargo fmt`、`clippy`（警告视为错误）和 `cargo test`。
 
 推送 `v*` 标签（版本号与 `package.json`、`Cargo.toml`、`tauri.conf.json` 一致，例如 `v0.5.0`）会触发 `.github/workflows/release.yml`：在 GitHub Actions 上分别构建 macOS（Apple 芯片、Intel）、Linux 和 Windows 安装包，全部成功后发布为 GitHub Release，并附上 `SHA256SUMS.txt`；也可以在 Actions 页面手动运行。Release 的说明取自 `.github/release-notes.md`，发版前更新其中的「更新内容」一节。
+
+### 手机版（Android、iOS）
+
+- Android：在 Actions 页面手动运行 `.github/workflows/android.yml`（推送 `v*` 标签时也会运行），产出用调试密钥签名的 APK，可以直接安装测试；上架需要自己的签名密钥。
+- iOS：`.github/workflows/ios.yml` 构建模拟器版 `.app`（Apple 芯片和 Intel 都能跑），没有签名，只能在模拟器里运行；装到 iPhone 需要 Apple 开发者账号。
+- 手机上：书架侧栏和阅读目录是抽屉，AI 和搜索面板全屏，对话框从底部弹出；API Key 存在 iOS 钥匙串 / Android Keystore。
+- 已知限制：手机版还没在真机上测过；Android 系统 WebView 可能不支持朗读；从 Android 文件管理器导入书籍还需要验证。
 
 ### 数据位置
 

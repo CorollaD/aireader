@@ -2,6 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./styles.css";
+import { mobile } from "./platform";
+
+document.documentElement.classList.toggle("mobile", mobile);
 
 async function start() {
   // In a plain browser during development, fake the Rust backend.

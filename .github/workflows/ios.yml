@@ -1,0 +1,69 @@
+# Builds the iOS app for the Simulator (Apple silicon and Intel Macs), by hand from the Actions
+# page or for a version tag. It isn't code-signed, so it runs only in the Simulator: installing
+# on an iPhone needs an Apple developer account and signing secrets.
+#
+# To try it: unzip the artifact, start a Simulator (Xcode → Open Developer Tool → Simulator),
+# then `xcrun simctl install booted AiReader.app`.
+
+name: iOS
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  simulator:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim,x86_64-apple-ios
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # The Xcode project is generated fresh, so it always matches the Tauri version.
+      - name: Xcode project
+        run: npm run tauri ios init -- --ci
+
+      # One PDFium library for both Simulator architectures, bundled as a resource.
+      - name: PDFium
+        run: |
+          PDFIUM_TARGET=aarch64-apple-ios-sim bash src-tauri/scripts/fetch-pdfium.sh
+          mv src-tauri/lib/libpdfium.dylib "$RUNNER_TEMP/arm64.dylib"
+          PDFIUM_TARGET=x86_64-apple-ios bash src-tauri/scripts/fetch-pdfium.sh
+          lipo -create "$RUNNER_TEMP/arm64.dylib" src-tauri/lib/libpdfium.dylib -output "$RUNNER_TEMP/pdfium.dylib"
+          mv "$RUNNER_TEMP/pdfium.dylib" src-tauri/lib/libpdfium.dylib
+          lipo -info src-tauri/lib/libpdfium.dylib
+
+      - name: Build for the Simulator
+        run: npm run tauri ios build -- --target aarch64-sim --target x86_64 --no-sign
+
+      - name: Collect the app
+        run: |
+          app="$(find src-tauri/gen/apple/build -name '*.app' -type d | head -n 1)"
+          [ -n "$app" ] || { echo "no .app was built" >&2; find src-tauri/gen/apple/build -maxdepth 4; exit 1; }
+          echo "built $app"
+          lipo -info "$app/$(defaults read "$PWD/$app/Info" CFBundleExecutable)" || true
+          ditto -c -k --keepParent "$app" "$RUNNER_TEMP/AiReader-ios-simulator.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AiReader-ios-simulator
+          path: ${{ runner.temp }}/AiReader-ios-simulator.zip
+          if-no-files-found: error

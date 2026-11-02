@@ -557,3 +557,65 @@ fn ties_go_the_same_way_on_every_device() {
     assert_eq!(newer((5, &x), (5, &y)), !newer((5, &y), (5, &x)));
     assert!(newer((6, &x), (5, &y)));
 }
+
+/// Two devices syncing through a running AiReader server, book file included. Set
+/// AIREADER_TEST_SERVER (its address), AIREADER_TEST_USER and AIREADER_TEST_PASSWORD, then run
+/// with `--ignored`.
+#[tokio::test]
+#[ignore = "needs a running AiReader server"]
+async fn through_a_live_server() {
+    let var = |name: &str| std::env::var(name).unwrap_or_else(|_| panic!("set {name}"));
+    let (url, user, password) = (
+        var("AIREADER_TEST_SERVER"),
+        var("AIREADER_TEST_USER"),
+        var("AIREADER_TEST_PASSWORD"),
+    );
+    let device =
+        |token: String| Remote::Server(super::remote::AiServer::new(&url, &token).unwrap());
+    let sign_in = || super::remote::server_sign_in(&url, &user, &password, false);
+    let (remote_a, remote_b) = (
+        device(sign_in().await.unwrap().token),
+        device(sign_in().await.unwrap().token),
+    );
+    let (a, b, _) = setup("live");
+
+    let id = a.import("书.txt", "第一章\n正文一\n第二章\n正文二");
+    a.save_annotations(
+        &id,
+        &Annotations {
+            highlights: vec![highlight("h1", 100)],
+            ..Default::default()
+        },
+    );
+    run(&a.library, &remote_a, true, false, |_| {})
+        .await
+        .unwrap();
+    run(&b.library, &remote_b, false, false, |_| {})
+        .await
+        .unwrap();
+    let missing = |d: &Device| {
+        d.lib()
+            .books()
+            .iter()
+            .any(|book| book.id == id && book.missing)
+    };
+    assert!(missing(&b), "the file hasn't been fetched yet");
+    assert_eq!(b.annotations(&id).highlights.len(), 1);
+
+    fetch_book(&b.library, &remote_b, &id).await.unwrap();
+    assert!(!missing(&b));
+
+    // A token that was signed out stops working, with a message that says so.
+    let session = sign_in().await.unwrap();
+    super::remote::server_sign_out(&url, &session.token).await;
+    let error = device(session.token).list("").await.unwrap_err();
+    assert_eq!(error.to_string(), crate::t!("sync_signed_out"));
+    assert_eq!(
+        super::remote::server_sign_in(&url, &user, "wrong password", false)
+            .await
+            .err()
+            .expect("a wrong password is refused")
+            .to_string(),
+        crate::t!("sync_wrong_password")
+    );
+}

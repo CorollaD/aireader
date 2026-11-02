@@ -4,11 +4,15 @@ import type { MessageKey } from "./i18n";
 
 export type FontFamily = "sans" | "serif" | "kai";
 export type UiTheme = "system" | "light" | "dark";
+/** Colours for buttons, links and selection; each has a light- and a dark-theme shade in styles.css. */
+export const ACCENTS = ["indigo", "blue", "teal", "violet", "rose", "orange", "graphite"] as const;
+export type Accent = (typeof ACCENTS)[number];
 export type ShelfSort = "recent" | "added" | "title" | "author" | "progress";
 
 export interface Settings {
   /** The interface's colours; the reading page has its own, from `background`. */
   uiTheme: UiTheme;
+  accent: Accent;
   background: string;
   /** `null` picks a readable colour automatically. */
   textColor: string | null;
@@ -50,6 +54,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   uiTheme: "system",
+  accent: "indigo",
   background: "#fbf8f1",
   textColor: null,
   fontFamily: "sans",
@@ -113,6 +118,7 @@ export const FONT_STACKS: Record<FontFamily, { name: MessageKey; css: string }> 
 export function normalizeSettings(raw: unknown): Settings {
   const s = { ...DEFAULT_SETTINGS, ...(raw && typeof raw === "object" ? (raw as Partial<Settings>) : {}) };
   if (!["system", "light", "dark"].includes(s.uiTheme)) s.uiTheme = DEFAULT_SETTINGS.uiTheme;
+  if (!ACCENTS.includes(s.accent)) s.accent = DEFAULT_SETTINGS.accent;
   if (!/^#[0-9a-f]{6}$/i.test(s.background)) s.background = DEFAULT_SETTINGS.background;
   if (s.textColor !== null && !/^#[0-9a-f]{6}$/i.test(s.textColor)) s.textColor = null;
   if (!(s.fontFamily in FONT_STACKS)) s.fontFamily = DEFAULT_SETTINGS.fontFamily;

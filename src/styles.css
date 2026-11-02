@@ -24,6 +24,38 @@
   --normal: 180ms var(--ease);
 }
 
+/* Accent colours, chosen in Settings: a shade for light surfaces (white text on it reads at
+   4.5:1 or better) and one for dark (dark text on it, likewise). */
+:root,
+[data-accent="indigo"] {
+  --accent-l: #5b5bd6;
+  --accent-d: #9b9bf2;
+}
+[data-accent="blue"] {
+  --accent-l: #2563eb;
+  --accent-d: #7aa7ff;
+}
+[data-accent="teal"] {
+  --accent-l: #0f766e;
+  --accent-d: #2dd4bf;
+}
+[data-accent="violet"] {
+  --accent-l: #7c3aed;
+  --accent-d: #b794f6;
+}
+[data-accent="rose"] {
+  --accent-l: #e11d48;
+  --accent-d: #fb7185;
+}
+[data-accent="orange"] {
+  --accent-l: #c2410c;
+  --accent-d: #fb923c;
+}
+[data-accent="graphite"] {
+  --accent-l: #3f3f46;
+  --accent-d: #e4e4e7;
+}
+
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
@@ -38,10 +70,10 @@
   --selected: rgba(24, 24, 27, 0.07);
   --border: rgba(24, 24, 27, 0.08);
   --border-strong: rgba(24, 24, 27, 0.15);
-  --accent: #5b5bd6;
-  --accent-hover: #4b4bc4;
+  --accent: var(--accent-l);
+  --accent-hover: color-mix(in srgb, var(--accent-l) 86%, #000);
   --on-accent: #ffffff;
-  --accent-soft: rgba(91, 91, 214, 0.1);
+  --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
   --danger: #dc2626;
   --ok: #15803d;
   --warn: #b45309;
@@ -68,10 +100,10 @@
   --selected: rgba(255, 255, 255, 0.09);
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.15);
-  --accent: #9b9bf2;
-  --accent-hover: #adadf6;
+  --accent: var(--accent-d);
+  --accent-hover: color-mix(in srgb, var(--accent-d) 84%, #fff);
   --on-accent: #16161d;
-  --accent-soft: rgba(155, 155, 242, 0.16);
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
   --danger: #f87171;
   --ok: #4ade80;
   --warn: #fbbf24;
@@ -404,10 +436,18 @@ input[type="color"] {
   overflow-y: auto;
 }
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   font-size: var(--text-lg);
   font-weight: 600;
   letter-spacing: -0.01em;
   padding: 2px 8px 12px;
+}
+.brand-mark {
+  width: 24px;
+  height: 24px;
+  margin: -2px 0 -2px -3px;
 }
 .side-item {
   display: flex;
@@ -2893,6 +2933,12 @@ button.cite:hover {
     display: none;
   }
 }
+@container (max-width: 440px) {
+  /* Phone width: a title cut to a character or two says nothing; the space goes to tools. */
+  .reader-title {
+    visibility: hidden;
+  }
+}
 @container (max-width: 660px) {
   .reader-bar .nav-tool {
     display: none;
@@ -4042,4 +4088,260 @@ article.flow a.internal:hover {
 .opds-more {
   align-self: center;
   margin-top: 12px;
+}
+
+/* Accent picker in Settings: each swatch shows its colour in the current theme. */
+.accent-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  /* Room for the selected swatch's ring. */
+  padding: 4px;
+  margin: -4px;
+}
+.accent-swatches .accent-swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-l);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  transition:
+    transform var(--fast),
+    box-shadow var(--fast);
+}
+:root[data-theme="dark"] .accent-swatches .accent-swatch {
+  background: var(--accent-d);
+}
+.accent-swatches .accent-swatch:hover:not(:disabled) {
+  background: var(--accent-l);
+  transform: scale(1.08);
+}
+:root[data-theme="dark"] .accent-swatches .accent-swatch:hover:not(:disabled),
+:root[data-theme="dark"] .accent-swatches .accent-swatch.on {
+  background: var(--accent-d);
+}
+.accent-swatches .accent-swatch.on,
+.accent-swatches .accent-swatch.on:hover:not(:disabled) {
+  background: var(--accent-l);
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--fg);
+}
+
+/* --- Depth and AI accents ------------------------------------------------------------------
+   Floating surfaces are frosted glass over what's beneath; a gradient, made from the accent,
+   is kept for AI features only so it reads as "AI" wherever it appears. */
+:root {
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+}
+:root,
+.reader[data-theme="dark"] {
+  --ai-gradient: linear-gradient(135deg, var(--accent) 10%, color-mix(in oklch, var(--accent), #c026d3 42%));
+  --glass: color-mix(in srgb, var(--surface) 82%, transparent);
+  --glass-blur: blur(20px) saturate(1.6);
+}
+
+.menu,
+.select-menu {
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: 12px;
+}
+.float-toolbar {
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+.modal-backdrop {
+  background: rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.modal {
+  border-radius: var(--radius-xl);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 24px 64px -12px var(--shadow);
+}
+
+button.primary {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 1px 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+button.primary:hover:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 4px 14px -2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.ai-orb {
+  border-radius: 16px;
+  color: var(--on-accent);
+  background: var(--ai-gradient);
+  box-shadow: 0 8px 24px -6px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.ai-send:not(:disabled, .stop),
+.ai-send:not(:disabled, .stop):hover {
+  color: var(--on-accent);
+  background: var(--ai-gradient) !important;
+}
+.ai-dots i {
+  background: var(--accent);
+}
+.streaming .md > :last-child::after {
+  background: var(--ai-gradient);
+}
+.ai-input:focus-within {
+  box-shadow:
+    0 0 0 3px var(--accent-soft),
+    0 8px 28px -10px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.ai-cards .ai-card {
+  transition:
+    transform var(--fast),
+    box-shadow var(--fast),
+    border-color var(--fast);
+}
+.ai-cards .ai-card:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-cards .ai-card:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* Sync settings: the signed-in AiReader server account. */
+.signed-in {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+
+/* --- Phones and tablets (html.mobile) ----------------------------------------------------
+   Bigger targets, room for the notch and home indicator, drawers instead of side columns,
+   and dialogs as sheets from the bottom. */
+.mobile {
+  --control-h: 36px;
+  --bar-h: 52px;
+  -webkit-tap-highlight-color: transparent;
+}
+.mobile .shelf-bar,
+.mobile .reader-bar,
+.mobile .review-head {
+  padding-top: env(safe-area-inset-top);
+  min-height: calc(var(--bar-h) + env(safe-area-inset-top));
+  height: auto;
+}
+.mobile .shelf-bar,
+.mobile .review-head {
+  padding-left: max(12px, env(safe-area-inset-left));
+  padding-right: max(12px, env(safe-area-inset-right));
+}
+.mobile .progress-bar-area {
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
+}
+.mobile .review-stage,
+.mobile .review-done,
+.mobile .shelf-content {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* The shelf's sidebar slides in over the books. */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  background: rgba(0, 0, 0, 0.3);
+  animation: appear var(--normal);
+}
+.mobile .sidebar {
+  position: fixed;
+  z-index: 60;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(82vw, 300px);
+  padding-top: calc(12px + env(safe-area-inset-top));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  box-shadow: var(--shadow-lg);
+  animation: drawer-in var(--normal);
+}
+@keyframes drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+/* In the reader, the contents and the AI or search panel cover the text instead of sharing
+   the width with it. */
+.mobile .reader-body {
+  position: relative;
+}
+.mobile .reader-body > .resizer {
+  display: none;
+}
+.drawer-backdrop.in-reader {
+  position: absolute;
+  z-index: 7;
+}
+.mobile .reader-body > .toc {
+  position: absolute;
+  z-index: 8;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(86vw, 340px) !important;
+  box-shadow: var(--shadow-lg);
+  animation: drawer-in var(--normal);
+}
+.mobile .reader-body > .ai-panel,
+.mobile .reader-body > .search-panel {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  width: 100% !important;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Dialogs rise from the bottom as sheets. */
+.mobile .modal-backdrop {
+  align-items: flex-end;
+}
+.mobile .modal {
+  width: 100% !important;
+  max-width: 100%;
+  max-height: calc(100% - env(safe-area-inset-top) - 24px);
+  overflow: auto;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  animation: sheet-in var(--normal);
+}
+@keyframes sheet-in {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+
+/* No hover on touch screens: what appears on pointing is always there. */
+@media (hover: none) {
+  .book-row .check:not(.on) {
+    opacity: 1;
+  }
+  .entry-actions {
+    visibility: visible;
+  }
 }

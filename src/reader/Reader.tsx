@@ -33,6 +33,7 @@ import { useReadingStats } from "./useReadingStats";
 import { useSpeech, useVoices } from "./useSpeech";
 import ReadAloudBar from "./ReadAloudBar";
 import { MIN_TEXT, Resizer, fitWidth, minWidth, usePanelWidths, type Panel } from "./Resizer";
+import { mobile } from "../platform";
 
 /** A navigation request; `n` makes repeated jumps to the same place distinct. */
 export interface Jump {
@@ -100,6 +101,8 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
   const [history, setHistory] = useState<{ back: Location[]; forward: Location[] }>({ back: [], forward: [] });
   const [toast, setToast] = useState<string | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
+  // On phones the contents are a drawer over the text: closed until asked for.
+  const [phoneToc, setPhoneToc] = useState(false);
   const [chatRequest, setChatRequest] = useState<ChatRequest | null>(null);
   const [pageSel, setPageSel] = useState<PageSelection | null>(null);
   const ai = useAi();
@@ -387,8 +390,14 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
   const rightPanel: Panel | null = aiShown ? "ai" : searchShown ? "search" : null;
   // Too narrow for both panels and the text: the one just opened on the right wins for now.
   const tocYields = !!rightPanel && bodyWidth > 0 && bodyWidth < minWidth("toc") + minWidth(rightPanel) + MIN_TEXT;
-  const tocShown = settings.showToc && !focus && !tocYields;
+  const tocShown = (mobile ? phoneToc : settings.showToc) && !focus && !tocYields;
   const toggleToc = () => {
+    if (mobile) {
+      setPhoneToc((open) => !open);
+      setAiOpen(false);
+      setSearch((s) => ({ ...s, open: false }));
+      return;
+    }
     if (!tocYields) return update({ showToc: !settings.showToc });
     setAiOpen(false);
     setSearch((s) => ({ ...s, open: false }));
@@ -775,17 +784,18 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
       {ocr.error && <div className="reader-notice error">{t("ocr.failed", { error: ocr.error })}</div>}
 
       <div className="reader-body" ref={body}>
+        {mobile && tocShown && <div className="drawer-backdrop in-reader" onClick={() => setPhoneToc(false)} />}
         {tocShown && (
           <Sidebar
             width={tocWidth}
-            onCollapse={() => update({ showToc: false })}
+            onCollapse={() => (mobile ? setPhoneToc(false) : update({ showToc: false }))}
             book={book}
             tab={sideTab}
             onTab={setSideTab}
             location={location}
             bookmarks={ann.data.bookmarks}
             highlights={ann.data.highlights}
-            onNavigate={navigate}
+            onNavigate={(loc, flash) => (navigate(loc, flash), setPhoneToc(false))}
             onRenameBookmark={(id, title) => ann.updateBookmark(id, { title })}
             onRemoveBookmark={ann.removeBookmark}
             onEditNote={setNoteFor}

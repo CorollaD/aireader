@@ -170,22 +170,44 @@ pub trait SecretStore: Send + Sync {
 
 pub struct KeyringStore;
 
+/// The keychain entry for a secret. On desktops the `keyring` crate picks the system store;
+/// phones use theirs directly (the iOS keychain, the Android keystore), set up on first use.
+#[cfg(desktop)]
+fn keychain_entry(name: &str) -> keyring_core::Result<keyring::Entry> {
+    keyring::Entry::new(KEYRING_SERVICE, name)
+}
+
+#[cfg(mobile)]
+fn keychain_entry(name: &str) -> keyring_core::Result<keyring_core::Entry> {
+    use std::sync::LazyLock;
+    static STORE: LazyLock<Result<(), String>> = LazyLock::new(|| {
+        #[cfg(target_os = "ios")]
+        let store = apple_native_keyring_store::protected::Store::new();
+        #[cfg(target_os = "android")]
+        let store = android_native_keyring_store::Store::new();
+        store
+            .map(|store| keyring_core::set_default_store(store))
+            .map_err(|e| e.to_string())
+    });
+    if let Err(e) = &*STORE {
+        return Err(keyring_core::Error::NoStorageAccess(e.clone().into()));
+    }
+    keyring_core::Entry::new(KEYRING_SERVICE, name)
+}
+
 impl SecretStore for KeyringStore {
     fn get(&self, name: &str) -> Option<String> {
-        keyring::Entry::new(KEYRING_SERVICE, name)
-            .ok()?
-            .get_password()
-            .ok()
+        keychain_entry(name).ok()?.get_password().ok()
     }
 
     fn set(&self, name: &str, value: &str) -> Result<()> {
-        keyring::Entry::new(KEYRING_SERVICE, name)?.set_password(value)?;
+        keychain_entry(name)?.set_password(value)?;
         Ok(())
     }
 
     fn delete(&self, name: &str) -> Result<()> {
-        match keyring::Entry::new(KEYRING_SERVICE, name)?.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        match keychain_entry(name)?.delete_credential() {
+            Ok(()) | Err(keyring_core::Error::NoEntry) => Ok(()),
             Err(e) => Err(e.into()),
         }
     }

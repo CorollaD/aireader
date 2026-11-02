@@ -460,7 +460,7 @@ export interface TextRun {
 }
 
 export interface SyncConfig {
-  /** "" (off), "webdav" or "folder". */
+  /** "" (off), "server" (an AiReader server), "webdav" or "folder". */
   backend: string;
   url: string;
   username: string;
@@ -471,9 +471,17 @@ export interface SyncConfig {
 export interface SyncStatus {
   config: SyncConfig;
   hasPassword: boolean;
+  /** Signed in to the AiReader server in `config`. */
+  signedIn: boolean;
   lastSync: number | null;
   running: boolean;
   error: string | null;
+}
+
+/** What an AiReader server says about itself. */
+export interface ServerInfo {
+  registration: boolean;
+  minPassword: number;
 }
 
 /** What a sync brought in (the `sync-changed` event). */

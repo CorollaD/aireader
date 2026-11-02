@@ -62,7 +62,7 @@ const MAX_COVER_BYTES: usize = 2 << 20;
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SyncConfig {
-    /// "" (off), "webdav" or "folder".
+    /// "" (off), "server" (an AiReader server), "webdav" or "folder".
     pub backend: String,
     pub url: String,
     pub username: String,
