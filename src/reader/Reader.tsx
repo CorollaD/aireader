@@ -110,7 +110,7 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
   const searchInput = useRef<HTMLInputElement>(null);
   const flowRef = useRef<FlowHandle>(null);
   const pendingSave = useRef<{ loc: Location; progress: number } | null>(null);
-  const saveTimer = useRef<number>();
+  const saveTimer = useRef<number | undefined>(undefined);
 
   const ann = useAnnotations(bookId);
   const ocr = useOcr(bookId, book?.title ?? "", book?.format === "PDF" || book?.format === "DJVU");

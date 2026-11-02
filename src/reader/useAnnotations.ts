@@ -22,7 +22,7 @@ export interface AnnotationsApi {
 export function useAnnotations(bookId: string): AnnotationsApi {
   const [data, setData] = useState<Annotations>({ bookmarks: [], highlights: [] });
   const loaded = useRef(false);
-  const timer = useRef<number>();
+  const timer = useRef<number | undefined>(undefined);
   const latest = useRef(data);
   /** Deleted since the last save. Saves name them: anything else this copy lacks came from a sync. */
   const removed = useRef<string[]>([]);

@@ -150,7 +150,7 @@ interface Props {
   speaking: SpeechPosition | null;
 }
 
-function useSize(ref: React.RefObject<HTMLElement>) {
+function useSize(ref: React.RefObject<HTMLElement | null>) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   useLayoutEffect(() => {
     const el = ref.current;

@@ -30,7 +30,7 @@ export default function App() {
   const [openAt, setOpenAt] = useState<OpenAt | null>(null);
   const [page, setPage] = useState<"review" | "stats" | "opds" | null>(null);
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
-  const saveTimer = useRef<number>();
+  const saveTimer = useRef<number | undefined>(undefined);
   const pendingSettings = useRef<Settings | null>(null);
 
   // Set before the tree renders, so every t() call below uses it.
