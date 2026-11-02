@@ -4,7 +4,7 @@ use anyhow::Result;
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 
-use crate::db::Db;
+use crate::db::{Db, deleted_since};
 
 use crate::model::Location;
 
@@ -65,7 +65,8 @@ impl AnnotationStore {
     }
 
     /// Saves what the reader holds. Its copy may be older than a sync that just ran, so nothing
-    /// is deleted unless listed in `removed`, and stored records newer than its copy stay.
+    /// is deleted unless listed in `removed`, stored records newer than its copy stay, and
+    /// records the sync deleted aren't brought back.
     pub fn apply(
         &self,
         book_id: &str,
@@ -75,10 +76,19 @@ impl AnnotationStore {
         let mut conn = self.db.conn();
         let tx = conn.transaction()?;
         let stored = read(&tx, book_id)?;
-        let mut new = annotations.clone();
         let gone = |id: &String| removed.contains(id);
-        new.bookmarks.retain(|b| !gone(&b.id));
-        new.highlights.retain(|h| !gone(&h.id));
+        let mut new = Annotations::default();
+        for b in &annotations.bookmarks {
+            let updated = b.updated.max(b.created);
+            if !gone(&b.id) && !deleted_since(&tx, "bookmark", &b.id, updated)? {
+                new.bookmarks.push(b.clone());
+            }
+        }
+        for h in &annotations.highlights {
+            if !gone(&h.id) && !deleted_since(&tx, "highlight", &h.id, h.updated)? {
+                new.highlights.push(h.clone());
+            }
+        }
         for o in stored.bookmarks.into_iter().filter(|o| !gone(&o.id)) {
             match new.bookmarks.iter_mut().find(|n| n.id == o.id) {
                 Some(n) if n.updated < o.updated => *n = o,
@@ -356,6 +366,51 @@ mod tests {
                 .note,
             newer.note
         );
+    }
+
+    #[test]
+    fn a_stale_save_cannot_bring_back_what_a_sync_deleted() {
+        let dir = std::env::temp_dir().join(format!("aireader-ann-dead-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Db::open(&dir.join("t.db")).unwrap();
+        let store = AnnotationStore::new(&db);
+        let mut kept = hl(0, 1, "text", None);
+        kept.id = "kept".into();
+        let mut deleted = hl(0, 2, "text", None);
+        deleted.id = "deleted".into();
+        let mine = Annotations {
+            highlights: vec![kept.clone(), deleted.clone()],
+            ..Default::default()
+        };
+        store.save("b", &mine).unwrap();
+
+        // Another device deleted one; the sync removed it while the reader held its old copy.
+        let conn = db.conn();
+        crate::db::tombstone(&conn, "highlight", "deleted", 10).unwrap();
+        store_for_test(&conn, "b", vec![kept.clone()]);
+        drop(conn);
+
+        store.apply("b", &mine, &[]).unwrap();
+        let ids: Vec<String> = store
+            .load("b")
+            .unwrap()
+            .highlights
+            .iter()
+            .map(|h| h.id.clone())
+            .collect();
+        assert_eq!(ids, ["kept"]);
+
+        // Changed after the deletion, it stays.
+        let mut edited = deleted.clone();
+        edited.updated = 20;
+        let later = Annotations {
+            highlights: vec![kept, edited],
+            ..Default::default()
+        };
+        store.apply("b", &later, &[]).unwrap();
+        assert_eq!(store.load("b").unwrap().highlights.len(), 2);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     fn store_for_test(conn: &Connection, book: &str, highlights: Vec<Highlight>) {

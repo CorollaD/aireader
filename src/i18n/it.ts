@@ -621,6 +621,7 @@ const it: Messages = {
   "tts.test": "Ascolta",
   "tts.testOk": "Funziona",
   "tts.sample": "Ciao, AiReader sta leggendo ad alta voce.",
+  "tts.badAudio": "L'audio inviato dal servizio vocale non può essere riprodotto.",
   "sync.server": "Server AiReader",
   "sync.signIn": "Accedi",
   "sync.register": "Crea account",

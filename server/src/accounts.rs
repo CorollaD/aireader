@@ -79,6 +79,36 @@ pub fn check_password(password: &str) -> Result<()> {
     Ok(())
 }
 
+/// Account ids name the account's folder of files, so a new account must never get the id of a
+/// deleted one. Databases made before ids were kept unique are rebuilt once, keeping every row.
+fn never_reuse_ids(conn: &Connection) -> Result<()> {
+    let sql: String = conn.query_row(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'",
+        [],
+        |r| r.get(0),
+    )?;
+    if sql.to_uppercase().contains("AUTOINCREMENT") {
+        return Ok(());
+    }
+    // Foreign keys are off while the table is replaced, or dropping it would drop the tokens.
+    conn.execute_batch(
+        "PRAGMA foreign_keys = OFF;
+         BEGIN;
+         CREATE TABLE users_unique (
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+             hash TEXT NOT NULL,
+             created INTEGER NOT NULL
+         );
+         INSERT INTO users_unique (id, name, hash, created) SELECT id, name, hash, created FROM users;
+         DROP TABLE users;
+         ALTER TABLE users_unique RENAME TO users;
+         COMMIT;
+         PRAGMA foreign_keys = ON;",
+    )?;
+    Ok(())
+}
+
 impl Accounts {
     pub fn open(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)?;
@@ -86,7 +116,7 @@ impl Accounts {
             "PRAGMA journal_mode = WAL;
              PRAGMA foreign_keys = ON;
              CREATE TABLE IF NOT EXISTS users (
-                 id INTEGER PRIMARY KEY,
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                  name TEXT NOT NULL UNIQUE COLLATE NOCASE,
                  hash TEXT NOT NULL,
                  created INTEGER NOT NULL
@@ -98,6 +128,7 @@ impl Accounts {
                  used INTEGER NOT NULL
              );",
         )?;
+        never_reuse_ids(&conn)?;
         Ok(Self {
             conn: Mutex::new(conn),
             dummy_hash: hash_password("not a real password")?,
@@ -265,6 +296,63 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let accounts = Accounts::open(&dir.path().join("a.db")).unwrap();
         (dir, accounts)
+    }
+
+    #[test]
+    fn a_deleted_accounts_id_is_never_given_again() {
+        let (_dir, a) = accounts();
+        a.add("alice", "correct horse").unwrap();
+        let bob = a.add("bob", "correct horse").unwrap();
+        assert_eq!(a.remove("bob").unwrap(), bob.id);
+        assert!(a.add("carol", "correct horse").unwrap().id > bob.id);
+    }
+
+    #[test]
+    fn older_databases_keep_their_accounts_and_stop_reusing_ids() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("a.db");
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                     hash TEXT NOT NULL, created INTEGER NOT NULL);
+                 CREATE TABLE tokens (hash TEXT PRIMARY KEY,
+                     user INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                     created INTEGER NOT NULL, used INTEGER NOT NULL);",
+            )
+            .unwrap();
+        }
+        let a = Accounts::open(&path).unwrap();
+        let alice = a.add("alice", "correct horse").unwrap();
+        let bob = a.add("bob", "correct horse").unwrap();
+        let token = a.issue_token(&alice).unwrap();
+        drop(a);
+        // Make it old again: the table as it was, with the same rows.
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "PRAGMA foreign_keys = OFF;
+                 CREATE TABLE old (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                     hash TEXT NOT NULL, created INTEGER NOT NULL);
+                 INSERT INTO old SELECT * FROM users;
+                 DROP TABLE users;
+                 ALTER TABLE old RENAME TO users;",
+            )
+            .unwrap();
+        }
+
+        let a = Accounts::open(&path).unwrap();
+        assert_eq!(a.user_for_token(&token).unwrap(), Some(alice.clone()));
+        assert_eq!(
+            a.sign_in("bob", "correct horse").unwrap(),
+            Some(bob.clone())
+        );
+        a.remove("bob").unwrap();
+        assert!(a.add("carol", "correct horse").unwrap().id > bob.id);
+        // Opening again changes nothing.
+        drop(a);
+        let a = Accounts::open(&path).unwrap();
+        assert_eq!(a.list().unwrap().len(), 2);
     }
 
     #[test]

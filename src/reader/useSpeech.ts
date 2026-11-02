@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errorText } from "../api";
+import { t } from "../i18n";
 import type { Settings, TtsSettings } from "../settings";
 import type { Location, OpenedBook } from "../types";
 import { pageText } from "./PagedView";
@@ -63,9 +64,13 @@ function onlineAudio(tts: TtsSettings, text: string): Promise<string> {
 let player: HTMLAudioElement | null = null;
 const audioPlayer = () => (player ??= new Audio());
 
+/** Stops each book being read aloud. */
+const readers = new Set<() => void>();
+
 /** Says `text` once (e.g. a word on a flashcard), interrupting anything being read. Fails when
  * an online voice can't be reached. */
 export async function speakOnce(text: string, settings: Pick<Settings, "ttsVoice" | "ttsRate" | "tts">): Promise<void> {
+  readers.forEach((stop) => stop());
   if (settings.tts.provider !== "system") {
     const url = await onlineAudio(settings.tts, text);
     const a = audioPlayer();
@@ -157,6 +162,11 @@ export function useSpeech(book: OpenedBook | null, settings: Settings, onError: 
             a.onended = () => {
               if (token === r.token) say(index + 1);
             };
+            a.onerror = () => {
+              if (token !== r.token) return;
+              stop();
+              live.current.onError(t("tts.badAudio"));
+            };
             // The next sentences load while this one plays.
             for (const next of r.queue.slice(index + 1, index + 3)) onlineAudio(tts, next.text).catch(() => {});
             return a.play();
@@ -231,6 +241,14 @@ export function useSpeech(book: OpenedBook | null, settings: Settings, onError: 
   // A different book, or leaving the reader, ends the reading.
   const bookId = book?.id;
   useEffect(() => stop, [bookId, stop]);
+
+  // Something said once elsewhere (a voice sample, a flashcard word) ends it too.
+  useEffect(() => {
+    readers.add(stop);
+    return () => {
+      readers.delete(stop);
+    };
+  }, [stop]);
 
   return { state, position, start, pause, resume, step, stop };
 }

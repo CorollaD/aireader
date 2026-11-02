@@ -506,6 +506,13 @@ async fn covers_travel_and_appear_when_they_arrive() {
 async fn a_half_written_file_is_retried_next_time() {
     let (a, b, remote) = setup("partial");
     let id = a.import("a.txt", "第一章\n正文");
+    a.save_annotations(
+        &id,
+        &Annotations {
+            highlights: vec![highlight("h", 5)],
+            ..Default::default()
+        },
+    );
     sync(&a, &remote).await;
     let device = crate::stats::device_id(&a.lib().db().conn()).unwrap();
     let path = format!("devices/{device}/{LIBRARY}");
@@ -519,6 +526,8 @@ async fn a_half_written_file_is_retried_next_time() {
     remote.write(&path, whole).await.unwrap();
     sync(&b, &remote).await;
     assert!(b.lib().get(&id).is_some());
+    // The book's notes, which came before the book did, are read again.
+    assert_eq!(b.annotations(&id).highlights.len(), 1);
 }
 
 #[test]

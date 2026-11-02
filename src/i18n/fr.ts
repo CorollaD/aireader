@@ -627,6 +627,7 @@ const fr: Messages = {
   "tts.test": "Écouter",
   "tts.testOk": "Ça marche",
   "tts.sample": "Bonjour, AiReader lit à voix haute.",
+  "tts.badAudio": "L'audio envoyé par le service vocal ne peut pas être lu.",
   "settings.version": "Version {version}",
   "sync.confirmPassword": "Confirmer le mot de passe",
   "sync.passwordMismatch": "Les mots de passe ne correspondent pas",

@@ -150,7 +150,8 @@ impl AiConfig {
     }
 }
 
-fn is_local_url(url: &str) -> bool {
+/// Whether `url` points at this computer.
+pub(crate) fn is_local_url(url: &str) -> bool {
     let host = url
         .split("://")
         .nth(1)

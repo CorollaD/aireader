@@ -610,6 +610,7 @@ const zhTW: Messages = {
   "tts.test": "試聽",
   "tts.testOk": "可以使用",
   "tts.sample": "你好，這是 AiReader 的朗讀試聽。",
+  "tts.badAudio": "語音服務傳回的音訊無法播放。",
   "sync.server": "AiReader 伺服器",
   "sync.signIn": "登入",
   "sync.register": "建立帳號",

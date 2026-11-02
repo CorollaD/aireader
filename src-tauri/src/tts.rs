@@ -28,17 +28,33 @@ pub struct TtsConfig {
     pub cluster: String,
 }
 
-/// The keychain entry for a service's key.
-pub fn key_name(provider: &str) -> String {
-    format!("tts:{provider}")
+impl TtsConfig {
+    /// An OpenAI-compatible service's API root, without the trailing slash.
+    fn base(&self) -> &str {
+        self.base_url.trim().trim_end_matches('/')
+    }
+
+    /// The keychain entry for the service's key. An OpenAI-compatible key belongs to one
+    /// address, so it is never sent to another service configured later.
+    pub fn key_name(&self) -> String {
+        match self.provider.as_str() {
+            "openai" => format!("tts:openai:{}", self.base().to_lowercase()),
+            provider => format!("tts:{provider}"),
+        }
+    }
 }
 
-fn client() -> Result<Client> {
-    Ok(Client::builder()
+/// The HTTP client for `url`. A server on this computer (Kokoro and the like) is reached
+/// directly: proxy tools would otherwise intercept `localhost` and answer 502.
+fn client(url: &str) -> Result<Client> {
+    let mut builder = Client::builder()
         .user_agent(USER_AGENT)
         .connect_timeout(Duration::from_secs(15))
-        .timeout(Duration::from_secs(60))
-        .build()?)
+        .timeout(Duration::from_secs(60));
+    if crate::ai::config::is_local_url(url) {
+        builder = builder.no_proxy();
+    }
+    Ok(builder.build()?)
 }
 
 fn escape_xml(text: &str) -> String {
@@ -91,10 +107,10 @@ async fn audio(response: reqwest::Response) -> Result<Vec<u8>> {
 pub async fn synthesize(cfg: &TtsConfig, key: Option<&str>, text: &str) -> Result<Vec<u8>> {
     let key = key.filter(|k| !k.is_empty());
     let need_key = || key.ok_or_else(|| anyhow!(t!("tts_no_key")));
-    let http = client()?;
+    let http = client(&cfg.base_url)?;
     match cfg.provider.as_str() {
         "openai" => {
-            let base = cfg.base_url.trim().trim_end_matches('/');
+            let base = cfg.base();
             if !(base.starts_with("http://") || base.starts_with("https://")) {
                 bail!(t!("opds_bad_address"));
             }
@@ -240,6 +256,29 @@ mod tests {
         assert!(synthesize(&cfg("openai"), None, "x").await.is_err());
         assert!(synthesize(&cfg("nope"), None, "x").await.is_err());
     }
+
+    #[test]
+    fn an_openai_compatible_key_belongs_to_its_address() {
+        let at = |base_url: &str| TtsConfig {
+            provider: "openai".into(),
+            base_url: base_url.into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            at("https://api.openai.com/v1/").key_name(),
+            at(" https://API.openai.com/v1").key_name()
+        );
+        assert_ne!(
+            at("https://api.openai.com/v1").key_name(),
+            at("https://api.siliconflow.cn/v1").key_name()
+        );
+        let azure = TtsConfig {
+            provider: "azure".into(),
+            base_url: "ignored".into(),
+            ..Default::default()
+        };
+        assert_eq!(azure.key_name(), "tts:azure");
+    }
 }
 
 // --- commands ---------------------------------------------------------------------------------
@@ -255,20 +294,20 @@ pub async fn tts_synthesize(
     config: TtsConfig,
     text: String,
 ) -> CmdResult<tauri::ipc::Response> {
-    let key = secret(&app, &key_name(&config.provider));
+    let key = secret(&app, &config.key_name());
     synthesize(&config, key.as_deref(), &text)
         .await
         .map(tauri::ipc::Response::new)
         .map_err(err)
 }
 
-/// Stores a service's key in the keychain; an empty key removes it.
+/// Stores the key of the service in `config` in the keychain; an empty key removes it.
 #[tauri::command]
-pub fn tts_set_key(app: AppHandle, provider: String, key: String) -> CmdResult<()> {
-    set_secret(&app, &key_name(&provider), key.trim()).map_err(err)
+pub fn tts_set_key(app: AppHandle, config: TtsConfig, key: String) -> CmdResult<()> {
+    set_secret(&app, &config.key_name(), key.trim()).map_err(err)
 }
 
 #[tauri::command]
-pub fn tts_has_key(app: AppHandle, provider: String) -> bool {
-    secret(&app, &key_name(&provider)).is_some()
+pub fn tts_has_key(app: AppHandle, config: TtsConfig) -> bool {
+    secret(&app, &config.key_name()).is_some()
 }

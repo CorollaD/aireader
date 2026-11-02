@@ -156,6 +156,23 @@ pub fn tombstone(conn: &Connection, kind: &str, id: &str, at: u64) -> Result<()>
     Ok(())
 }
 
+/// When `id` was deleted, if it was.
+pub fn deleted_at(conn: &Connection, kind: &str, id: &str) -> Result<Option<u64>> {
+    Ok(conn
+        .query_row(
+            "SELECT at FROM tombstones WHERE kind = ?1 AND id = ?2",
+            params![kind, id],
+            |r| r.get::<_, i64>(0),
+        )
+        .optional()?
+        .map(|at| at as u64))
+}
+
+/// Whether a record last changed at `updated` was deleted since.
+pub fn deleted_since(conn: &Connection, kind: &str, id: &str, updated: u64) -> Result<bool> {
+    Ok(deleted_at(conn, kind, id)?.is_some_and(|at| updated <= at))
+}
+
 impl Db {
     pub fn open(path: &Path) -> Result<Self> {
         register_sqlite_vec();

@@ -26,18 +26,8 @@ export function useAnnotations(bookId: string): AnnotationsApi {
   const latest = useRef(data);
   /** Deleted since the last save. Saves name them: anything else this copy lacks came from a sync. */
   const removed = useRef<string[]>([]);
-
-  useEffect(() => {
-    loaded.current = false;
-    api
-      .getAnnotations(bookId)
-      .then((a) => {
-        latest.current = a;
-        setData(a);
-      })
-      .catch(() => {})
-      .finally(() => (loaded.current = true));
-  }, [bookId]);
+  /** Changes made before the book's notes arrived, to make again on them. */
+  const early = useRef<((a: Annotations) => Annotations)[]>([]);
 
   const flush = useCallback(() => {
     window.clearTimeout(timer.current);
@@ -46,6 +36,32 @@ export function useAnnotations(bookId: string): AnnotationsApi {
     removed.current = [];
     return api.saveAnnotations(bookId, latest.current, gone).catch(() => {});
   }, [bookId]);
+
+  useEffect(() => {
+    let current = true;
+    loaded.current = false;
+    early.current = [];
+    api
+      .getAnnotations(bookId)
+      .then((a) => {
+        if (!current) return;
+        const next = early.current.reduce((acc, f) => f(acc), a);
+        latest.current = next;
+        setData(next);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!current) return;
+        loaded.current = true;
+        if (early.current.length > 0) {
+          early.current = [];
+          timer.current = window.setTimeout(flush, 400);
+        }
+      });
+    return () => {
+      current = false;
+    };
+  }, [bookId, flush]);
 
   // Save pending changes when leaving the book, or quitting.
   useEffect(() => {
@@ -79,7 +95,10 @@ export function useAnnotations(bookId: string): AnnotationsApi {
         latest.current = next;
         return next;
       });
-      if (!loaded.current) return;
+      if (!loaded.current) {
+        early.current.push(f);
+        return;
+      }
       window.clearTimeout(timer.current);
       timer.current = window.setTimeout(flush, 400);
     },

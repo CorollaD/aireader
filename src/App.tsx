@@ -65,6 +65,7 @@ export default function App() {
         .then((id) => {
           if (!id) return;
           setOpenAt(null);
+          setPage(null);
           setReading(id);
         })
         .catch(() => {});

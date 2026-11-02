@@ -618,6 +618,7 @@ const ja: Messages = {
   "tts.test": "試聴",
   "tts.testOk": "使用できます",
   "tts.sample": "こんにちは、AiReader の読み上げです。",
+  "tts.badAudio": "音声サービスから届いた音声を再生できません。",
   "settings.version": "バージョン {version}",
   "sync.confirmPassword": "パスワードの確認",
   "sync.passwordMismatch": "パスワードが一致しません",

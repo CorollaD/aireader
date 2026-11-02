@@ -610,6 +610,7 @@ const zhCN = {
   "tts.test": "试听",
   "tts.testOk": "可以使用",
   "tts.sample": "你好，这是 AiReader 的朗读试听。",
+  "tts.badAudio": "语音服务返回的音频无法播放。",
   "sync.server": "AiReader 服务器",
   "sync.signIn": "登录",
   "sync.register": "创建账号",

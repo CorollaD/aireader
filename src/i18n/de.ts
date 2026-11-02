@@ -625,6 +625,7 @@ const de: Messages = {
   "tts.test": "Anhören",
   "tts.testOk": "Funktioniert",
   "tts.sample": "Hallo, hier liest AiReader vor.",
+  "tts.badAudio": "Die Audiodaten des Sprachdienstes lassen sich nicht abspielen.",
   "settings.version": "Version {version}",
   "sync.confirmPassword": "Passwort bestätigen",
   "sync.passwordMismatch": "Die Passwörter stimmen nicht überein",

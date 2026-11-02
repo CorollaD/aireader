@@ -177,18 +177,6 @@ fn tombstones(conn: &Connection) -> Result<Vec<Tombstone>> {
     Ok(list)
 }
 
-/// When `id` was deleted, if it was.
-fn deleted_at(conn: &Connection, kind: &str, id: &str) -> Result<Option<u64>> {
-    Ok(conn
-        .query_row(
-            "SELECT at FROM tombstones WHERE kind = ?1 AND id = ?2",
-            params![kind, id],
-            |r| r.get::<_, i64>(0),
-        )
-        .optional()?
-        .map(|at| at as u64))
-}
-
 fn remote_seconds(conn: &Connection, book_id: &str) -> Result<u64> {
     let total: Option<i64> = conn.query_row(
         "SELECT sum(seconds) FROM remote_reading WHERE book_id = ?1",
@@ -336,7 +324,7 @@ fn merge_library(
             continue;
         }
         let conn = db.conn();
-        if deleted_at(&conn, "book", &book.id)?.is_some_and(|at| activity(book) <= at) {
+        if db::deleted_since(&conn, "book", &book.id, activity(book))? {
             continue;
         }
         let before: i64 = conn
@@ -380,7 +368,7 @@ fn merge_records<T: Serialize + Clone>(
 ) -> Result<Vec<T>> {
     let mut out: Vec<T> = local.to_vec();
     for record in incoming {
-        if deleted_at(conn, kind, id(record))?.is_some_and(|at| updated(record) <= at) {
+        if db::deleted_since(conn, kind, id(record), updated(record))? {
             continue;
         }
         match out.iter_mut().find(|l| id(l) == id(record)) {
@@ -395,9 +383,11 @@ fn merge_records<T: Serialize + Clone>(
     Ok(out)
 }
 
-fn merge_book_file(lib: &Library, id: &str, file: BookFile, merged: &mut Merged) -> Result<()> {
+/// Merges a book's notes and chats. False when the book isn't here (yet): the file is read
+/// again next time, after the device's library file has brought the book.
+fn merge_book_file(lib: &Library, id: &str, file: BookFile, merged: &mut Merged) -> Result<bool> {
     if lib.get(id).is_none() {
-        return Ok(());
+        return Ok(false);
     }
     let db = lib.db().clone();
     let mut conn = db.conn();
@@ -432,7 +422,7 @@ fn merge_book_file(lib: &Library, id: &str, file: BookFile, merged: &mut Merged)
         }
     }
     tx.commit()?;
-    Ok(())
+    Ok(true)
 }
 
 fn merge_cards(conn: &Connection, file: CardsFile, merged: &mut Merged) -> Result<()> {
@@ -465,7 +455,8 @@ pub fn merge(lib: &mut Library, files: &[Incoming]) -> Result<Merged> {
     let mut order: Vec<&Incoming> = files.iter().collect();
     order.sort_by_key(|f| f.name != LIBRARY);
     for file in order {
-        let result = (|| -> Result<()> {
+        // Whether the file is merged for good, or should be read again next time.
+        let result = (|| -> Result<bool> {
             if file.name == LIBRARY {
                 merge_library(
                     lib,
@@ -487,12 +478,13 @@ pub fn merge(lib: &mut Library, files: &[Incoming]) -> Result<Merged> {
                 .strip_prefix("book-")
                 .and_then(|n| n.strip_suffix(".json"))
             {
-                merge_book_file(lib, id, serde_json::from_slice(&file.bytes)?, &mut merged)?;
+                return merge_book_file(lib, id, serde_json::from_slice(&file.bytes)?, &mut merged);
             }
-            Ok(())
+            Ok(true)
         })();
         match result {
-            Ok(()) => {
+            Ok(false) => {}
+            Ok(true) => {
                 lib.db().conn().execute(
                     "INSERT OR REPLACE INTO sync_seen (device, file, tag) VALUES (?1, ?2, ?3)",
                     params![file.device, file.name, file.tag],

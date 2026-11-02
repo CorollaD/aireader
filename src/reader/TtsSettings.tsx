@@ -40,13 +40,22 @@ export default function TtsSettings({ settings, update }: { settings: Settings; 
   useEffect(() => {
     setKey("");
     setMessage(null);
-    if (online) {
-      api
-        .ttsHasKey(tts.provider)
-        .then(setHasKey)
-        .catch(() => setHasKey(false));
-    }
-  }, [tts.provider, online]);
+  }, [tts.provider]);
+
+  // An OpenAI-compatible key belongs to its address, so another address needs its own.
+  const keyFor = tts.provider === "openai" ? tts.baseUrl.trim().replace(/\/+$/, "").toLowerCase() : "";
+  useEffect(() => {
+    if (!online) return;
+    let current = true;
+    api
+      .ttsHasKey(tts)
+      .then((has) => current && setHasKey(has))
+      .catch(() => current && setHasKey(false));
+    return () => {
+      current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the provider and address pick the key
+  }, [tts.provider, keyFor, online]);
 
   const set = (patch: Partial<Tts>) => {
     update({ tts: { ...tts, ...patch } });
@@ -59,7 +68,7 @@ export default function TtsSettings({ settings, update }: { settings: Settings; 
 
   const saveKey = async () => {
     if (!key.trim()) return;
-    await api.ttsSetKey(tts.provider, key);
+    await api.ttsSetKey(tts, key);
     setKey("");
     setHasKey(true);
   };

@@ -143,20 +143,34 @@ impl AppState {
             bytes,
             ocr,
         });
-        let mut open = self.open.lock().unwrap();
-        open.retain(|(k, _)| k != id);
-        open.push((id.to_owned(), book.clone()));
-        while open.len() > 1
-            && (open.len() > MAX_OPEN
-                || open.iter().map(|(_, b)| b.bytes).sum::<usize>() > MAX_OPEN_BYTES)
+        // Books are dropped after the lock is released: closing a PDF waits for PDFium, which
+        // may be busy rendering, and every page and image request goes through this lock.
+        let mut evicted = Vec::new();
         {
-            open.remove(0);
+            let mut open = self.open.lock().unwrap();
+            if let Some(i) = open.iter().position(|(k, _)| k == id) {
+                evicted.push(open.remove(i));
+            }
+            open.push((id.to_owned(), book.clone()));
+            while open.len() > 1
+                && (open.len() > MAX_OPEN
+                    || open.iter().map(|(_, b)| b.bytes).sum::<usize>() > MAX_OPEN_BYTES)
+            {
+                evicted.push(open.remove(0));
+            }
         }
+        drop(evicted);
         Ok(book)
     }
 
     fn forget(&self, ids: &[String]) {
-        self.open.lock().unwrap().retain(|(k, _)| !ids.contains(k));
+        let evicted: Vec<_> = self
+            .open
+            .lock()
+            .unwrap()
+            .extract_if(.., |(k, _)| ids.contains(k))
+            .collect();
+        drop(evicted);
     }
 }
 
@@ -850,7 +864,12 @@ pub async fn save_chat(
 ) -> CmdResult<()> {
     blocking(move || {
         let db = state(&app).library().db().clone();
-        crate::db::save_chat(&db.conn(), &book_id, &chat).map_err(err)
+        let conn = db.conn();
+        // A chat a sync just deleted stays deleted unless it changed since.
+        if crate::db::deleted_since(&conn, "chat", &chat.id, chat.updated).map_err(err)? {
+            return Ok(());
+        }
+        crate::db::save_chat(&conn, &book_id, &chat).map_err(err)
     })
     .await
 }

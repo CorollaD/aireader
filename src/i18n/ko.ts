@@ -617,6 +617,7 @@ const ko: Messages = {
   "tts.test": "미리 듣기",
   "tts.testOk": "사용할 수 있습니다",
   "tts.sample": "안녕하세요, AiReader가 읽어 드립니다.",
+  "tts.badAudio": "음성 서비스가 보낸 오디오를 재생할 수 없습니다.",
   "settings.version": "버전 {version}",
   "sync.confirmPassword": "비밀번호 확인",
   "sync.passwordMismatch": "비밀번호가 일치하지 않습니다",

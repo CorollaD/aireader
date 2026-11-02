@@ -139,9 +139,10 @@ export const api = {
   syncFetchBook: (id: string) => invoke<void>("sync_fetch_book", { id }),
   /** MP3 audio of a sentence from an online voice service. */
   ttsSynthesize: (config: TtsSettings, text: string) => invoke<ArrayBuffer>("tts_synthesize", { config, text }),
-  /** Keeps a voice service's key in the keychain; an empty key removes it. */
-  ttsSetKey: (provider: string, key: string) => invoke<void>("tts_set_key", { provider, key }),
-  ttsHasKey: (provider: string) => invoke<boolean>("tts_has_key", { provider }),
+  /** Keeps a voice service's key in the keychain (an OpenAI-compatible one for its address only);
+   *  an empty key removes it. */
+  ttsSetKey: (config: TtsSettings, key: string) => invoke<void>("tts_set_key", { config, key }),
+  ttsHasKey: (config: TtsSettings) => invoke<boolean>("tts_has_key", { config }),
   syncServerInfo: (url: string) => invoke<ServerInfo>("sync_server_info", { url }),
   /** Signs in (or creates the account, with `register`) and switches sync to the server. */
   syncServerSignIn: (config: SyncConfig, password: string, register: boolean) => invoke<SyncStatus>("sync_server_sign_in", { config, password, register }),
