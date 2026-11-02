@@ -15,8 +15,6 @@ permissions:
 jobs:
   apk:
     runs-on: ubuntu-22.04
-    env:
-      NDK_VERSION: 27.2.12479018
     steps:
       - uses: actions/checkout@v4
 
@@ -25,12 +23,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
-
+      # The runner comes with the Android SDK and NDK installed.
       - name: Android NDK
         run: |
-          sdkmanager --install "ndk;$NDK_VERSION"
-          echo "NDK_HOME=$ANDROID_SDK_ROOT/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+          echo "SDK: $ANDROID_HOME, NDK: $ANDROID_NDK_LATEST_HOME"
 
       - uses: actions/setup-node@v4
         with:
