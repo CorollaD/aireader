@@ -1,0 +1,7 @@
+# Replace with your domain. Caddy fetches and renews the HTTPS certificate itself.
+sync.example.com {
+	reverse_proxy aireader:8080
+	request_body {
+		max_size 1100MB
+	}
+}

@@ -1,0 +1,29 @@
+# AiReader sync server behind Caddy, which gets an HTTPS certificate on its own.
+# Point your domain at the machine, set it in Caddyfile, then: docker compose up -d
+services:
+  aireader:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - aireader-data:/data
+    environment:
+      # Let people create accounts from the app. Off by default: add accounts with
+      #   docker compose exec -it aireader aireader-server user add <name>
+      AIREADER_OPEN_REGISTRATION: "false"
+      # Storage per account in MB (0: no limit), and the largest file in MB.
+      AIREADER_QUOTA_MB: "0"
+      AIREADER_MAX_UPLOAD_MB: "1024"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+
+volumes:
+  aireader-data:
+  caddy-data:
