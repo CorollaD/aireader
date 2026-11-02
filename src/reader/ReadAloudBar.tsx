@@ -44,14 +44,21 @@ export default function ReadAloudBar(props: {
         options={RATES.map((r) => ({ value: String(r), label: `${r}×` }))}
         onChange={(rate) => update({ ttsRate: Number(rate) })}
       />
-      <Select
-        ghost
-        className="read-aloud-voice"
-        value={settings.ttsVoice ?? ""}
-        label={t("reader.speechVoice")}
-        options={[{ value: "", label: t("reader.voiceAuto") }, ...voices.map((v) => ({ value: v.voiceURI, label: `${v.name} (${v.lang})` }))]}
-        onChange={(voice) => update({ ttsVoice: voice || null })}
-      />
+      {settings.tts.provider === "system" ? (
+        <Select
+          ghost
+          className="read-aloud-voice"
+          value={settings.ttsVoice ?? ""}
+          label={t("reader.speechVoice")}
+          options={[{ value: "", label: t("reader.voiceAuto") }, ...voices.map((v) => ({ value: v.voiceURI, label: `${v.name} (${v.lang})` }))]}
+          onChange={(voice) => update({ ttsVoice: voice || null })}
+        />
+      ) : (
+        // An online voice is chosen in Settings → Reading.
+        <span className="read-aloud-voice muted small ellipsis" title={settings.tts.voice}>
+          {settings.tts.voice}
+        </span>
+      )}
       <button className="icon-button" title={t("common.close")} aria-label={t("common.close")} onClick={props.onStop}>
         <Icon name="close" size={16} />
       </button>

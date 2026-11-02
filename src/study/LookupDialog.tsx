@@ -126,7 +126,7 @@ export default function LookupDialog(props: {
       <div className="lookup">
         <div className="lookup-word">
           <input value={front} aria-label={t("cards.front")} onChange={(e) => setFront(e.target.value)} />
-          <button className="icon-button" title={t("cards.speak")} aria-label={t("cards.speak")} onClick={() => speakOnce(front, settings)}>
+          <button className="icon-button" title={t("cards.speak")} aria-label={t("cards.speak")} onClick={() => speakOnce(front, settings).catch(() => {})}>
             <Icon name="volume" size={16} />
           </button>
         </div>

@@ -7,6 +7,32 @@ export type UiTheme = "system" | "light" | "dark";
 /** Colours for buttons, links and selection; each has a light- and a dark-theme shade in styles.css. */
 export const ACCENTS = ["indigo", "blue", "teal", "violet", "rose", "orange", "graphite"] as const;
 export type Accent = (typeof ACCENTS)[number];
+/** Who reads aloud: the system's voices, or an online service. */
+export type TtsProvider = "system" | "openai" | "azure" | "volcengine" | "elevenlabs";
+export const TTS_PROVIDERS: TtsProvider[] = ["system", "openai", "azure", "volcengine", "elevenlabs"];
+
+/** An online voice. Each service uses some of the fields; keys are kept in the keychain. */
+export interface TtsSettings {
+  provider: TtsProvider;
+  /** OpenAI-compatible services: the API root, e.g. https://api.openai.com/v1. */
+  baseUrl: string;
+  model: string;
+  voice: string;
+  /** Azure: the resource's region. */
+  region: string;
+  /** Volcengine: the app id and cluster from its console. */
+  appId: string;
+  cluster: string;
+}
+
+/** What a service starts with when chosen. */
+export const TTS_DEFAULTS: Record<Exclude<TtsProvider, "system">, Partial<TtsSettings>> = {
+  openai: { baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini-tts", voice: "alloy" },
+  azure: { region: "eastasia", voice: "zh-CN-XiaoxiaoNeural" },
+  volcengine: { cluster: "volcano_tts", voice: "BV001_streaming" },
+  elevenlabs: { model: "eleven_multilingual_v2", voice: "JBFqnCBsd6RMkjVDRZzb" },
+};
+
 export type ShelfSort = "recent" | "added" | "title" | "author" | "progress";
 
 export interface Settings {
@@ -29,6 +55,7 @@ export interface Settings {
   /** Reading aloud: a system voice (`voiceURI`; `null` picks one for the text's language). */
   ttsVoice: string | null;
   ttsRate: number;
+  tts: TtsSettings;
   /** Comics turn right to left (manga): reversed arrow keys, and spreads read right to left. */
   comicRtl: boolean;
   /** Reflowable books: vertical scrolling or horizontal pages. */
@@ -67,6 +94,7 @@ export const DEFAULT_SETTINGS: Settings = {
   comicRtl: false,
   ttsVoice: null,
   ttsRate: 1,
+  tts: { provider: "system", baseUrl: "", model: "", voice: "", region: "", appId: "", cluster: "" },
   flowMode: "scroll",
   columns: 1,
   paragraphSpacing: 0.75,
@@ -124,6 +152,8 @@ export function normalizeSettings(raw: unknown): Settings {
   if (!(s.fontFamily in FONT_STACKS)) s.fontFamily = DEFAULT_SETTINGS.fontFamily;
   if (typeof s.ttsVoice !== "string" || !s.ttsVoice) s.ttsVoice = null;
   if (typeof s.ttsRate !== "number" || !(s.ttsRate >= 0.5 && s.ttsRate <= 2)) s.ttsRate = DEFAULT_SETTINGS.ttsRate;
+  s.tts = { ...DEFAULT_SETTINGS.tts, ...(s.tts && typeof s.tts === "object" ? s.tts : {}) };
+  if (!TTS_PROVIDERS.includes(s.tts.provider)) s.tts.provider = "system";
   if (typeof s.customFont !== "string" || !s.customFont) s.customFont = null;
   if (!UI_SCALES.some((u) => u.value === s.uiScale)) s.uiScale = DEFAULT_SETTINGS.uiScale;
   if (!["continuous", "single", "spread"].includes(s.pageLayout)) s.pageLayout = DEFAULT_SETTINGS.pageLayout;

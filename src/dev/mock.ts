@@ -573,6 +573,14 @@ export function installMock() {
           // The browser has no webview zoom; CSS zoom lays out the same way.
           document.documentElement.style.setProperty("zoom", String(a.value));
           return null;
+        case "tts_has_key":
+          return false;
+        case "tts_set_key":
+          return null;
+        case "tts_synthesize":
+          throw "No key for the voice service yet";
+        case "plugin:app|version":
+          return "0.7.1";
         case "plugin:dialog|open":
           return ["/Users/demo/Books/新导入的书.epub"];
         default:

@@ -1,7 +1,7 @@
 // The Settings dialog (⌘/Ctrl+,): interface language and size, reading appearance, AI service,
 // and the shortcut list.
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { api, errorText } from "./api";
 import ExportNotes from "./ExportNotes";
 import DictionarySettings from "./study/DictionarySettings";
@@ -16,6 +16,8 @@ import { shortcuts } from "./reader/shortcuts";
 import { ACCENTS, UI_SCALES, type Settings, type UiTheme } from "./settings";
 import { Modal } from "./ui";
 import { Select } from "./Select";
+import { getVersion } from "@tauri-apps/api/app";
+import TtsSettings from "./reader/TtsSettings";
 
 export type SettingsTab = "general" | "reading" | "dictionary" | "sync" | "ai" | "shortcuts";
 
@@ -118,9 +120,15 @@ export default function SettingsDialog(props: {
                 <div className="panel-label">{t("export.allBooks")}</div>
                 <ExportNotes />
               </div>
+              <AppVersion />
             </>
           )}
-          {tab === "reading" && <ReadingSettings settings={settings} update={update} text paged />}
+          {tab === "reading" && (
+            <>
+              <ReadingSettings settings={settings} update={update} text paged />
+              <TtsSettings settings={settings} update={update} />
+            </>
+          )}
           {tab === "dictionary" && <DictionarySettings />}
           {tab === "sync" && <SyncSettings />}
           {tab === "ai" && ai.status && <AiSettingsForm status={ai.status} onSaved={ai.setStatus} />}
@@ -176,4 +184,16 @@ function Backup() {
       {message && <p className={message.ok ? "ok-text small" : "error small"}>{message.text}</p>}
     </div>
   );
+}
+
+/** Which version this is, for bug reports and checking for updates. */
+function AppVersion() {
+  const [version, setVersion] = useState("");
+  useEffect(() => {
+    getVersion()
+      .then(setVersion)
+      .catch(() => {});
+  }, []);
+  if (!version) return null;
+  return <p className="app-version muted small">{t("settings.version", { version })}</p>;
 }

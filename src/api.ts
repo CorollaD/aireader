@@ -1,6 +1,7 @@
 // Typed wrappers around the Tauri commands and `book://` URLs.
 
 import { Channel, invoke } from "@tauri-apps/api/core";
+import type { TtsSettings } from "./settings";
 import type {
   AiConfig,
   AiEvent,
@@ -136,6 +137,11 @@ export const api = {
   /** `quick` leaves out covers and book files, for when the app is closing. */
   syncNow: (quick: boolean) => invoke<void>("sync_now", { quick }),
   syncFetchBook: (id: string) => invoke<void>("sync_fetch_book", { id }),
+  /** MP3 audio of a sentence from an online voice service. */
+  ttsSynthesize: (config: TtsSettings, text: string) => invoke<ArrayBuffer>("tts_synthesize", { config, text }),
+  /** Keeps a voice service's key in the keychain; an empty key removes it. */
+  ttsSetKey: (provider: string, key: string) => invoke<void>("tts_set_key", { provider, key }),
+  ttsHasKey: (provider: string) => invoke<boolean>("tts_has_key", { provider }),
   syncServerInfo: (url: string) => invoke<ServerInfo>("sync_server_info", { url }),
   /** Signs in (or creates the account, with `register`) and switches sync to the server. */
   syncServerSignIn: (config: SyncConfig, password: string, register: boolean) => invoke<SyncStatus>("sync_server_sign_in", { config, password, register }),

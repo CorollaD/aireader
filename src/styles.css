@@ -4345,3 +4345,15 @@ button.primary:hover:not(:disabled) {
     visibility: visible;
   }
 }
+
+.account-mode {
+  margin-bottom: 12px;
+}
+.app-version {
+  margin-top: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tts-settings .select-trigger {
+  min-width: 220px;
+}

@@ -143,7 +143,12 @@ function Review(props: { settings: Settings; onOpen: (bookId: string, location: 
       <article className="flashcard">
         <div className="flashcard-front">
           <span>{card.front}</span>
-          <button className="icon-button" title={t("cards.speak")} aria-label={t("cards.speak")} onClick={() => speakOnce(card.front, props.settings)}>
+          <button
+            className="icon-button"
+            title={t("cards.speak")}
+            aria-label={t("cards.speak")}
+            onClick={() => speakOnce(card.front, props.settings).catch(() => {})}
+          >
             <Icon name="volume" size={16} />
           </button>
         </div>

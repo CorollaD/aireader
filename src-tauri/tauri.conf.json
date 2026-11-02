@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: blob: book: http://book.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' book: http://book.localhost; connect-src 'self' ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; img-src 'self' data: blob: book: http://book.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' book: http://book.localhost; connect-src 'self' ipc: http://ipc.localhost; media-src 'self' blob:"
     }
   },
   "bundle": {

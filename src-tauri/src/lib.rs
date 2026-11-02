@@ -22,6 +22,7 @@ pub mod recall;
 pub mod search;
 pub mod stats;
 pub mod sync;
+pub mod tts;
 
 use std::path::{Path, PathBuf};
 
@@ -152,6 +153,9 @@ pub fn run() {
             sync::commands::sync_server_info,
             sync::commands::sync_server_sign_in,
             sync::commands::sync_server_sign_out,
+            tts::tts_synthesize,
+            tts::tts_set_key,
+            tts::tts_has_key,
             commands::opds_save_catalog,
             commands::opds_remove_catalog,
             commands::opds_feed,

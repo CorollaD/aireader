@@ -1,10 +1,10 @@
-// Reading the book aloud with the system's voices, one sentence at a time, on into the next
-// chapter or page. Pausing cancels the sentence and starts it again on resuming, which works
-// the same on every system's speech engine.
+// Reading the book aloud, one sentence at a time, on into the next chapter or page: with the
+// system's voices, or with an online voice service (audio fetched a sentence or two ahead).
+// Pausing stops the sentence and starts it again on resuming, the same with every engine.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "../api";
-import type { Settings } from "../settings";
+import { api, errorText } from "../api";
+import type { Settings, TtsSettings } from "../settings";
 import type { Location, OpenedBook } from "../types";
 import { pageText } from "./PagedView";
 import { chapterSentences, speechLang, splitSentences, type Sentence } from "./speech";
@@ -39,8 +39,41 @@ export function useVoices(): SpeechSynthesisVoice[] {
   return voices;
 }
 
-/** Says `text` once (e.g. a word on a flashcard), interrupting anything being read. */
-export function speakOnce(text: string, settings: Pick<Settings, "ttsVoice" | "ttsRate">) {
+/** Audio of sentences from the online voice, by voice and text, fetched once each. */
+const audioCache = new Map<string, Promise<string>>();
+const AUDIO_CACHE_SIZE = 12;
+
+function onlineAudio(tts: TtsSettings, text: string): Promise<string> {
+  const key = `${tts.provider}|${tts.baseUrl}|${tts.model}|${tts.voice}|${tts.region}|${text}`;
+  let audio = audioCache.get(key);
+  if (!audio) {
+    audio = api.ttsSynthesize(tts, text).then((bytes) => URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" })));
+    audio.catch(() => audioCache.delete(key));
+    audioCache.set(key, audio);
+    // Forget the oldest sentences.
+    for (const [old, url] of [...audioCache].slice(0, Math.max(0, audioCache.size - AUDIO_CACHE_SIZE))) {
+      audioCache.delete(old);
+      url.then(URL.revokeObjectURL, () => {});
+    }
+  }
+  return audio;
+}
+
+/** The one element online audio plays in. */
+let player: HTMLAudioElement | null = null;
+const audioPlayer = () => (player ??= new Audio());
+
+/** Says `text` once (e.g. a word on a flashcard), interrupting anything being read. Fails when
+ * an online voice can't be reached. */
+export async function speakOnce(text: string, settings: Pick<Settings, "ttsVoice" | "ttsRate" | "tts">): Promise<void> {
+  if (settings.tts.provider !== "system") {
+    const url = await onlineAudio(settings.tts, text);
+    const a = audioPlayer();
+    a.src = url;
+    a.playbackRate = settings.ttsRate;
+    await a.play();
+    return;
+  }
   if (!supported()) return;
   const synth = window.speechSynthesis;
   synth.cancel();
@@ -65,6 +98,7 @@ export function useSpeech(book: OpenedBook | null, settings: Settings, onError: 
   const stop = useCallback(() => {
     run.current.token++;
     if (supported()) window.speechSynthesis.cancel();
+    player?.pause();
     shownPage.current = null;
     setState("idle");
     setPosition(null);
@@ -111,7 +145,29 @@ export function useSpeech(book: OpenedBook | null, settings: Settings, onError: 
         shownPage.current = r.unit;
         setPosition({ kind: "page", page: r.unit });
       }
-      const { ttsRate, ttsVoice } = live.current.settings;
+      const { ttsRate, ttsVoice, tts } = live.current.settings;
+      if (tts.provider !== "system") {
+        setState("playing");
+        onlineAudio(tts, sentence.text)
+          .then((url) => {
+            if (token !== r.token) return;
+            const a = audioPlayer();
+            a.src = url;
+            a.playbackRate = ttsRate;
+            a.onended = () => {
+              if (token === r.token) say(index + 1);
+            };
+            // The next sentences load while this one plays.
+            for (const next of r.queue.slice(index + 1, index + 3)) onlineAudio(tts, next.text).catch(() => {});
+            return a.play();
+          })
+          .catch((e) => {
+            if (token !== r.token) return;
+            stop();
+            live.current.onError(errorText(e));
+          });
+        return;
+      }
       const synth = window.speechSynthesis;
       const u = new SpeechSynthesisUtterance(sentence.text);
       u.lang = speechLang(sentence.text);
@@ -156,7 +212,8 @@ export function useSpeech(book: OpenedBook | null, settings: Settings, onError: 
 
   const pause = useCallback(() => {
     run.current.token++;
-    window.speechSynthesis.cancel();
+    if (supported()) window.speechSynthesis.cancel();
+    player?.pause();
     setState("paused");
   }, []);
 

@@ -17,6 +17,9 @@ export default function SyncSettings() {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   // What the AiReader server at the typed address allows; null while unknown.
   const [info, setInfo] = useState<ServerInfo | null>(null);
+  // Signing in to an account, or creating one first.
+  const [registering, setRegistering] = useState(false);
+  const [confirm, setConfirm] = useState("");
 
   const reload = useCallback(() => {
     api
@@ -99,6 +102,8 @@ export default function SyncSettings() {
       setStatus(next);
       setForm(next.config);
       setPassword("");
+      setConfirm("");
+      setRegistering(false);
       await api.syncNow(false);
       return t("sync.done");
     });
@@ -125,6 +130,18 @@ export default function SyncSettings() {
   const ready =
     form.backend === "server" ? signedIn : form.backend === "webdav" ? form.url.trim() !== "" : form.backend === "folder" ? form.folder !== "" : false;
   const canSignIn = form.url.trim() !== "" && form.username.trim() !== "" && password !== "";
+  const minPassword = info?.minPassword ?? 8;
+  // Why the new account can't be created yet, if it can't.
+  const registerProblem = !registering
+    ? null
+    : info && !info.registration
+      ? t("sync.registrationClosedHint")
+      : password && [...password].length < minPassword
+        ? t("sync.passwordTooShort", { n: minPassword })
+        : confirm && confirm !== password
+          ? t("sync.passwordMismatch")
+          : null;
+  const canSubmit = canSignIn && (!registering || (!registerProblem && confirm === password));
   const backends = [
     ["", t("sync.off")],
     ["server", t("sync.server")],
@@ -166,6 +183,14 @@ export default function SyncSettings() {
             <span>{t("sync.url")}</span>
             <input value={form.url} placeholder="https://sync.example.com" onChange={(e) => patch({ url: e.target.value })} />
           </label>
+          <div className="segmented account-mode">
+            <button className={registering ? "" : "on"} onClick={() => (setRegistering(false), setMessage(null))}>
+              {t("sync.signIn")}
+            </button>
+            <button className={registering ? "on" : ""} onClick={() => (setRegistering(true), setMessage(null))}>
+              {t("sync.register")}
+            </button>
+          </div>
           <label className="field">
             <span>{t("sync.username")}</span>
             <input value={form.username} autoComplete="username" onChange={(e) => patch({ username: e.target.value })} />
@@ -175,23 +200,31 @@ export default function SyncSettings() {
             <input
               type="password"
               value={password}
-              autoComplete="current-password"
+              autoComplete={registering ? "new-password" : "current-password"}
               onChange={(e) => (setPassword(e.target.value), setMessage(null))}
-              onKeyDown={(e) => e.key === "Enter" && canSignIn && !busy && signIn(false)}
+              onKeyDown={(e) => e.key === "Enter" && canSubmit && !busy && signIn(registering)}
             />
           </label>
+          {registering && (
+            <label className="field">
+              <span>{t("sync.confirmPassword")}</span>
+              <input
+                type="password"
+                value={confirm}
+                autoComplete="new-password"
+                onChange={(e) => (setConfirm(e.target.value), setMessage(null))}
+                onKeyDown={(e) => e.key === "Enter" && canSubmit && !busy && signIn(true)}
+              />
+            </label>
+          )}
+          {registerProblem && <p className="error small">{registerProblem}</p>}
           <p className="muted small hint">{t("sync.serverHint")}</p>
           <p className="muted small hint">{t("sync.serverPasswordHint")}</p>
           {form.url.trim().startsWith("http://") && <p className="error small">{t("sync.insecure")}</p>}
           <div className="inline-add form-actions">
-            <button className="primary" disabled={busy || !canSignIn} onClick={() => signIn(false)}>
-              {t("sync.signIn")}
+            <button className="primary" disabled={busy || !canSubmit} onClick={() => signIn(registering)}>
+              {registering ? t("sync.registerAndSignIn") : t("sync.signIn")}
             </button>
-            {info?.registration && (
-              <button disabled={busy || !canSignIn || password.length < info.minPassword} onClick={() => signIn(true)}>
-                {t("sync.register")}
-              </button>
-            )}
           </div>
           {message && <p className={message.ok ? "ok-text small" : "error small"}>{message.text}</p>}
         </div>
