@@ -144,6 +144,32 @@ function chatTitle(c: Chat): string {
   return line.length > 40 ? `${line.slice(0, 40)}…` : line || t("ai.chatTab");
 }
 
+const shorten = (s: string, n: number) => {
+  const line = s.replace(/\s+/g, " ").trim();
+  return line.length > n ? `${line.slice(0, n)}…` : line;
+};
+
+/** An answer as note text: the passage asked about, the answer, and where its [n] point. */
+function answerNote(turn: Turn, quote: Quote | null): string {
+  const parts: string[] = [];
+  if (quote) parts.push(quote.selection.trim().replace(/^/gm, "> "));
+  parts.push(turn.text.trim());
+  const sources = turn.sources ?? [];
+  if (sources.length) parts.push(sources.map((s) => `- [${s.n}] ${s.title}: ${shorten(s.excerpt, 80)}`).join("\n"));
+  return parts.join("\n\n");
+}
+
+/** A whole conversation as note text. */
+function chatNote(c: Chat): string {
+  const parts: string[] = [];
+  if (c.quote) parts.push(c.quote.selection.trim().replace(/^/gm, "> "));
+  for (const turn of c.turns) {
+    if (!turn.text.trim()) continue;
+    parts.push(turn.role === "user" ? `**${t("ai.noteQuestion")}** ${turn.text.trim()}` : answerNote(turn, null));
+  }
+  return parts.join("\n\n");
+}
+
 /** A saved conversation back as a chat (stored data is checked loosely). */
 function restoreChat(r: ChatRecord): Chat {
   const data = (r.data ?? {}) as { turns?: Turn[]; quote?: Quote | null };
@@ -162,6 +188,8 @@ export default function AiPanel(props: {
   location: Location | null;
   chatRequest: ChatRequest | null;
   onSaveNote: (quote: Quote, note: string) => void;
+  /** Keeps text as a note on the whole book. */
+  onSaveBookNote: (title: string, text: string) => void;
   onNavigate: (loc: Location) => void;
   onClose: () => void;
   highlights: Highlight[];
@@ -332,6 +360,27 @@ export default function AiPanel(props: {
     const last = chat.turns[chat.turns.length - 1];
     const turns = last?.role === "assistant" ? chat.turns.slice(0, -1) : chat.turns;
     run({ ...chat, turns: [...turns, { role: "assistant", text: "" }] });
+  };
+
+  const saveChatNote = () => {
+    props.onSaveBookNote(chatTitle(chat), chatNote(chat));
+    setNotice(t("ai.savedBookNote"));
+  };
+
+  /** Keeps answer `i`: on the passage asked about when there is one, otherwise on the book. */
+  const saveAnswer = (i: number) => {
+    const turn = chat.turns[i];
+    if (chat.quote?.anchor) {
+      props.onSaveNote(chat.quote, turn.text);
+      setNotice(t("ai.savedNote"));
+      return;
+    }
+    const asked = chat.turns
+      .slice(0, i)
+      .reverse()
+      .find((x) => x.role === "user")?.text;
+    props.onSaveBookNote(shorten(asked ?? chat.quote?.selection ?? chatTitle(chat), 60), answerNote(turn, chat.quote));
+    setNotice(t("ai.savedBookNote"));
   };
 
   const newChat = () => {
@@ -579,12 +628,23 @@ export default function AiPanel(props: {
       {tab === "chat" && ai.ready && (
         <button
           className="icon-button"
-          title={t("ai.newChat")}
-          aria-label={t("ai.newChat")}
+          title={t("ai.saveChatNote")}
+          aria-label={t("ai.saveChatNote")}
+          onClick={saveChatNote}
+          disabled={chat.status === "running" || !chat.turns.some((turn) => turn.role === "assistant" && turn.text)}
+        >
+          <Icon name="note" />
+        </button>
+      )}
+      {tab === "chat" && ai.ready && (
+        <button
+          className="icon-button"
+          title={t("ai.clearChat")}
+          aria-label={t("ai.clearChat")}
           onClick={newChat}
           disabled={chat.turns.length === 0 && !chat.quote}
         >
-          <Icon name="plus" />
+          <Icon name="eraser" />
         </button>
       )}
       <button className="icon-button" title={t("ai.settings")} aria-label={t("ai.settings")} onClick={ai.openSettings}>
@@ -659,14 +719,7 @@ export default function AiPanel(props: {
                   streaming={running && i === chat.turns.length - 1}
                   last={i === chat.turns.length - 1}
                   onCopy={() => copy(turn.text)}
-                  onNote={
-                    chat.quote?.anchor && turn.text
-                      ? () => {
-                          props.onSaveNote(chat.quote!, turn.text);
-                          setNotice(t("ai.savedNote"));
-                        }
-                      : undefined
-                  }
+                  onNote={turn.text ? () => saveAnswer(i) : undefined}
                   onRegenerate={!running && i === chat.turns.length - 1 ? regenerate : undefined}
                   onNavigate={props.onNavigate}
                 />

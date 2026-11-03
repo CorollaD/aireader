@@ -579,6 +579,7 @@ export default function ShelfView(props: {
                 <span className="row-cover" />
                 <span className="row-main">{t("shelf.colTitle")}</span>
                 <span className="row-cell">{t("shelf.colFormat")}</span>
+                <span className="row-cell">{t("shelf.colSize")}</span>
                 <span className="row-cell">{t("shelf.colProgress")}</span>
                 <span className="row-cell">{t("shelf.colReadTime")}</span>
                 <span className="row-cell">{t("shelf.colLastRead")}</span>

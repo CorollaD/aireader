@@ -57,6 +57,15 @@ CREATE TABLE IF NOT EXISTS highlights (
     updated INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS highlights_book ON highlights (book_id);
+CREATE TABLE IF NOT EXISTS book_notes (
+    id TEXT PRIMARY KEY,
+    book_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created INTEGER NOT NULL,
+    updated INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS book_notes_book ON book_notes (book_id);
 CREATE TABLE IF NOT EXISTS ai_cache (
     book_id TEXT NOT NULL,
     model TEXT NOT NULL,

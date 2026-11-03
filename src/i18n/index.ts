@@ -94,6 +94,23 @@ export function formatNumber(n: number): string {
   return new Intl.NumberFormat(current, { maximumFractionDigits: 1, notation: n >= 10_000 ? "compact" : "standard" }).format(n);
 }
 
+/** A file size in KB, MB or GB, e.g. "3.2 MB". */
+export function formatSize(bytes: number): string {
+  const units = ["kilobyte", "megabyte", "gigabyte"] as const;
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return new Intl.NumberFormat(current, {
+    style: "unit",
+    unit: units[unit],
+    unitDisplay: "short",
+    maximumFractionDigits: value < 10 ? 1 : 0,
+  }).format(value);
+}
+
 export function formatMinutes(minutes: number): string {
   if (minutes < 1) return t("time.lessThanMinute");
   if (minutes < 60) return t("time.minutes", { n: Math.round(minutes) });

@@ -689,6 +689,12 @@ pub fn transfer_annotations(
         });
         report.bookmarks += 1;
     }
+    // Notes on the whole book have no position to map.
+    for n in &from_ann.notes {
+        if !to_ann.notes.iter().any(|x| x.id == n.id) {
+            to_ann.notes.push(n.clone());
+        }
+    }
     report
 }
 
@@ -866,6 +872,7 @@ mod tests {
                 updated: 0,
             }],
             highlights: vec![h, lost],
+            notes: vec![],
         };
         let mut to_ann = Annotations::default();
         let report = transfer_annotations(&from, &from_ann, &to, &mut to_ann);

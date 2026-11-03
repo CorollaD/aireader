@@ -98,6 +98,18 @@ pub fn to_csv(books: &[BookNotes]) -> String {
                 &library::date(h.created),
             ]);
         }
+        for n in &b.annotations.notes {
+            row([
+                &b.title,
+                author,
+                "",
+                "note",
+                &n.title,
+                &n.text,
+                "",
+                &library::date(n.created),
+            ]);
+        }
         for m in &b.annotations.bookmarks {
             row([
                 &b.title,
@@ -162,9 +174,22 @@ pub fn to_json(books: &[BookNotes]) -> Result<String> {
                     })
                 })
                 .collect();
+            let notes: Vec<serde_json::Value> = b
+                .annotations
+                .notes
+                .iter()
+                .map(|n| {
+                    json!({
+                        "title": n.title,
+                        "text": n.text,
+                        "created": library::date(n.created),
+                    })
+                })
+                .collect();
             json!({
                 "title": b.title,
                 "author": b.author,
+                "notes": notes,
                 "highlights": highlights,
                 "bookmarks": bookmarks,
             })
@@ -231,6 +256,13 @@ mod tests {
                     created: 0,
                     updated: 0,
                 }],
+                notes: vec![crate::annotations::BookNote {
+                    id: "n".into(),
+                    title: "主题".into(),
+                    text: "分久必合".into(),
+                    created: 0,
+                    updated: 0,
+                }],
             },
         }
     }
@@ -256,6 +288,7 @@ mod tests {
             "\"三国, \"\"演义\"\"\",罗贯中,第一回,highlight,\"滚滚\n长江\",想法,yellow,1970-01-01"
         ));
         assert!(csv.contains(",第 2 页,bookmark,摘录,,,1970-01-02\n"));
+        assert!(csv.contains(",罗贯中,,note,主题,分久必合,,1970-01-01\n"));
     }
 
     #[test]
@@ -263,6 +296,7 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(&to_json(&[book()]).unwrap()).unwrap();
         assert_eq!(v[0]["highlights"][0]["chapter"], "第一回");
         assert_eq!(v[0]["bookmarks"][0]["excerpt"], "摘录");
+        assert_eq!(v[0]["notes"][0]["text"], "分久必合");
     }
 
     #[test]

@@ -538,6 +538,21 @@ const MESSAGES: &[(&str, [&str; 10])] = &[
         ],
     ),
     (
+        "notes_book",
+        [
+            "整本书笔记",
+            "整本書筆記",
+            "Notes on the book",
+            "Notas sobre el libro",
+            "Note sul libro",
+            "Notes sur le livre",
+            "Notizen zum Buch",
+            "本全体のメモ",
+            "책 전체 메모",
+            "Notas sobre o livro",
+        ],
+    ),
+    (
         "notes_bookmarks",
         [
             "书签",

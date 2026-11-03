@@ -1536,6 +1536,42 @@ input[type="radio"] {
   align-items: center;
   padding: 4px 12px 8px;
 }
+/* A note on the whole book shows a few lines until opened. */
+.book-note-text {
+  margin-top: 3px;
+  max-height: 7.5em;
+  overflow: hidden;
+  line-height: 1.5;
+}
+.book-note {
+  cursor: default;
+}
+.book-note.clipped {
+  cursor: pointer;
+}
+.book-note.clipped:not(.open) .book-note-text {
+  mask-image: linear-gradient(to bottom, #000 60%, transparent);
+}
+.book-note.open .book-note-text {
+  max-height: none;
+}
+.book-note-text .md > :first-child {
+  margin-top: 0;
+}
+.book-note.editing {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: default;
+}
+.book-note.editing:hover {
+  background: none;
+}
+.book-note.editing textarea {
+  resize: vertical;
+  font: inherit;
+  line-height: 1.5;
+}
 .notes-chapter {
   padding: 10px 12px 4px;
   font-size: var(--text-sm);
@@ -1709,6 +1745,9 @@ input[type="radio"] {
   margin: 0 auto;
   padding: 40px 32px 24px;
   font-family: var(--reader-font);
+  /* The system's own text smoothing, as in its document viewers: "antialiased" (set for the
+     interface) draws reading text thinner and greyer on macOS. */
+  -webkit-font-smoothing: auto;
   overflow-wrap: break-word;
 }
 .flow.justify {

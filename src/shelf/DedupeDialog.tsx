@@ -3,7 +3,7 @@
 // leave the shelf.
 
 import { useState } from "react";
-import { formatNumber, t } from "../i18n";
+import { formatNumber, formatSize, t } from "../i18n";
 import { Icon } from "../icons";
 import type { Book, DuplicateCopy, DuplicateGroup } from "../types";
 import { Modal } from "../ui";
@@ -116,7 +116,7 @@ function facts(c: DuplicateCopy, book: Book): string[] {
   if (c.hasText) out.push(t("dd.chars", { n: formatNumber(c.chars) }));
   if (c.tocEntries > 1) out.push(t("dd.toc", { n: c.tocEntries }));
   if (c.completeness < 0.9) out.push(t("dd.incomplete", { n: Math.round(c.completeness * 100) }));
-  out.push(`${(book.size / 1024 / 1024).toFixed(1)} MB`);
+  out.push(formatSize(book.size));
   if (book.progress > 0) out.push(t("dd.read", { p: percent(book.progress) }));
   return out;
 }

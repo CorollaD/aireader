@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CUSTOM_FONT, DEFAULT_SETTINGS, isDark, normalizeSettings, themeVars } from "./settings";
+import { BACKGROUNDS, CUSTOM_FONT, DEFAULT_SETTINGS, isDark, luminance, normalizeSettings, themeVars } from "./settings";
 
 describe("settings", () => {
   it("falls back to defaults for bad values", () => {
@@ -28,5 +28,17 @@ describe("settings", () => {
     expect(custom.startsWith(`"${CUSTOM_FONT}", `)).toBe(true);
     expect(normalizeSettings({ customFont: 3 }).customFont).toBeNull();
     expect(normalizeSettings({ uiTheme: "neon" }).uiTheme).toBe("system");
+  });
+
+  it("gives every paper text as crisp as print", () => {
+    const contrast = (a: string, b: string) => {
+      const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    for (const { color } of BACKGROUNDS) {
+      const fg = themeVars({ ...DEFAULT_SETTINGS, background: color })["--reading-fg"];
+      // Light papers come close to black on white (21:1); dark ones stop short of glare.
+      expect(contrast(fg, color), color).toBeGreaterThanOrEqual(isDark(color) ? 11 : 15.5);
+    }
   });
 });

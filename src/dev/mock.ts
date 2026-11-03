@@ -471,7 +471,7 @@ export function installMock() {
             { text: "complex recurrent or convolutional neural networks [1, 2].", x: 0.15, y: 0.42, w: 0.65, h: 0.015 },
           ];
         case "get_annotations":
-          return db.annotations.get(a.id as string) ?? { bookmarks: [], highlights: [] };
+          return db.annotations.get(a.id as string) ?? { bookmarks: [], highlights: [], notes: [] };
         case "save_annotations":
           db.annotations.set(a.id as string, a.annotations as Annotations);
           return null;

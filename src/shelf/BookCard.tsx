@@ -1,7 +1,7 @@
 import { useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
 import { coverUrl } from "../api";
 import type { Book } from "../types";
-import { formatDate, formatDuration, t } from "../i18n";
+import { formatDate, formatDuration, formatSize, t } from "../i18n";
 import { Icon } from "../icons";
 
 /** Deterministic hue for books without a cover. */
@@ -56,7 +56,13 @@ export function BookCard({ book, selected, selecting, onOpen, onToggle, onMenu }
       title={
         book.missing
           ? t(book.synced ? "book.notDownloadedTitle" : "book.missingTitle")
-          : `${book.title}${book.readSeconds > 0 ? `\n${t("book.readTime", { time: formatDuration(book.readSeconds) })}` : ""}`
+          : [
+              book.title,
+              t("book.size", { size: formatSize(book.size) }),
+              book.readSeconds > 0 && t("book.readTime", { time: formatDuration(book.readSeconds) }),
+            ]
+              .filter(Boolean)
+              .join("\n")
       }
     >
       <div className="cover">
@@ -131,6 +137,7 @@ export function BookRow({ book, selected, selecting, onOpen, onToggle, onMenu }:
         </div>
       </div>
       <span className="row-cell">{book.format}</span>
+      <span className="row-cell">{formatSize(book.size)}</span>
       <span className="row-cell">{book.missing ? missingLabel(book) : percent(book.progress)}</span>
       <span className="row-cell">{book.readSeconds > 0 ? formatDuration(book.readSeconds) : "—"}</span>
       <span className="row-cell">{formatDate(book.lastRead)}</span>

@@ -314,6 +314,38 @@ async fn deletions_reach_other_devices_and_stay_deleted() {
 }
 
 #[tokio::test]
+async fn notes_on_the_book_travel_and_their_deletion_too() {
+    let (a, b, remote) = setup("book-notes");
+    let id = a.import("a.txt", "第一章\n正文");
+    let note = crate::annotations::BookNote {
+        id: "n".into(),
+        title: "问题".into(),
+        text: "回答".into(),
+        created: 100,
+        updated: 100,
+    };
+    a.save_annotations(
+        &id,
+        &Annotations {
+            notes: vec![note.clone()],
+            ..Default::default()
+        },
+    );
+    sync(&a, &remote).await;
+    sync(&b, &remote).await;
+    assert_eq!(b.annotations(&id).notes, [note]);
+
+    a.save_annotations(&id, &Annotations::default());
+    sync(&a, &remote).await;
+    let got = sync(&b, &remote).await;
+    assert!(b.annotations(&id).notes.is_empty());
+    assert_eq!(got.merged.books, std::slice::from_ref(&id));
+    sync(&b, &remote).await;
+    sync(&a, &remote).await;
+    assert!(a.annotations(&id).notes.is_empty());
+}
+
+#[tokio::test]
 async fn removing_a_book_removes_it_everywhere() {
     let (a, b, remote) = setup("remove");
     let id = a.import("a.txt", "第一章\n正文");

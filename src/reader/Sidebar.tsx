@@ -1,8 +1,9 @@
-// Left sidebar: table of contents, bookmarks, and highlights/notes.
+// Left sidebar: table of contents, bookmarks, highlights/notes and notes on the whole book.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { TocEntry } from "../types";
-import type { Bookmark, Card, Highlight, Location, OpenedBook } from "../types";
+import type { BookNote, Bookmark, Card, Highlight, Location, OpenedBook } from "../types";
+import Markdown from "../ai/Markdown";
 import { formatDate, t } from "../i18n";
 import { Icon, type IconName } from "../icons";
 import { MOD } from "./shortcuts";
@@ -22,6 +23,9 @@ interface Props {
   onRemoveBookmark: (id: string) => void;
   onEditNote: (id: string) => void;
   onRemoveHighlight: (id: string) => void;
+  notes: BookNote[];
+  onUpdateNote: (id: string, patch: Pick<BookNote, "title" | "text">) => void;
+  onRemoveNote: (id: string) => void;
   onExport: () => void;
   cards: Card[];
   onCardFromHighlight: (highlight: Highlight) => void;
@@ -34,7 +38,6 @@ interface Props {
 export default function Sidebar(props: Props) {
   const { book, tab, location } = props;
   const list = useRef<HTMLDivElement>(null);
-  const flow = book.kind === "flow";
 
   const currentToc = useMemo(() => {
     if (!location) return -1;
@@ -52,7 +55,7 @@ export default function Sidebar(props: Props) {
   const tabs: [SidebarTab, string, IconName, number | null][] = [
     ["toc", t("side.toc"), "list", null],
     ["bookmarks", t("side.bookmarks"), "bookmark", props.bookmarks.length],
-    ...(flow ? ([["notes", t("side.notes"), "note", props.highlights.length]] as [SidebarTab, string, IconName, number][]) : []),
+    ["notes", t("side.notes"), "note", props.highlights.length + props.notes.length],
     ["cards", t("side.cards"), "layers", props.cards.length],
   ];
 
@@ -81,7 +84,7 @@ export default function Sidebar(props: Props) {
             <TocTree bookId={book.id} toc={book.toc} current={currentToc} onNavigate={props.onNavigate} />
           ))}
         {tab === "bookmarks" && <Bookmarks {...props} />}
-        {tab === "notes" && flow && <Notes {...props} />}
+        {tab === "notes" && <Notes {...props} />}
         {tab === "cards" && <Cards {...props} />}
       </div>
     </aside>
@@ -187,16 +190,25 @@ function Bookmarks(props: Props) {
 
 function Notes(props: Props) {
   const { book } = props;
+  const flow = book.kind === "flow";
   const sorted = [...props.highlights].sort((a, b) => a.chapter - b.chapter || a.startBlock - b.startBlock || a.start - b.start);
+  const counts = [
+    ...(flow && (sorted.length > 0 || props.notes.length === 0) ? [t("side.highlightCount", { n: sorted.length })] : []),
+    ...(props.notes.length > 0 ? [t("side.bookNoteCount", { n: props.notes.length })] : []),
+  ];
   return (
     <>
       <div className="notes-head">
-        <span className="muted small">{t("side.highlightCount", { n: sorted.length })}</span>
-        <button disabled={sorted.length === 0} onClick={props.onExport} title={t("side.exportTitle")}>
+        <span className="muted small">{counts.join(" · ")}</span>
+        <button disabled={sorted.length === 0 && props.notes.length === 0} onClick={props.onExport} title={t("side.exportTitle")}>
           {t("side.export")}
         </button>
       </div>
-      {sorted.length === 0 && <div className="side-empty muted small">{t("side.noNotes")}</div>}
+      {props.notes.length > 0 && <div className="notes-chapter">{t("side.bookNotes")}</div>}
+      {props.notes.map((n) => (
+        <BookNoteEntry key={n.id} note={n} onUpdate={props.onUpdateNote} onRemove={props.onRemoveNote} />
+      ))}
+      {sorted.length === 0 && props.notes.length === 0 && <div className="side-empty muted small">{flow ? t("side.noNotes") : t("side.noBookNotes")}</div>}
       {sorted.map((h, i) => (
         <div key={h.id}>
           {(i === 0 || sorted[i - 1].chapter !== h.chapter) && (
@@ -247,6 +259,84 @@ function Notes(props: Props) {
         </div>
       ))}
     </>
+  );
+}
+
+/** A note on the whole book: shortened until clicked, edited in place. */
+function BookNoteEntry(props: { note: BookNote; onUpdate: (id: string, patch: Pick<BookNote, "title" | "text">) => void; onRemove: (id: string) => void }) {
+  const { note } = props;
+  const [open, setOpen] = useState(false);
+  const [clipped, setClipped] = useState(false);
+  const [draft, setDraft] = useState<{ title: string; text: string } | null>(null);
+  const body = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = body.current;
+    if (el && !open) setClipped(el.scrollHeight > el.clientHeight + 1);
+  }, [note.text, open, draft]);
+  if (draft) {
+    const save = () => {
+      if (draft.text.trim()) props.onUpdate(note.id, { title: draft.title.trim(), text: draft.text.trim() });
+      setDraft(null);
+    };
+    return (
+      <div className="side-entry book-note editing">
+        <input className="full" value={draft.title} placeholder={t("side.noteTitle")} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+        <textarea
+          className="full"
+          autoFocus
+          rows={8}
+          value={draft.text}
+          onChange={(e) => setDraft({ ...draft, text: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setDraft(null);
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
+          }}
+        />
+        <div className="form-actions inline-add">
+          <button onClick={() => setDraft(null)}>{t("common.cancel")}</button>
+          <button className="primary" disabled={!draft.text.trim()} onClick={save}>
+            {t("common.save")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div
+      className={`side-entry book-note${open ? " open" : ""}${clipped ? " clipped" : ""}`}
+      onClick={() => clipped && setOpen((o) => !o)}
+      title={clipped && !open ? t("side.expandNote") : undefined}
+    >
+      {note.title && <div className="entry-title">{note.title}</div>}
+      <div className="book-note-text" ref={body}>
+        <Markdown text={note.text} />
+      </div>
+      <div className="entry-meta">
+        <span>{formatDate(note.updated)}</span>
+        <span className="entry-actions">
+          <button
+            className="icon"
+            title={t("side.editNote")}
+            onClick={(e) => {
+              e.stopPropagation();
+              setDraft({ title: note.title, text: note.text });
+            }}
+          >
+            <Icon name="edit" size={14} />
+          </button>
+          <button
+            className="icon"
+            title={t("side.deleteNote")}
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onRemove(note.id);
+            }}
+          >
+            <Icon name="close" size={14} />
+          </button>
+        </span>
+      </div>
+    </div>
   );
 }
 

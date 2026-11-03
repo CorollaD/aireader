@@ -25,7 +25,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::annotations::{self, Bookmark, Highlight};
+use crate::annotations::{self, BookNote, Bookmark, Highlight};
 use crate::cards::{self, SyncCard, SyncReview};
 use crate::db::{self, ChatRecord};
 use crate::library::{self, Book, Library};
@@ -120,6 +120,7 @@ struct LibraryFile {
 struct BookFile {
     bookmarks: Vec<Bookmark>,
     highlights: Vec<Highlight>,
+    notes: Vec<BookNote>,
     chats: Vec<ChatRecord>,
 }
 
@@ -199,13 +200,18 @@ pub fn export(lib: &Library) -> Result<Vec<(String, Vec<u8>)>> {
         let mut bookmarks = annotations::read(&conn, &book.id)?;
         bookmarks.bookmarks.sort_by(|a, b| a.id.cmp(&b.id));
         bookmarks.highlights.sort_by(|a, b| a.id.cmp(&b.id));
+        bookmarks.notes.sort_by(|a, b| a.id.cmp(&b.id));
         let mut chats = db::list_chats(&conn, &book.id)?;
         chats.sort_by(|a, b| a.id.cmp(&b.id));
-        if !(bookmarks.bookmarks.is_empty() && bookmarks.highlights.is_empty() && chats.is_empty())
+        if !(bookmarks.bookmarks.is_empty()
+            && bookmarks.highlights.is_empty()
+            && bookmarks.notes.is_empty()
+            && chats.is_empty())
         {
             let file = BookFile {
                 bookmarks: bookmarks.bookmarks,
                 highlights: bookmarks.highlights,
+                notes: bookmarks.notes,
                 chats,
             };
             files.push((book_file(&book.id), serde_json::to_vec(&file)?));
@@ -276,10 +282,14 @@ fn merge_library(
             db::tombstone(&conn, &t.kind, &t.id, t.at)?;
             let at = t.at as i64;
             match t.kind.as_str() {
-                "bookmark" | "highlight" => {
+                "bookmark" | "highlight" | "note" => {
+                    let table = match t.kind.as_str() {
+                        "note" => "book_notes",
+                        "bookmark" => "bookmarks",
+                        _ => "highlights",
+                    };
                     let sql = format!(
-                        "DELETE FROM {}s WHERE id = ?1 AND updated <= ?2 RETURNING book_id",
-                        t.kind
+                        "DELETE FROM {table} WHERE id = ?1 AND updated <= ?2 RETURNING book_id"
                     );
                     let book: Option<String> = conn
                         .query_row(&sql, params![t.id, at], |r| r.get(0))
@@ -409,6 +419,14 @@ fn merge_book_file(lib: &Library, id: &str, file: BookFile, merged: &mut Merged)
             &file.highlights,
             |h| &h.id,
             |h| h.updated,
+        )?,
+        notes: merge_records(
+            &tx,
+            "note",
+            &local.notes,
+            &file.notes,
+            |n| &n.id,
+            |n| n.updated,
         )?,
     };
     if ann != local {

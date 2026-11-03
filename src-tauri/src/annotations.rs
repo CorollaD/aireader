@@ -1,4 +1,5 @@
-//! Per-book bookmarks and highlights/notes, stored in the library database.
+//! Per-book bookmarks, highlights/notes and notes on the whole book, stored in the library
+//! database.
 
 use anyhow::Result;
 use rusqlite::{Connection, params};
@@ -44,11 +45,24 @@ pub struct Highlight {
     pub updated: u64,
 }
 
+/// A note on the whole book rather than a passage, such as an AI answer kept for later.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookNote {
+    pub id: String,
+    pub title: String,
+    /// Markdown.
+    pub text: String,
+    pub created: u64,
+    pub updated: u64,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Annotations {
     pub bookmarks: Vec<Bookmark>,
     pub highlights: Vec<Highlight>,
+    pub notes: Vec<BookNote>,
 }
 
 pub struct AnnotationStore {
@@ -89,6 +103,11 @@ impl AnnotationStore {
                 new.highlights.push(h.clone());
             }
         }
+        for n in &annotations.notes {
+            if !gone(&n.id) && !deleted_since(&tx, "note", &n.id, n.updated)? {
+                new.notes.push(n.clone());
+            }
+        }
         for o in stored.bookmarks.into_iter().filter(|o| !gone(&o.id)) {
             match new.bookmarks.iter_mut().find(|n| n.id == o.id) {
                 Some(n) if n.updated < o.updated => *n = o,
@@ -101,6 +120,13 @@ impl AnnotationStore {
                 Some(n) if n.updated < o.updated => *n = o,
                 Some(_) => {}
                 None => new.highlights.push(o),
+            }
+        }
+        for o in stored.notes.into_iter().filter(|o| !gone(&o.id)) {
+            match new.notes.iter_mut().find(|n| n.id == o.id) {
+                Some(n) if n.updated < o.updated => *n = o,
+                Some(_) => {}
+                None => new.notes.push(o),
             }
         }
         write(&tx, book_id, &new)?;
@@ -168,6 +194,20 @@ pub fn read(conn: &Connection, book_id: &str) -> Result<Annotations> {
     })? {
         ann.highlights.push(row?);
     }
+    let mut stmt = conn.prepare(
+        "SELECT id, title, text, created, updated FROM book_notes WHERE book_id = ?1 ORDER BY rowid",
+    )?;
+    for row in stmt.query_map(params![book_id], |r| {
+        Ok(BookNote {
+            id: r.get(0)?,
+            title: r.get(1)?,
+            text: r.get(2)?,
+            created: r.get(3)?,
+            updated: r.get(4)?,
+        })
+    })? {
+        ann.notes.push(row?);
+    }
     Ok(ann)
 }
 
@@ -190,6 +230,13 @@ pub fn write(conn: &Connection, book_id: &str, ann: &Annotations) -> Result<()> 
     {
         crate::db::tombstone(conn, "highlight", &h.id, now)?;
     }
+    for n in old
+        .notes
+        .iter()
+        .filter(|n| !ann.notes.iter().any(|x| x.id == n.id))
+    {
+        crate::db::tombstone(conn, "note", &n.id, now)?;
+    }
     let mut new = ann.clone();
     for b in &mut new.bookmarks {
         b.updated = b.updated.max(b.created);
@@ -204,6 +251,16 @@ pub fn store(conn: &Connection, book_id: &str, ann: &Annotations) -> Result<()> 
         "DELETE FROM highlights WHERE book_id = ?1",
         params![book_id],
     )?;
+    conn.execute(
+        "DELETE FROM book_notes WHERE book_id = ?1",
+        params![book_id],
+    )?;
+    for n in &ann.notes {
+        conn.execute(
+            "INSERT OR REPLACE INTO book_notes (id, book_id, title, text, created, updated) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![n.id, book_id, n.title, n.text, n.created, n.updated],
+        )?;
+    }
     for b in &ann.bookmarks {
         conn.execute(
             "INSERT OR REPLACE INTO bookmarks (id, book_id, location, title, excerpt, created, updated) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -243,10 +300,12 @@ pub fn chapter_name(titles: &[String], chapter: usize) -> String {
         .unwrap_or_else(|| crate::t!("title_chapter", n = chapter + 1))
 }
 
-/// The books that have any bookmarks or highlights.
+/// The books that have any bookmarks, highlights or notes.
 pub fn books_with_notes(conn: &Connection) -> Result<Vec<String>> {
-    let mut stmt =
-        conn.prepare("SELECT book_id FROM bookmarks UNION SELECT book_id FROM highlights")?;
+    let mut stmt = conn.prepare(
+        "SELECT book_id FROM bookmarks UNION SELECT book_id FROM highlights
+         UNION SELECT book_id FROM book_notes",
+    )?;
     let ids = stmt
         .query_map([], |r| r.get(0))?
         .collect::<rusqlite::Result<Vec<String>>>()?;
@@ -263,6 +322,15 @@ pub fn to_markdown(
     let mut out = format!("# {title}\n\n");
     if let Some(author) = author {
         out.push_str(&format!("{author}\n\n"));
+    }
+    if !annotations.notes.is_empty() {
+        out.push_str(&format!("## {}\n\n", crate::t!("notes_book")));
+        for n in &annotations.notes {
+            if !n.title.trim().is_empty() {
+                out.push_str(&format!("### {}\n\n", n.title.trim()));
+            }
+            out.push_str(&format!("{}\n\n", n.text.trim()));
+        }
     }
     let mut highlights: Vec<&Highlight> = annotations.highlights.iter().collect();
     highlights.sort_by_key(|h| (h.chapter, h.start_block, h.start));
@@ -413,6 +481,16 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    fn book_note(id: &str, title: &str, text: &str) -> BookNote {
+        BookNote {
+            id: id.into(),
+            title: title.into(),
+            text: text.into(),
+            created: 1,
+            updated: 1,
+        }
+    }
+
     fn store_for_test(conn: &Connection, book: &str, highlights: Vec<Highlight>) {
         let ann = Annotations {
             highlights,
@@ -443,6 +521,7 @@ mod tests {
                 updated: 1,
             }],
             highlights: vec![hl(0, 1, "text", Some("note"))],
+            notes: vec![book_note("n", "问题", "回答")],
         };
         store.save("b1", &ann).unwrap();
         assert_eq!(store.load("b1").unwrap(), ann);
@@ -463,11 +542,61 @@ mod tests {
                 hl(1, 0, "second", None),
                 hl(0, 2, "first\nline", Some("my note")),
             ],
+            notes: vec![],
         };
         let md = to_markdown("Book", Some("Me"), &["One".into(), "Two".into()], &ann);
         assert_eq!(
             md,
             "# Book\n\nMe\n\n## One\n\n> first\n> line\n\nmy note\n\n## Two\n\n> second\n\n"
         );
+    }
+
+    #[test]
+    fn notes_on_the_book_come_first_in_markdown() {
+        let ann = Annotations {
+            highlights: vec![hl(0, 0, "passage", None)],
+            notes: vec![book_note("n", "What is it about?", "**Power**, mostly.")],
+            ..Default::default()
+        };
+        let md = to_markdown("Book", None, &["One".into()], &ann);
+        let heading = crate::t!("notes_book");
+        assert_eq!(
+            md,
+            format!(
+                "# Book\n\n## {heading}\n\n### What is it about?\n\n**Power**, mostly.\n\n## One\n\n> passage\n\n"
+            )
+        );
+    }
+
+    #[test]
+    fn a_deleted_note_on_the_book_stays_deleted() {
+        let dir = std::env::temp_dir().join(format!("aireader-ann-note-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Db::open(&dir.join("t.db")).unwrap();
+        let store = AnnotationStore::new(&db);
+        let mine = Annotations {
+            notes: vec![book_note("a", "", "one"), book_note("b", "", "two")],
+            ..Default::default()
+        };
+        store.save("b", &mine).unwrap();
+        store.apply("b", &mine, &["a".to_owned()]).unwrap();
+        let ids: Vec<String> = store
+            .load("b")
+            .unwrap()
+            .notes
+            .into_iter()
+            .map(|n| n.id)
+            .collect();
+        assert_eq!(ids, ["b"]);
+        assert!(
+            crate::db::deleted_at(&db.conn(), "note", "a")
+                .unwrap()
+                .is_some()
+        );
+        // A stale copy can't bring it back.
+        store.apply("b", &mine, &[]).unwrap();
+        assert_eq!(store.load("b").unwrap().notes.len(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

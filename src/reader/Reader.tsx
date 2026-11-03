@@ -800,6 +800,9 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
             onRemoveBookmark={ann.removeBookmark}
             onEditNote={setNoteFor}
             onRemoveHighlight={ann.removeHighlight}
+            notes={ann.data.notes}
+            onUpdateNote={ann.updateNote}
+            onRemoveNote={ann.removeNote}
             onExport={() => setExporting(true)}
             cards={cards}
             onCardFromHighlight={cardFromHighlight}
@@ -878,6 +881,7 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
             location={location}
             chatRequest={chatRequest}
             onSaveNote={saveAiNote}
+            onSaveBookNote={(title, text) => ann.addNote({ title, text })}
             onNavigate={(loc) => navigate(loc, true)}
             onClose={() => setAiOpen(false)}
             highlights={ann.data.highlights}

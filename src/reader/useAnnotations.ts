@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "../api";
 import { onBeforeExit } from "../lifecycle";
-import type { Annotations, Bookmark, Highlight, SyncChanges } from "../types";
+import type { Annotations, BookNote, Bookmark, Highlight, SyncChanges } from "../types";
 
 const now = () => Math.floor(Date.now() / 1000);
 const newId = () => crypto.randomUUID();
@@ -17,10 +17,13 @@ export interface AnnotationsApi {
   addHighlight: (h: Omit<Highlight, "id" | "created" | "updated">) => Highlight;
   updateHighlight: (id: string, patch: Partial<Omit<Highlight, "id" | "created">>) => void;
   removeHighlight: (id: string) => void;
+  addNote: (n: Pick<BookNote, "title" | "text">) => void;
+  updateNote: (id: string, patch: Partial<Pick<BookNote, "title" | "text">>) => void;
+  removeNote: (id: string) => void;
 }
 
 export function useAnnotations(bookId: string): AnnotationsApi {
-  const [data, setData] = useState<Annotations>({ bookmarks: [], highlights: [] });
+  const [data, setData] = useState<Annotations>({ bookmarks: [], highlights: [], notes: [] });
   const loaded = useRef(false);
   const timer = useRef<number | undefined>(undefined);
   const latest = useRef(data);
@@ -128,6 +131,16 @@ export function useAnnotations(bookId: string): AnnotationsApi {
       removeHighlight: (id: string) => {
         removed.current.push(id);
         change((a) => ({ ...a, highlights: a.highlights.filter((h) => h.id !== id) }));
+      },
+      addNote: (n: Pick<BookNote, "title" | "text">) => {
+        const full: BookNote = { ...n, id: newId(), created: now(), updated: now() };
+        change((a) => ({ ...a, notes: [...a.notes, full] }));
+      },
+      updateNote: (id: string, patch: Partial<Pick<BookNote, "title" | "text">>) =>
+        change((a) => ({ ...a, notes: a.notes.map((n) => (n.id === id ? { ...n, ...patch, updated: now() } : n)) })),
+      removeNote: (id: string) => {
+        removed.current.push(id);
+        change((a) => ({ ...a, notes: a.notes.filter((n) => n.id !== id) }));
       },
     }),
     [change],

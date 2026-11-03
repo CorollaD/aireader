@@ -161,9 +161,20 @@ export interface Highlight {
 
 export type HighlightColor = "yellow" | "green" | "blue" | "pink" | "purple";
 
+/** A note on the whole book rather than a passage, such as an AI answer kept for later. */
+export interface BookNote {
+  id: string;
+  title: string;
+  /** Markdown. */
+  text: string;
+  created: number;
+  updated: number;
+}
+
 export interface Annotations {
   bookmarks: Bookmark[];
   highlights: Highlight[];
+  notes: BookNote[];
 }
 
 export interface Span {

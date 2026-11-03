@@ -186,7 +186,7 @@ function mix(a: string, b: string, t: number): string {
 }
 
 /** WCAG relative luminance. */
-function luminance(color: string): number {
+export function luminance(color: string): number {
   const [r, g, b] = rgb(color).map((v) => {
     const c = v / 255;
     return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
@@ -201,8 +201,9 @@ export const isDark = (bg: string) => luminance(bg) < 0.25;
 export function themeVars(s: Settings): Record<string, string> {
   const bg = s.background;
   const dark = isDark(bg);
-  // Text is the background pushed strongly towards black/white, which keeps a hint of its hue.
-  const fg = s.textColor ?? mix(bg, dark ? "#ffffff" : "#000000", dark ? 0.8 : 0.85);
+  // Text is the background pushed nearly to black, or to white short of glaring on a dark
+  // page: about as crisp as a printed page or the system's document viewers, with a hint of hue.
+  const fg = s.textColor ?? mix(bg, dark ? "#ffffff" : "#000000", dark ? 0.88 : 0.93);
   const toward = dark ? "#ffffff" : "#000000";
   return {
     "--reading-bg": bg,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LANGUAGES, setLanguage, t } from ".";
+import { LANGUAGES, formatSize, setLanguage, t } from ".";
 import zhCN from "./zh-CN";
 import zhTW from "./zh-TW";
 import en from "./en";
@@ -46,5 +46,14 @@ describe("translations", () => {
     expect(t("loc.page")).toContain("{n}");
     setLanguage("zh-CN");
     expect(t("loc.page", { n: 3 })).toBe("第 3 页");
+  });
+
+  it("writes file sizes in the largest fitting unit", () => {
+    setLanguage("en");
+    expect(formatSize(500)).toBe("0.5 kB");
+    expect(formatSize(3.25 * 1024 * 1024)).toBe("3.3 MB");
+    expect(formatSize(250 * 1024 * 1024)).toBe("250 MB");
+    expect(formatSize(2.5 * 1024 ** 3)).toBe("2.5 GB");
+    setLanguage("zh-CN");
   });
 });

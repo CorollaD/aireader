@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Modal } from "../ui";
 import type { Book, BookPatch } from "../types";
-import { t } from "../i18n";
+import { formatSize, t } from "../i18n";
 import { childName, groupTree, labelOf } from "./groups";
 import { Select } from "../Select";
 
@@ -105,7 +105,7 @@ export function EditDialog(props: { books: Book[]; groups: string[]; onSave: (pa
       </label>
       {single && (
         <div className="muted small">
-          {single.fileName} · {(single.size / 1024 / 1024).toFixed(2)} MB
+          {single.fileName} · {t("book.size", { size: formatSize(single.size) })}
         </div>
       )}
     </Modal>
