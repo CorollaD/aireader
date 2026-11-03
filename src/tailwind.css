@@ -14,6 +14,8 @@
   prefix: "d-";
   exclude: reset, rootscrollgutter, rootscrolllock;
   /* Only the components the app uses. */
-  include: properties, rootcolor, scrollbar, svg, alert, badge, button, checkbox, input, join, kbd, link, loading, menu, modal, progress, radio, range, select, status, textarea, toast, toggle;
+  include:
+    properties, rootcolor, scrollbar, svg, alert, badge, button, checkbox, input, join, kbd, link, loading, menu, modal, progress, radio, range, select, status,
+    textarea, toast, toggle;
 }
 @source "./";
