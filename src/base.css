@@ -1,0 +1,21 @@
+/*
+ * The reset for elements styled with daisyUI or Tailwind (the older markup is styled by
+ * styles.css). In the `base` layer, so components and utilities build on it.
+ */
+:is(button, input, textarea, select):is([class*="d-"], .tw) {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+:is(button, input, textarea):is(.tw) {
+  border: 0 solid;
+  padding: 0;
+  background: transparent;
+}
+button:is([class*="d-"], .tw):not(:disabled) {
+  cursor: pointer;
+}
+:is(input, textarea).tw:focus {
+  outline: none;
+}

@@ -1,0 +1,167 @@
+/*
+ * Components that utilities can't express well: the book as an object on the shelf.
+ * Loaded into the `components` layer (see tailwind.css).
+ */
+
+/* A book standing on the shelf, after Apple Books: the cover with a spine (a hinge shadow and
+   highlight near the left edge), a sliver of page edges on the right, and a shadow it casts. */
+.book3d {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  border-radius: 3px 7px 7px 3px;
+  background: var(--input);
+  box-shadow:
+    0 1px 1px rgb(0 0 0 / 0.1),
+    0 8px 14px -4px rgb(0 0 0 / 0.22),
+    0 22px 40px -14px rgb(0 0 0 / 0.32);
+  transition:
+    transform 220ms var(--ease),
+    box-shadow 220ms var(--ease);
+}
+[data-scheme="dark"] .book3d {
+  box-shadow:
+    0 1px 1px rgb(0 0 0 / 0.5),
+    0 8px 16px -4px rgb(0 0 0 / 0.6),
+    0 22px 40px -14px rgb(0 0 0 / 0.75);
+}
+/* Page edges, just showing past the cover on the right. */
+.book3d::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  right: -4px;
+  width: 4px;
+  border-radius: 0 2px 2px 0;
+  background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.035) 0 1px, transparent 1px 3px), linear-gradient(to right, #ddd6c8, #f6f2ea 45%, #e6e0d4);
+  box-shadow: inset 1px 0 1px rgb(0 0 0 / 0.16);
+}
+[data-scheme="dark"] .book3d::before {
+  background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.06) 0 1px, transparent 1px 3px), linear-gradient(to right, #8f897d, #c4beb2 45%, #a49e92);
+}
+.book3d-face {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+}
+/* The spine's hinge and a soft sheen across the cover. */
+.book3d-face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    rgb(0 0 0 / 0.22) 0,
+    rgb(255 255 255 / 0.28) 1.4%,
+    rgb(255 255 255 / 0) 3.2%,
+    rgb(0 0 0 / 0.14) 4.4%,
+    rgb(0 0 0 / 0) 8%,
+    rgb(255 255 255 / 0.07) 55%,
+    rgb(0 0 0 / 0.06) 100%
+  );
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.25);
+}
+.book-tile:hover .book3d,
+.book-tile:focus-visible .book3d {
+  transform: translateY(-5px);
+  box-shadow:
+    0 2px 2px rgb(0 0 0 / 0.1),
+    0 14px 22px -6px rgb(0 0 0 / 0.26),
+    0 32px 52px -18px rgb(0 0 0 / 0.38);
+}
+.book-tile.selected .book3d {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+.book-tile.missing .book3d {
+  opacity: 0.45;
+}
+/* Small covers in the list stand flat, with the hinge only. */
+.book3d.flat {
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.18),
+    0 3px 6px -2px rgb(0 0 0 / 0.18);
+}
+.book3d.flat::before {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .book3d {
+    transition: none;
+  }
+  .book-tile:hover .book3d {
+    transform: none;
+  }
+}
+
+/* Fields show focus with the accent, as a soft ring. */
+.d-input:focus,
+.d-input:focus-within,
+.d-select:focus,
+.d-textarea:focus {
+  border-color: var(--accent);
+  outline: 3px solid var(--accent-soft);
+  outline-offset: 0;
+}
+
+/* --- The older markup's controls, drawn as daisyUI's ----------------------------------------
+   Screens not yet rewritten still use these semantic classes; they take daisyUI's look here. */
+.icon-button {
+  @apply d-btn d-btn-ghost d-btn-sm d-btn-square border-transparent font-medium text-[var(--muted)] shadow-none;
+}
+.icon-button:hover:not(:disabled) {
+  @apply bg-[var(--hover)] text-[var(--fg)];
+}
+.icon-button.on {
+  @apply bg-[var(--selected)] text-[var(--fg)];
+}
+.icon-button.wide {
+  @apply w-auto gap-1.5 px-2.5;
+}
+button.primary {
+  @apply d-btn d-btn-sm d-btn-primary;
+}
+button.danger:not(.icon) {
+  @apply text-[var(--danger)];
+}
+.link-button {
+  @apply d-link d-link-hover d-link-primary inline h-auto border-0 bg-transparent p-0 font-medium;
+}
+.segmented {
+  @apply rounded-lg bg-[var(--input)] p-0.5;
+}
+.segmented button {
+  @apply rounded-md px-3 py-1 text-[13px] font-medium;
+}
+.segmented button.on {
+  @apply bg-[var(--surface)] text-[var(--fg)] shadow-sm;
+}
+kbd {
+  @apply d-kbd d-kbd-xs;
+}
+.icon-button:disabled {
+  @apply border-transparent bg-transparent opacity-35;
+}
+
+/* Dialogs dim and soften what is behind them. */
+.d-modal-open {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* Narrow readers hide some tools: these rules sit here, above daisyUI's buttons, to win. */
+@container (max-width: 960px) {
+  .reader-bar .tool-group .fit-tool {
+    display: none;
+  }
+}
+@container (max-width: 660px) {
+  .reader-bar .nav-tool {
+    display: none;
+  }
+}

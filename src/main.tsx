@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "./styles.css";
+import "./tailwind.css";
 import { mobile } from "./platform";
 
 document.documentElement.classList.toggle("mobile", mobile);

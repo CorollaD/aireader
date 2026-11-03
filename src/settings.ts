@@ -3,9 +3,14 @@
 import type { MessageKey } from "./i18n";
 
 export type FontFamily = "sans" | "serif" | "kai";
-export type UiTheme = "system" | "light" | "dark";
+export const FONT_WEIGHTS = [400, 500, 600] as const;
+export type FontWeight = (typeof FONT_WEIGHTS)[number];
+/** The interface's colours: following the system's light or dark, or one theme (styles.css). */
+export const UI_THEMES = ["system", "light", "warm", "dark", "slate", "oled"] as const;
+export type UiTheme = (typeof UI_THEMES)[number];
+const DARK_THEMES: string[] = ["dark", "slate", "oled"];
 /** Colours for buttons, links and selection; each has a light- and a dark-theme shade in styles.css. */
-export const ACCENTS = ["indigo", "blue", "teal", "violet", "rose", "orange", "graphite"] as const;
+export const ACCENTS = ["indigo", "blue", "navy", "teal", "mint", "violet", "rose", "cherry", "orange", "amber", "graphite"] as const;
 export type Accent = (typeof ACCENTS)[number];
 /** Who reads aloud: the system's voices, or an online service. */
 export type TtsProvider = "system" | "openai" | "azure" | "volcengine" | "elevenlabs";
@@ -43,6 +48,8 @@ export interface Settings {
   /** `null` picks a readable colour automatically. */
   textColor: string | null;
   fontFamily: FontFamily;
+  /** How heavy book text is drawn. */
+  fontWeight: FontWeight;
   /** A font file the user added (see `api.listFonts`), used before `fontFamily`. */
   customFont: string | null;
   fontSize: number;
@@ -85,6 +92,7 @@ export const DEFAULT_SETTINGS: Settings = {
   background: "#fbf8f1",
   textColor: null,
   fontFamily: "sans",
+  fontWeight: 400,
   customFont: null,
   fontSize: 19,
   lineHeight: 1.8,
@@ -128,6 +136,22 @@ export const BACKGROUNDS: { name: MessageKey; color: string }[] = [
   { name: "bg.black", color: "#000000" },
 ];
 
+/** Reading themes after Apple Books': paper, ink, typeface and weight chosen together. */
+export const READING_THEMES: {
+  name: MessageKey;
+  background: string;
+  textColor: string | null;
+  fontFamily: FontFamily;
+  fontWeight: FontWeight;
+}[] = [
+  { name: "theme.original", background: "#ffffff", textColor: null, fontFamily: "sans", fontWeight: 400 },
+  { name: "theme.quiet", background: "#48484c", textColor: "#d6d6d8", fontFamily: "sans", fontWeight: 400 },
+  { name: "theme.paper", background: "#f4eee2", textColor: "#2b2620", fontFamily: "serif", fontWeight: 400 },
+  { name: "theme.bold", background: "#ffffff", textColor: "#000000", fontFamily: "sans", fontWeight: 600 },
+  { name: "theme.calm", background: "#ebdcc2", textColor: "#3b2c1b", fontFamily: "serif", fontWeight: 400 },
+  { name: "theme.focus", background: "#fbf8ef", textColor: "#161616", fontFamily: "sans", fontWeight: 500 },
+];
+
 /** CSS family name under which the user's added font is registered. */
 export const CUSTOM_FONT = "AiReader Custom";
 
@@ -145,11 +169,12 @@ export const FONT_STACKS: Record<FontFamily, { name: MessageKey; css: string }> 
 
 export function normalizeSettings(raw: unknown): Settings {
   const s = { ...DEFAULT_SETTINGS, ...(raw && typeof raw === "object" ? (raw as Partial<Settings>) : {}) };
-  if (!["system", "light", "dark"].includes(s.uiTheme)) s.uiTheme = DEFAULT_SETTINGS.uiTheme;
+  if (!UI_THEMES.includes(s.uiTheme)) s.uiTheme = DEFAULT_SETTINGS.uiTheme;
   if (!ACCENTS.includes(s.accent)) s.accent = DEFAULT_SETTINGS.accent;
   if (!/^#[0-9a-f]{6}$/i.test(s.background)) s.background = DEFAULT_SETTINGS.background;
   if (s.textColor !== null && !/^#[0-9a-f]{6}$/i.test(s.textColor)) s.textColor = null;
   if (!(s.fontFamily in FONT_STACKS)) s.fontFamily = DEFAULT_SETTINGS.fontFamily;
+  if (!FONT_WEIGHTS.includes(s.fontWeight)) s.fontWeight = DEFAULT_SETTINGS.fontWeight;
   if (typeof s.ttsVoice !== "string" || !s.ttsVoice) s.ttsVoice = null;
   if (typeof s.ttsRate !== "number" || !(s.ttsRate >= 0.5 && s.ttsRate <= 2)) s.ttsRate = DEFAULT_SETTINGS.ttsRate;
   s.tts = { ...DEFAULT_SETTINGS.tts, ...(s.tts && typeof s.tts === "object" ? s.tts : {}) };
@@ -196,6 +221,13 @@ export function luminance(color: string): number {
 
 export const isDark = (bg: string) => luminance(bg) < 0.25;
 
+/** The interface theme in use, with "system" resolved. */
+export function uiThemeName(pref: UiTheme, systemDark: boolean): Exclude<UiTheme, "system"> {
+  return pref === "system" ? (systemDark ? "dark" : "light") : pref;
+}
+
+export const isDarkTheme = (name: string) => DARK_THEMES.includes(name);
+
 /** CSS variables of the reading page, derived from its paper colour. The interface's own colours
  * are in styles.css. */
 export function themeVars(s: Settings): Record<string, string> {
@@ -214,6 +246,7 @@ export function themeVars(s: Settings): Record<string, string> {
     "--reading-border": mix(bg, toward, dark ? 0.18 : 0.12),
     "--reading-scheme": dark ? "dark" : "light",
     // An added font comes first; the chosen family covers characters it lacks.
+    "--reader-weight": String(s.fontWeight),
     "--reader-font": s.customFont ? `"${CUSTOM_FONT}", ${FONT_STACKS[s.fontFamily].css}` : FONT_STACKS[s.fontFamily].css,
   };
 }

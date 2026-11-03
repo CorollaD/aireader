@@ -19,7 +19,7 @@ import type {
   Source,
   Usage,
 } from "../types";
-import { Modal } from "../ui";
+import { Menu, Modal } from "../ui";
 import type { TextRange } from "../reader/anchors";
 import { formatDate, formatNumber, t, type MessageKey } from "../i18n";
 import { Icon, type IconName } from "../icons";
@@ -599,7 +599,7 @@ export default function AiPanel(props: {
       </div>
       <span className="spacer" />
       {tab === "chat" && ai.ready && sessions.length > 0 && (
-        <div className="menu-anchor chat-history-anchor">
+        <div className="menu-anchor chat-history-anchor relative">
           <button
             className={`icon-button${historyOpen ? " on" : ""}`}
             title={t("ai.history")}
@@ -609,19 +609,27 @@ export default function AiPanel(props: {
             <Icon name="clock" />
           </button>
           {historyOpen && (
-            <div className="menu dropdown chat-history">
+            <Menu className="absolute top-full right-0 mt-1.5 max-h-96 w-72 flex-nowrap overflow-y-auto">
               {sessions.map((r) => (
-                <div key={r.id} className={`chat-session${r.id === chat.id ? " current" : ""}`}>
-                  <button className="chat-session-open" onClick={() => openSession(r)}>
-                    <span className="ellipsis">{r.title}</span>
-                    <span className="muted small">{formatDate(r.updated)}</span>
+                <li key={r.id} className="group/session flex-row items-center">
+                  <button
+                    className={`tw flex min-w-0 flex-1 flex-col items-start gap-0 rounded-lg py-1.5${r.id === chat.id ? " bg-[var(--selected)]" : ""}`}
+                    onClick={() => openSession(r)}
+                  >
+                    <span className="w-full truncate">{r.title}</span>
+                    <span className="text-xs text-[var(--muted)]">{formatDate(r.updated)}</span>
                   </button>
-                  <button className="icon-button" title={t("common.delete")} aria-label={t("common.delete")} onClick={() => deleteSession(r.id)}>
+                  <button
+                    className="d-btn d-btn-ghost d-btn-xs d-btn-square text-[var(--muted)] opacity-0 group-hover/session:opacity-100 focus-visible:opacity-100"
+                    title={t("common.delete")}
+                    aria-label={t("common.delete")}
+                    onClick={() => deleteSession(r.id)}
+                  >
                     <Icon name="close" size={13} />
                   </button>
-                </div>
+                </li>
               ))}
-            </div>
+            </Menu>
           )}
         </div>
       )}
@@ -1146,7 +1154,7 @@ function ModelSwitch({ disabled }: { disabled: boolean }) {
   return (
     <Select
       ghost
-      className="model-switch"
+      className="model-switch d-select-xs shrink-0 text-xs text-[var(--muted)]"
       value={current}
       disabled={disabled}
       label={t("ai.model")}

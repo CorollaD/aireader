@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, errorText } from "../api";
 import { t } from "../i18n";
 import { Icon } from "../icons";
+import { Menu, MenuItem } from "../ui";
 import { isDark } from "../settings";
 import { CITE_W, FONT_FAMILY, allIds, fontOf, layout, parseOutline, toMarkdown, type MindNode, type Placed } from "./mindTree";
 
@@ -318,11 +319,11 @@ export function MindMapViewer(props: { outline: string; title: string; onClose: 
             {t("mm.export")} <Icon name="chevronDown" size={14} />
           </button>
           {menu && (
-            <div className="menu dropdown" onClick={(e) => e.stopPropagation()}>
-              <button onClick={() => save("png")}>{t("mm.exportPng")}</button>
-              <button onClick={() => save("svg")}>{t("mm.exportSvg")}</button>
-              <button onClick={copyOutline}>{t("mm.copyOutline")}</button>
-            </div>
+            <Menu className="absolute top-full right-0 mt-1.5" onClick={(e) => e.stopPropagation()}>
+              <MenuItem onClick={() => save("png")}>{t("mm.exportPng")}</MenuItem>
+              <MenuItem onClick={() => save("svg")}>{t("mm.exportSvg")}</MenuItem>
+              <MenuItem onClick={copyOutline}>{t("mm.copyOutline")}</MenuItem>
+            </Menu>
           )}
         </div>
         <button className="icon-button" title={t("common.close")} aria-label={t("common.close")} onClick={props.onClose}>

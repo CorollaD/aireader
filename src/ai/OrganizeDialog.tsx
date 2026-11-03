@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api, errorText } from "../api";
 import type { Book, BookPatch, Suggestion } from "../types";
 import { Modal } from "../ui";
+import { BTN, BTN_PRIMARY, INPUT } from "../tw";
 import { t } from "../i18n";
 import { useAi } from "./AiContext";
 
@@ -99,49 +100,74 @@ export default function OrganizeDialog(props: { books: Book[]; onApply: (changes
       footer={
         phase === "review" ? (
           <>
-            <span className="muted small">{t("org.onlyAdd")}</span>
-            <span className="spacer" />
-            <button onClick={props.onClose}>{t("common.cancel")}</button>
-            <button className="primary" disabled={accepted === 0 || applying} onClick={apply}>
+            <span className="self-center text-xs text-[var(--muted)]">{t("org.onlyAdd")}</span>
+            <span className="flex-1" />
+            <button className={BTN} onClick={props.onClose}>
+              {t("common.cancel")}
+            </button>
+            <button className={BTN_PRIMARY} disabled={accepted === 0 || applying} onClick={apply}>
               {t("org.apply", { n: accepted })}
             </button>
           </>
         ) : (
-          <button onClick={props.onClose}>{t("common.close")}</button>
+          <button className={BTN} onClick={props.onClose}>
+            {t("common.close")}
+          </button>
         )
       }
     >
-      {phase === "running" && <p className="muted">{t("org.running")}</p>}
-      {phase === "error" && <p className="error">{error}</p>}
+      {phase === "running" && (
+        <p className="flex items-center gap-2 text-[var(--muted)]">
+          <span className="d-loading d-loading-spinner d-loading-sm" /> {t("org.running")}
+        </p>
+      )}
+      {phase === "error" && <p className="text-[var(--danger)]">{error}</p>}
       {phase === "review" &&
         (rows.length === 0 ? (
-          <p className="muted">{t("org.nothing")}</p>
+          <p className="text-[var(--muted)]">{t("org.nothing")}</p>
         ) : (
-          <div className="organize-list">
+          <div className="flex flex-col divide-y divide-[var(--line)]">
             {rows.map((r, i) => (
-              <div key={r.book.id} className={`organize-row${r.accept ? "" : " off"}`}>
-                <input type="checkbox" checked={r.accept} onChange={(e) => update(i, { accept: e.target.checked })} />
-                <div className="organize-main">
-                  <div className="ellipsis">
-                    <strong>{r.book.title}</strong>
-                  </div>
+              <div key={r.book.id} className={`flex items-start gap-3 py-2.5${r.accept ? "" : " opacity-50"}`}>
+                <input
+                  type="checkbox"
+                  className="d-checkbox d-checkbox-sm d-checkbox-primary mt-0.5"
+                  checked={r.accept}
+                  onChange={(e) => update(i, { accept: e.target.checked })}
+                />
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <strong className="truncate text-[13px]">{r.book.title}</strong>
                   {r.suggestion.group && (
-                    <label className="organize-field">
-                      <span className={`group-chip${r.book.group ? "" : " none"}`}>{r.book.group ?? t("shelf.ungrouped")}</span>
-                      <span className="muted">→</span>
-                      <input value={r.group} disabled={!r.accept} aria-label={t("org.moveTo")} onChange={(e) => update(i, { group: e.target.value })} />
+                    <label className="flex items-center gap-2 text-[13px]">
+                      <span className={`d-badge d-badge-sm shrink-0 ${r.book.group ? "d-badge-ghost" : "d-badge-outline text-[var(--muted)]"}`}>
+                        {r.book.group ?? t("shelf.ungrouped")}
+                      </span>
+                      <span className="text-[var(--muted)]">→</span>
+                      <input
+                        className={`${INPUT} d-input-xs flex-1`}
+                        value={r.group}
+                        disabled={!r.accept}
+                        aria-label={t("org.moveTo")}
+                        onChange={(e) => update(i, { group: e.target.value })}
+                      />
                     </label>
                   )}
                   {r.suggestion.author && (
-                    <label className="organize-field toggle">
-                      <input type="checkbox" checked={r.acceptAuthor} disabled={!r.accept} onChange={(e) => update(i, { acceptAuthor: e.target.checked })} />
-                      <span className="small">{t("org.setAuthor", { author: r.suggestion.author })}</span>
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="d-checkbox d-checkbox-xs"
+                        checked={r.acceptAuthor}
+                        disabled={!r.accept}
+                        onChange={(e) => update(i, { acceptAuthor: e.target.checked })}
+                      />
+                      <span className="text-xs">{t("org.setAuthor", { author: r.suggestion.author })}</span>
                     </label>
                   )}
                 </div>
               </div>
             ))}
-            {error && <p className="error small">{error}</p>}
+            {error && <p className="pt-2 text-xs text-[var(--danger)]">{error}</p>}
           </div>
         ))}
     </Modal>

@@ -1,0 +1,19 @@
+/*
+ * Tailwind utilities and daisyUI components, over the older hand-written styles (styles.css, in
+ * the `legacy` layer): an element given daisyUI or Tailwind classes takes those. The resets are
+ * left out until the move is complete.
+ */
+@layer theme, base, legacy, components, utilities;
+@import "./styles.css" layer(legacy);
+@import "tailwindcss/theme.css" layer(theme);
+@import "./base.css" layer(base);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./components.css" layer(components);
+@plugin "daisyui" {
+  themes: false;
+  prefix: "d-";
+  exclude: reset, rootscrollgutter, rootscrolllock;
+  /* Only the components the app uses. */
+  include: properties, rootcolor, scrollbar, svg, alert, badge, button, checkbox, input, join, kbd, link, loading, menu, modal, progress, radio, range, select, status, textarea, toast, toggle;
+}
+@source "./";

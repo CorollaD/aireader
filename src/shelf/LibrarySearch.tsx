@@ -70,13 +70,15 @@ export default function LibrarySearch(props: {
     return book ? [{ book, hits: r.hits }] : [];
   });
   return (
-    <section className="library-search">
-      {shown.length > 0 && <div className="panel-heading">{t("shelf.inBooks", { n: shown.length })}</div>}
+    <section className="mt-8 border-t border-[var(--line)] pt-4">
+      {shown.length > 0 && (
+        <h3 className="mb-3 text-[11px] font-semibold tracking-wide text-[var(--faint)] uppercase">{t("shelf.inBooks", { n: shown.length })}</h3>
+      )}
       {indexing && (
-        <div className="muted small index-note">
+        <div className="mb-3 text-xs text-[var(--muted)]">
           {t("shelf.indexing", { done: indexing.done, total: indexing.total })}{" "}
           <button
-            className="link-button"
+            className="d-link d-link-primary"
             onClick={() => {
               api.stopIndexing().catch(() => {});
               setIndexing(null);
@@ -87,15 +89,21 @@ export default function LibrarySearch(props: {
         </div>
       )}
       {shown.map(({ book, hits }) => (
-        <div key={book.id} className="library-hit">
-          <div className="row-cover">
-            <Cover book={book} small />
+        <div key={book.id} className="mb-4 flex gap-3">
+          <div className="book3d flat w-10 shrink-0 self-start">
+            <div className="book3d-face">
+              <Cover book={book} small />
+            </div>
           </div>
-          <div className="library-hit-main">
-            <div className="book-title">{book.title}</div>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <div className="mb-1 text-[13px] font-semibold">{book.title}</div>
             {hits.map((h, i) => (
-              <button key={i} className="hit" onClick={() => props.onOpen(book, h.location)}>
-                <span className="hit-chapter">{describeHit(h)}</span>
+              <button
+                key={i}
+                className="tw flex flex-col gap-0.5 rounded-lg px-2 py-1.5 text-left text-[13px] leading-relaxed hover:bg-[var(--hover)] [&_mark]:rounded-sm [&_mark]:bg-[var(--accent-soft)] [&_mark]:text-inherit"
+                onClick={() => props.onOpen(book, h.location)}
+              >
+                <span className="text-xs text-[var(--muted)]">{describeHit(h)}</span>
                 <span>{marked(h.snippet, query)}</span>
               </button>
             ))}

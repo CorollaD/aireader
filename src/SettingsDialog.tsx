@@ -13,7 +13,7 @@ import { LANGUAGES, systemLanguage, t, type MessageKey } from "./i18n";
 import { Icon, type IconName } from "./icons";
 import { ReadingSettings } from "./reader/SettingsPanel";
 import { shortcuts } from "./reader/shortcuts";
-import { ACCENTS, UI_SCALES, type Settings, type UiTheme } from "./settings";
+import { ACCENTS, isDarkTheme, UI_SCALES, type Settings, type UiTheme } from "./settings";
 import { Modal } from "./ui";
 import { Select } from "./Select";
 import { getVersion } from "@tauri-apps/api/app";
@@ -37,7 +37,10 @@ const TABS: { key: SettingsTab; icon: IconName; label: () => string }[] = [
 const THEMES: [UiTheme, MessageKey][] = [
   ["system", "settings.themeSystem"],
   ["light", "settings.themeLight"],
+  ["warm", "settings.themeWarm"],
   ["dark", "settings.themeDark"],
+  ["slate", "settings.themeSlate"],
+  ["oled", "settings.themeOled"],
 ];
 
 export default function SettingsDialog(props: {
@@ -79,12 +82,25 @@ export default function SettingsDialog(props: {
               </div>
               <div className="panel-section">
                 <div className="panel-label">{t("settings.theme")}</div>
-                <div className="segmented">
-                  {THEMES.map(([value, label]) => (
-                    <button key={value} className={settings.uiTheme === value ? "on" : ""} onClick={() => update({ uiTheme: value })}>
-                      {t(label)}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label={t("settings.theme")}>
+                  {THEMES.map(([value, label]) => {
+                    // Each choice is drawn in its own colours; "system" shows light and dark halves.
+                    const name = value === "system" ? null : value;
+                    return (
+                      <button
+                        key={value}
+                        role="radio"
+                        aria-checked={settings.uiTheme === value}
+                        data-theme={name ?? undefined}
+                        data-scheme={name ? (isDarkTheme(name) ? "dark" : "light") : undefined}
+                        className={`theme-choice${settings.uiTheme === value ? " on" : ""}${name ? "" : " system"}`}
+                        onClick={() => update({ uiTheme: value })}
+                      >
+                        <span className="theme-sample">Aa</span>
+                        <span className="theme-name">{t(label)}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               <div className="panel-section">

@@ -7,6 +7,7 @@ import { formatNumber, formatSize, t } from "../i18n";
 import { Icon } from "../icons";
 import type { Book, DuplicateCopy, DuplicateGroup } from "../types";
 import { Modal } from "../ui";
+import { BTN, BTN_PRIMARY } from "../tw";
 import { Cover, percent } from "./BookCard";
 
 export function DedupeDialog(props: {
@@ -42,57 +43,72 @@ export function DedupeDialog(props: {
       footer={
         props.groups.length > 0 ? (
           <>
-            <span className="muted small">{removing > 0 && t("dd.footer", { n: removing })}</span>
-            <span className="spacer" />
-            <button onClick={props.onClose}>{t("common.cancel")}</button>
-            <button className="primary" disabled={chosen.length === 0 || busy} onClick={apply}>
+            <span className="self-center text-xs text-[var(--muted)]">{removing > 0 && t("dd.footer", { n: removing })}</span>
+            <span className="flex-1" />
+            <button className={BTN} onClick={props.onClose}>
+              {t("common.cancel")}
+            </button>
+            <button className={BTN_PRIMARY} disabled={chosen.length === 0 || busy} onClick={apply}>
               {t("dd.apply", { n: chosen.length })}
             </button>
           </>
         ) : (
-          <button onClick={props.onClose}>{t("common.close")}</button>
+          <button className={BTN} onClick={props.onClose}>
+            {t("common.close")}
+          </button>
         )
       }
     >
       {props.groups.length === 0 ? (
-        <p className="muted">{t("dd.none")}</p>
+        <p className="text-[var(--muted)]">{t("dd.none")}</p>
       ) : (
         <>
-          <p className="muted small dedupe-intro">{props.intro ?? t("dd.intro")}</p>
-          <div className="dedupe-list">
+          <p className="mb-3 text-xs leading-relaxed text-[var(--muted)]">{props.intro ?? t("dd.intro")}</p>
+          <div className="flex flex-col gap-3">
             {props.groups.map((g, i) => {
               const first = props.books.get(g.copies[0].id);
               return (
-                <div key={g.copies[0].id} className={`dedupe-group${selected[i] ? "" : " off"}`}>
-                  <label className="dedupe-head">
-                    <input type="checkbox" checked={selected[i]} onChange={(e) => setSelected((s) => s.map((v, j) => (j === i ? e.target.checked : v)))} />
-                    <strong className="ellipsis">{first?.title}</strong>
+                <div key={g.copies[0].id} className={`rounded-xl border border-[var(--line)] p-3${selected[i] ? "" : " opacity-55"}`}>
+                  <label className="mb-2 flex cursor-pointer items-center gap-2.5">
+                    <input
+                      type="checkbox"
+                      className="d-checkbox d-checkbox-sm d-checkbox-primary"
+                      checked={selected[i]}
+                      onChange={(e) => setSelected((s) => s.map((v, j) => (j === i ? e.target.checked : v)))}
+                    />
+                    <strong className="truncate text-[13px]">{first?.title}</strong>
                   </label>
-                  {!g.confident && <p className="dedupe-warn">{t("dd.guess")}</p>}
+                  {!g.confident && <p className="mb-2 text-xs text-[var(--warn)]">{t("dd.guess")}</p>}
                   {g.copies.map((c, k) => {
                     const book = props.books.get(c.id);
                     if (!book) return null;
                     return (
-                      <label key={c.id} className={`dedupe-copy${keep[i] === c.id ? " keep" : ""}`}>
+                      <label
+                        key={c.id}
+                        className={`flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 ${keep[i] === c.id ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--hover)]"}`}
+                      >
                         <input
                           type="radio"
+                          className="d-radio d-radio-sm d-radio-primary"
                           name={`keep-${i}`}
                           checked={keep[i] === c.id}
                           disabled={!selected[i]}
                           onChange={() => setKeep((ks) => ks.map((v, j) => (j === i ? c.id : v)))}
                         />
-                        <span className="dedupe-cover">
-                          <Cover book={book} small />
-                        </span>
-                        <span className="dedupe-main">
-                          <span className="dedupe-line">
-                            <span className="badge-soft">{book.format}</span>
-                            <span className="ellipsis">{book.fileName}</span>
-                            {k === 0 && <span className="badge-soft ok">{t("dd.recommended")}</span>}
+                        <span className="book3d flat w-8 shrink-0">
+                          <span className="book3d-face">
+                            <Cover book={book} small />
                           </span>
-                          <span className="dedupe-facts muted small">{facts(c, book).join(" · ")}</span>
                         </span>
-                        <span className="dedupe-score" title={t("dd.scoreTitle")}>
+                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span className="flex items-center gap-1.5 text-[13px]">
+                            <span className="d-badge d-badge-ghost d-badge-sm font-semibold">{book.format}</span>
+                            <span className="truncate">{book.fileName}</span>
+                            {k === 0 && <span className="d-badge d-badge-success d-badge-soft d-badge-sm font-semibold">{t("dd.recommended")}</span>}
+                          </span>
+                          <span className="text-xs text-[var(--muted)]">{facts(c, book).join(" · ")}</span>
+                        </span>
+                        <span className="text-lg font-bold text-[var(--muted)] tabular-nums" title={t("dd.scoreTitle")}>
                           {Math.round(c.score)}
                         </span>
                       </label>
@@ -123,15 +139,13 @@ function facts(c: DuplicateCopy, book: Book): string[] {
 
 export function DedupeProgress(props: { done: number; total: number; name: string }) {
   return (
-    <div className="modal-backdrop">
-      <div className="modal import-progress">
-        <div className="modal-title">
+    <div className="d-modal d-modal-open">
+      <div className="d-modal-box flex w-[420px] flex-col gap-3" role="dialog" aria-modal="true" aria-label={t("dd.scanning")}>
+        <h2 className="flex items-center gap-2 text-[17px] font-semibold">
           <Icon name="layers" /> {t("dd.scanning")}
-        </div>
-        <div className="bar">
-          <div style={{ width: props.total ? `${(props.done / props.total) * 100}%` : "0%" }} />
-        </div>
-        <div className="muted small ellipsis">{props.total ? `${props.done} / ${props.total}　${props.name}` : ""}</div>
+        </h2>
+        <progress className="d-progress d-progress-primary w-full" value={props.total ? props.done : undefined} max={props.total || 1} />
+        <div className="truncate text-xs text-[var(--muted)]">{props.total ? `${props.done} / ${props.total}　${props.name}` : ""}</div>
       </div>
     </div>
   );

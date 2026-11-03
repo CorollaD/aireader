@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Modal } from "../ui";
+import { BTN, BTN_PRIMARY, FIELD, INPUT } from "../tw";
 import type { Book, BookPatch } from "../types";
 import { formatSize, t } from "../i18n";
 import { childName, groupTree, labelOf } from "./groups";
@@ -46,8 +47,10 @@ export function EditDialog(props: { books: Book[]; groups: string[]; onSave: (pa
       onClose={props.onClose}
       footer={
         <>
-          <button onClick={props.onClose}>{t("common.cancel")}</button>
-          <button className="primary" onClick={save} disabled={invalid}>
+          <button className={BTN} onClick={props.onClose}>
+            {t("common.cancel")}
+          </button>
+          <button className={BTN_PRIMARY} onClick={save} disabled={invalid}>
             {t("common.save")}
           </button>
         </>
@@ -55,17 +58,17 @@ export function EditDialog(props: { books: Book[]; groups: string[]; onSave: (pa
     >
       {single && (
         <>
-          <label className="field">
+          <label className={FIELD}>
             <span>{t("edit.bookTitle")}</span>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+            <input className={INPUT} value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
           </label>
-          <label className="field">
+          <label className={FIELD}>
             <span>{t("edit.author")}</span>
-            <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder={t("edit.unknown")} />
+            <input className={INPUT} value={author} onChange={(e) => setAuthor(e.target.value)} placeholder={t("edit.unknown")} />
           </label>
         </>
       )}
-      <label className="field">
+      <label className={FIELD}>
         <span>{t("edit.groups")}</span>
         <Select
           full
@@ -84,7 +87,7 @@ export function EditDialog(props: { books: Book[]; groups: string[]; onSave: (pa
         />
         {choice === NEW && (
           <input
-            className="inline-add"
+            className={INPUT}
             value={newGroup}
             autoFocus
             placeholder={t("edit.newGroup")}
@@ -95,7 +98,6 @@ export function EditDialog(props: { books: Book[]; groups: string[]; onSave: (pa
         {choice === NEW && (
           <Select
             full
-            className="inline-add"
             value={newParent}
             label={t("shelf.parentGroup")}
             options={[{ value: "", label: t("shelf.topLevel") }, ...groupTree(props.groups).map(({ name }) => ({ value: name, label: name }))]}
@@ -104,7 +106,7 @@ export function EditDialog(props: { books: Book[]; groups: string[]; onSave: (pa
         )}
       </label>
       {single && (
-        <div className="muted small">
+        <div className="text-xs text-[var(--muted)]">
           {single.fileName} · {t("book.size", { size: formatSize(single.size) })}
         </div>
       )}

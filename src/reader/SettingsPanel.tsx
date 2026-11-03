@@ -1,27 +1,41 @@
 // Reading appearance controls, shown in the reader's "Aa" popover and in the Settings dialog.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { UpdateSettings } from "../App";
 import { api, errorText } from "../api";
 import { t } from "../i18n";
-import { BACKGROUNDS, FONT_STACKS, isDark, type FontFamily, type Settings } from "../settings";
+import { BACKGROUNDS, FONT_STACKS, FONT_WEIGHTS, isDark, READING_THEMES, type FontFamily, type FontWeight, type Settings } from "../settings";
+import type { MessageKey } from "../i18n";
+import { BTN, BTN_GHOST } from "../tw";
+
+const WEIGHT_NAMES: Record<FontWeight, MessageKey> = { 400: "rs.weightRegular", 500: "rs.weightMedium", 600: "rs.weightBold" };
 import { Select } from "../Select";
 
 function Slider(props: { label: string; value: number; min: number; max: number; step: number; format: (v: number) => string; onChange: (v: number) => void }) {
   return (
-    <label className="slider">
+    <label className="my-2.5 grid grid-cols-[84px_1fr_52px] items-center gap-2.5 text-[13px]">
       <span>{props.label}</span>
       <input
         type="range"
-        style={{ "--fill": `${((props.value - props.min) / (props.max - props.min)) * 100}%` } as CSSProperties}
+        className="d-range d-range-primary d-range-xs"
         min={props.min}
         max={props.max}
         step={props.step}
         value={props.value}
         onChange={(e) => props.onChange(Number(e.target.value))}
       />
-      <span className="slider-value">{props.format(props.value)}</span>
+      <span className="text-right text-xs text-[var(--muted)] tabular-nums">{props.format(props.value)}</span>
     </label>
+  );
+}
+
+/** Sections of the panel: a small heading over its controls. */
+function Section(props: { label?: string; children: ReactNode }) {
+  return (
+    <section className="mb-4 last:mb-0">
+      {props.label && <h3 className="mb-2 text-xs font-semibold text-[var(--muted)]">{props.label}</h3>}
+      {props.children}
+    </section>
   );
 }
 
@@ -55,7 +69,7 @@ function CustomFont(props: { value: string | null; onChange: (name: string | nul
   };
   const label = (name: string) => name.replace(/\.[^.]+$/, "");
   return (
-    <div className="custom-font">
+    <div className="mt-2 flex flex-wrap items-center gap-2">
       <Select
         full
         value={props.value ?? ""}
@@ -63,21 +77,23 @@ function CustomFont(props: { value: string | null; onChange: (name: string | nul
         options={[{ value: "", label: t("rs.customFontNone") }, ...fonts.map((f) => ({ value: f, label: label(f) }))]}
         onChange={(font) => props.onChange(font || null)}
       />
-      <button onClick={add}>{t("rs.addFont")}</button>
+      <button className={BTN} onClick={add}>
+        {t("rs.addFont")}
+      </button>
       {props.value && (
-        <button onClick={remove} title={t("rs.removeFont")}>
+        <button className={`${BTN_GHOST} text-[var(--danger)]`} onClick={remove} title={t("rs.removeFont")}>
           {t("common.delete")}
         </button>
       )}
-      {error && <div className="error small">{error}</div>}
+      {error && <div className="w-full text-xs text-[var(--danger)]">{error}</div>}
     </div>
   );
 }
 
 function Toggle(props: { label: string; on: boolean; onChange: (on: boolean) => void }) {
   return (
-    <label className="toggle">
-      <input type="checkbox" checked={props.on} onChange={(e) => props.onChange(e.target.checked)} />
+    <label className="flex cursor-pointer items-center gap-2 text-[13px]">
+      <input type="checkbox" className="d-toggle d-toggle-primary d-toggle-sm" checked={props.on} onChange={(e) => props.onChange(e.target.checked)} />
       {props.label}
     </label>
   );
@@ -99,15 +115,44 @@ function Choice<T extends string | number>(props: { value: T; options: [T, strin
 export function ReadingSettings(props: { settings: Settings; update: UpdateSettings; text: boolean; paged: boolean }) {
   const { settings: s, update } = props;
   const custom = !BACKGROUNDS.some((b) => b.color === s.background);
+  const themeOn = (th: (typeof READING_THEMES)[number]) =>
+    s.background === th.background && s.textColor === th.textColor && s.fontWeight === th.fontWeight && (!props.text || s.fontFamily === th.fontFamily);
   return (
     <>
-      <div className="panel-section">
-        <div className="panel-label">{t("rs.background")}</div>
-        <div className="swatches">
+      <Section label={t("rs.theme")}>
+        <div className="grid grid-cols-3 gap-2">
+          {READING_THEMES.map((th) => (
+            <button
+              key={th.name}
+              className={`tw flex h-16 flex-col items-center justify-center gap-0.5 rounded-xl border border-black/10 shadow-sm transition ${
+                themeOn(th) ? "ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--surface)]" : "hover:-translate-y-px hover:shadow-md"
+              }`}
+              style={{
+                background: th.background,
+                color: th.textColor ?? (isDark(th.background) ? "#eee" : "#121212"),
+                fontFamily: FONT_STACKS[th.fontFamily].css,
+              }}
+              onClick={() =>
+                update({ background: th.background, textColor: th.textColor, fontWeight: th.fontWeight, ...(props.text ? { fontFamily: th.fontFamily } : {}) })
+              }
+            >
+              <span className="text-[19px] leading-none" style={{ fontWeight: th.fontWeight === 400 ? 500 : 700 }}>
+                Aa
+              </span>
+              <span className="text-[11px]" style={{ fontWeight: th.fontWeight === 600 ? 700 : 500 }}>
+                {t(th.name)}
+              </span>
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      <Section label={t("rs.background")}>
+        <div className="grid grid-cols-3 gap-1.5">
           {BACKGROUNDS.map((b) => (
             <button
               key={b.color}
-              className={`swatch${s.background === b.color ? " on" : ""}`}
+              className={`tw h-9 truncate rounded-lg border border-black/10 px-1.5 text-xs font-medium ${s.background === b.color ? "ring-2 ring-[var(--accent)] ring-offset-1 ring-offset-[var(--surface)]" : ""}`}
               style={{ background: b.color, color: isDark(b.color) ? "#eee" : "#333" }}
               title={t(b.name)}
               onClick={() => update({ background: b.color })}
@@ -115,32 +160,42 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
               {t(b.name)}
             </button>
           ))}
-          <label className={`swatch custom${custom ? " on" : ""}`} title={t("rs.customColor")}>
-            <input type="color" value={s.background} onChange={(e) => update({ background: e.target.value })} />
+          <label
+            className={`flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--line-strong)] text-xs font-medium text-[var(--muted)] ${
+              custom ? "ring-2 ring-[var(--accent)] ring-offset-1 ring-offset-[var(--surface)]" : ""
+            }`}
+            title={t("rs.customColor")}
+          >
+            <input
+              type="color"
+              className="tw size-4 cursor-pointer overflow-hidden rounded"
+              value={s.background}
+              onChange={(e) => update({ background: e.target.value })}
+            />
             {t("rs.custom")}
           </label>
         </div>
-      </div>
+      </Section>
 
-      <div className="panel-section">
-        <div className="panel-label">{t("rs.textColor")}</div>
-        <div className="row-gap">
-          <div className="segmented">
-            <button className={s.textColor === null ? "on" : ""} onClick={() => update({ textColor: null })}>
-              {t("rs.auto")}
-            </button>
-            <button className={s.textColor !== null ? "on" : ""} onClick={() => update({ textColor: isDark(s.background) ? "#d8d8d8" : "#222222" })}>
-              {t("rs.custom")}
-            </button>
-          </div>
-          {s.textColor !== null && <input type="color" value={s.textColor} onChange={(e) => update({ textColor: e.target.value })} />}
+      <Section label={t("rs.textColor")}>
+        <div className="flex items-center gap-2">
+          <Choice
+            value={s.textColor === null ? "auto" : "custom"}
+            options={[
+              ["auto", t("rs.auto")],
+              ["custom", t("rs.custom")],
+            ]}
+            onChange={(v) => update({ textColor: v === "auto" ? null : isDark(s.background) ? "#d8d8d8" : "#222222" })}
+          />
+          {s.textColor !== null && (
+            <input type="color" className="tw size-7 cursor-pointer rounded-md" value={s.textColor} onChange={(e) => update({ textColor: e.target.value })} />
+          )}
         </div>
-      </div>
+      </Section>
 
       {props.text && (
         <>
-          <div className="panel-section">
-            <div className="panel-label">{t("rs.font")}</div>
+          <Section label={t("rs.font")}>
             <div className="segmented">
               {(Object.keys(FONT_STACKS) as FontFamily[]).map((f) => (
                 <button key={f} className={s.fontFamily === f ? "on" : ""} style={{ fontFamily: FONT_STACKS[f].css }} onClick={() => update({ fontFamily: f })}>
@@ -149,8 +204,15 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
               ))}
             </div>
             <CustomFont value={s.customFont} onChange={(customFont) => update({ customFont })} />
-          </div>
-          <div className="panel-section">
+          </Section>
+          <Section label={t("rs.weight")}>
+            <Choice
+              value={s.fontWeight}
+              options={FONT_WEIGHTS.map((w) => [w, t(WEIGHT_NAMES[w])] as [FontWeight, string])}
+              onChange={(fontWeight) => update({ fontWeight })}
+            />
+          </Section>
+          <Section>
             <Slider label={t("rs.fontSize")} value={s.fontSize} min={13} max={36} step={1} format={(v) => `${v}px`} onChange={(v) => update({ fontSize: v })} />
             <Slider
               label={t("rs.lineHeight")}
@@ -182,14 +244,13 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
                 onChange={(v) => update({ maxWidth: v })}
               />
             )}
-            <div className="row-gap toggles">
+            <div className="mt-3 flex gap-5">
               <Toggle label={t("rs.indent")} on={s.indent} onChange={(indent) => update({ indent })} />
               <Toggle label={t("rs.justify")} on={s.justify} onChange={(justify) => update({ justify })} />
             </div>
-          </div>
-          <div className="panel-section">
-            <div className="panel-label">{t("rs.pageTurn")}</div>
-            <div className="row-gap">
+          </Section>
+          <Section label={t("rs.pageTurn")}>
+            <div className="flex flex-wrap gap-2">
               <Choice
                 value={s.flowMode}
                 options={[
@@ -209,14 +270,13 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
                 />
               )}
             </div>
-          </div>
+          </Section>
         </>
       )}
 
       {props.paged && (
-        <div className="panel-section">
-          {props.text && <div className="panel-heading">{t("settings.pagedBooks")}</div>}
-          <div className="option-row">
+        <Section label={props.text ? t("settings.pagedBooks") : undefined}>
+          <div className="my-2 flex items-center justify-between gap-3 text-[13px]">
             <span>{t("rs.pageLayout")}</span>
             <Choice
               value={s.pageLayout}
@@ -228,7 +288,7 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
               onChange={(pageLayout) => update({ pageLayout })}
             />
           </div>
-          <div className="option-row">
+          <div className="my-2 flex items-center justify-between gap-3 text-[13px]">
             <span>{t("rs.fit")}</span>
             <Choice
               value={s.pageFit}
@@ -241,7 +301,7 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
             />
           </div>
           <Toggle label={t("rs.comicRtl")} on={s.comicRtl} onChange={(comicRtl) => update({ comicRtl })} />
-        </div>
+        </Section>
       )}
     </>
   );
@@ -250,9 +310,12 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
 /** The reader's "Aa" popover. */
 export default function SettingsPanel(props: { settings: Settings; update: UpdateSettings; textOptions: boolean; onMore: () => void }) {
   return (
-    <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="settings-panel absolute top-[calc(100%+8px)] right-0 z-[60] max-h-[calc(100vh-70px)] w-[352px] overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--glass)] p-4 shadow-2xl backdrop-blur-xl backdrop-saturate-150"
+      onClick={(e) => e.stopPropagation()}
+    >
       <ReadingSettings settings={props.settings} update={props.update} text={props.textOptions} paged={false} />
-      <div className="panel-footer">
+      <div className="mt-3 flex justify-end border-t border-[var(--line)] pt-2.5">
         <button className="link-button" onClick={props.onMore}>
           {t("rs.more")}
         </button>

@@ -5,7 +5,7 @@ import { api, fontUrl } from "./api";
 import { onBeforeExit, saveAll } from "./lifecycle";
 import OcrProgressBar from "./ocr/OcrProgressBar";
 import { resolveLanguage, setLanguage, t } from "./i18n";
-import { CUSTOM_FONT, DEFAULT_SETTINGS, normalizeSettings, themeVars, UI_SCALES, type Settings } from "./settings";
+import { CUSTOM_FONT, DEFAULT_SETTINGS, isDarkTheme, normalizeSettings, themeVars, UI_SCALES, uiThemeName, type Settings } from "./settings";
 import SettingsDialog, { SettingsOpener, type SettingsTab } from "./SettingsDialog";
 import ShelfView from "./shelf/ShelfView";
 import ReviewView from "./study/ReviewView";
@@ -106,7 +106,9 @@ export default function App() {
   useEffect(() => {
     const dark = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => {
-      document.documentElement.dataset.theme = settings.uiTheme === "system" ? (dark.matches ? "dark" : "light") : settings.uiTheme;
+      const name = uiThemeName(settings.uiTheme, dark.matches);
+      document.documentElement.dataset.theme = name;
+      document.documentElement.dataset.scheme = isDarkTheme(name) ? "dark" : "light";
     };
     apply();
     dark.addEventListener("change", apply);

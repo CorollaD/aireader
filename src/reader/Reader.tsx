@@ -3,10 +3,10 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, errorText } from "../api";
 import { onBeforeExit } from "../lifecycle";
 import type { UpdateSettings } from "../App";
-import { isDark, type Settings } from "../settings";
+import { isDark, isDarkTheme, uiThemeName, type Settings } from "../settings";
 import { dragRegion } from "../titlebar";
 import type { Card, Highlight, HighlightColor, Hit, Location, OpenedBook, Reference } from "../types";
-import { isTyping, Modal, Toast } from "../ui";
+import { isTyping, Menu, MenuDivider, MenuItem, Modal, Toast } from "../ui";
 import { t } from "../i18n";
 import { Icon } from "../icons";
 import { useOpenSettings } from "../SettingsDialog";
@@ -443,7 +443,7 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
         forward();
       } else if (e.key === "Escape") {
         // Open dialogs handle Escape themselves.
-        if (document.querySelector(".modal-backdrop")) return;
+        if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
         if (selection || activeMark || pageSel) {
           clearSelection();
           setActiveMark(null);
@@ -517,10 +517,14 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
   const mark = activeMark ? ann.data.highlights.find((h) => h.id === activeMark.id) : null;
   const noteHighlight = noteFor ? ann.data.highlights.find((h) => h.id === noteFor) : null;
 
+  // Dark paper puts the reader's own controls in a dark theme, unless the interface's is dark.
+  const darkPaper = isDark(settings.background) && !isDarkTheme(uiThemeName(settings.uiTheme, window.matchMedia("(prefers-color-scheme: dark)").matches));
+
   return (
     <div
       className={`reader${focus ? " focus" : ""}`}
-      data-theme={isDark(settings.background) ? "dark" : undefined}
+      data-theme={darkPaper ? "dark" : undefined}
+      data-scheme={darkPaper ? "dark" : undefined}
       onClick={() => (setPanel(false), setMoreMenu(false))}
     >
       {focus && <div className="focus-hotzone" />}
@@ -676,74 +680,83 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
               <Icon name="more" />
             </button>
             {moreMenu && (
-              <div className="menu dropdown" onClick={(e) => (e.stopPropagation(), setMoreMenu(false))}>
+              <Menu className="absolute top-full right-0 mt-1.5 w-64" onClick={(e) => (e.stopPropagation(), setMoreMenu(false))}>
                 {book.kind === "paged" && (
                   <>
-                    <div className="narrow-tools">
-                      <button className={settings.pageFit === "width" ? "checked" : ""} onClick={() => (update({ pageFit: "width" }), setZoom(1))}>
-                        <Icon name="fitWidth" /> {t("rs.fitWidth")}
-                      </button>
-                      <button className={settings.pageFit === "page" ? "checked" : ""} onClick={() => (update({ pageFit: "page" }), setZoom(1))}>
-                        <Icon name="fitPage" /> {t("rs.fitPage")}
-                      </button>
-                      <button className={settings.pageFit === "height" ? "checked" : ""} onClick={() => (update({ pageFit: "height" }), setZoom(1))}>
-                        <Icon name="fitHeight" /> {t("rs.fitHeight")}
-                      </button>
-                      <button onClick={rotate}>
-                        <Icon name="rotate" /> {t("reader.rotate")}
-                      </button>
-                      <hr />
-                    </div>
-                    <button className={settings.pageLayout === "continuous" ? "checked" : ""} onClick={() => update({ pageLayout: "continuous" })}>
-                      <Icon name="list" /> {t("rs.continuous")}
-                    </button>
-                    <button className={settings.pageLayout === "single" ? "checked" : ""} onClick={() => update({ pageLayout: "single" })}>
-                      <Icon name="fitPage" /> {t("rs.single")}
-                    </button>
-                    <button className={settings.pageLayout === "spread" ? "checked" : ""} onClick={() => update({ pageLayout: "spread" })}>
-                      <Icon name="spread" /> {t("rs.spread")}
-                    </button>
+                    <MenuItem
+                      className="narrow-tool"
+                      icon="fitWidth"
+                      checked={settings.pageFit === "width"}
+                      onClick={() => (update({ pageFit: "width" }), setZoom(1))}
+                    >
+                      {t("rs.fitWidth")}
+                    </MenuItem>
+                    <MenuItem
+                      className="narrow-tool"
+                      icon="fitPage"
+                      checked={settings.pageFit === "page"}
+                      onClick={() => (update({ pageFit: "page" }), setZoom(1))}
+                    >
+                      {t("rs.fitPage")}
+                    </MenuItem>
+                    <MenuItem
+                      className="narrow-tool"
+                      icon="fitHeight"
+                      checked={settings.pageFit === "height"}
+                      onClick={() => (update({ pageFit: "height" }), setZoom(1))}
+                    >
+                      {t("rs.fitHeight")}
+                    </MenuItem>
+                    <MenuItem className="narrow-tool" icon="rotate" onClick={rotate}>
+                      {t("reader.rotate")}
+                    </MenuItem>
+                    <MenuDivider className="narrow-tool" />
+                    <MenuItem icon="list" checked={settings.pageLayout === "continuous"} onClick={() => update({ pageLayout: "continuous" })}>
+                      {t("rs.continuous")}
+                    </MenuItem>
+                    <MenuItem icon="fitPage" checked={settings.pageLayout === "single"} onClick={() => update({ pageLayout: "single" })}>
+                      {t("rs.single")}
+                    </MenuItem>
+                    <MenuItem icon="spread" checked={settings.pageLayout === "spread"} onClick={() => update({ pageLayout: "spread" })}>
+                      {t("rs.spread")}
+                    </MenuItem>
                     {book.format === "PDF" && (
                       <>
-                        <button onClick={() => setPaperDialog(true)}>
-                          <Icon name="note" /> {t("paper.details")}
-                        </button>
-                        <button onClick={() => setCiting(true)}>
-                          <Icon name="copy" /> {t("cite.action")}
-                        </button>
+                        <MenuItem icon="note" onClick={() => setPaperDialog(true)}>
+                          {t("paper.details")}
+                        </MenuItem>
+                        <MenuItem icon="copy" onClick={() => setCiting(true)}>
+                          {t("cite.action")}
+                        </MenuItem>
                       </>
                     )}
                     {ocr.pending.length > 0 && !ocr.running && (
-                      <button onClick={ocr.start}>
-                        <Icon name="type" /> {t("ocr.recognise", { n: ocr.pending.length })}
-                      </button>
+                      <MenuItem icon="type" onClick={ocr.start}>
+                        {t("ocr.recognise", { n: ocr.pending.length })}
+                      </MenuItem>
                     )}
                     {book.format === "CBZ" && (
-                      <button className={settings.comicRtl ? "checked" : ""} onClick={() => update({ comicRtl: !settings.comicRtl })}>
-                        <Icon name="arrowLeft" /> {t("rs.comicRtl")}
-                      </button>
+                      <MenuItem icon="arrowLeft" checked={settings.comicRtl} onClick={() => update({ comicRtl: !settings.comicRtl })}>
+                        {t("rs.comicRtl")}
+                      </MenuItem>
                     )}
-                    <hr />
+                    <MenuDivider />
                   </>
                 )}
-                <button onClick={() => setFocus(true)}>
-                  <Icon name="focus" /> {t("reader.focus")}
-                  <kbd>F</kbd>
-                </button>
-                <button onClick={() => toggleFullscreen().catch(() => {})}>
-                  <Icon name="maximize" /> {t("reader.fullscreen")}
-                  <kbd>F11</kbd>
-                </button>
-                <hr />
-                <button onClick={() => openSettings("shortcuts")}>
-                  <Icon name="keyboard" /> {t("reader.shortcuts")}
-                  <kbd>?</kbd>
-                </button>
-                <button onClick={() => openSettings()}>
-                  <Icon name="settings" /> {t("reader.settings")}
-                  <kbd>{MOD},</kbd>
-                </button>
-              </div>
+                <MenuItem icon="focus" kbd="F" onClick={() => setFocus(true)}>
+                  {t("reader.focus")}
+                </MenuItem>
+                <MenuItem icon="maximize" kbd="F11" onClick={() => toggleFullscreen().catch(() => {})}>
+                  {t("reader.fullscreen")}
+                </MenuItem>
+                <MenuDivider />
+                <MenuItem icon="keyboard" kbd="?" onClick={() => openSettings("shortcuts")}>
+                  {t("reader.shortcuts")}
+                </MenuItem>
+                <MenuItem icon="settings" kbd={`${MOD},`} onClick={() => openSettings()}>
+                  {t("reader.settings")}
+                </MenuItem>
+              </Menu>
             )}
           </div>
         </div>
