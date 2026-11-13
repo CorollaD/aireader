@@ -520,9 +520,12 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
   // Dark paper puts the reader's own controls in a dark theme, unless the interface's is dark.
   const darkPaper = isDark(settings.background) && !isDarkTheme(uiThemeName(settings.uiTheme, window.matchMedia("(prefers-color-scheme: dark)").matches));
 
+  // The bars and panels take the paper's tint when both are light or both dark.
+  const paperChrome = isDark(settings.background) || !isDarkTheme(uiThemeName(settings.uiTheme, window.matchMedia("(prefers-color-scheme: dark)").matches));
+
   return (
     <div
-      className={`reader${focus ? " focus" : ""}`}
+      className={`reader${focus ? " focus" : ""}${paperChrome ? " paper-chrome" : ""}`}
       data-theme={darkPaper ? "dark" : undefined}
       data-scheme={darkPaper ? "dark" : undefined}
       onClick={() => (setPanel(false), setMoreMenu(false))}
@@ -833,7 +836,11 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
             onReset={() => panels.reset("toc")}
           />
         )}
-        <section className="reader-view">
+        <section
+          className="reader-view"
+          // Document pages (not comics) take the paper colour: see .page-tint in components.css.
+          data-page-tint={!isFlow && book.format !== "CBZ" ? (isDark(settings.background) ? "dark" : "light") : undefined}
+        >
           {isFlow ? (
             <FlowView
               ref={flowRef}

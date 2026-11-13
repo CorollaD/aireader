@@ -10,7 +10,9 @@ export const UI_THEMES = ["system", "light", "warm", "dark", "slate", "oled"] as
 export type UiTheme = (typeof UI_THEMES)[number];
 const DARK_THEMES: string[] = ["dark", "slate", "oled"];
 /** Colours for buttons, links and selection; each has a light- and a dark-theme shade in styles.css. */
-export const ACCENTS = ["indigo", "blue", "navy", "teal", "mint", "violet", "rose", "cherry", "orange", "amber", "graphite"] as const;
+export const ACCENTS = ["red", "orange", "amber", "green", "teal", "blue", "indigo", "purple", "pink", "graphite"] as const;
+/** Accents of earlier versions, by the one now closest to them. */
+const OLD_ACCENTS: Record<string, Accent> = { rose: "pink", cherry: "red", violet: "purple", mint: "green", navy: "blue" };
 export type Accent = (typeof ACCENTS)[number];
 /** Who reads aloud: the system's voices, or an online service. */
 export type TtsProvider = "system" | "openai" | "azure" | "volcengine" | "elevenlabs";
@@ -89,7 +91,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   uiTheme: "system",
   accent: "indigo",
-  background: "#fbf8f1",
+  background: "#f7f0e0",
   textColor: null,
   fontFamily: "sans",
   fontWeight: 400,
@@ -127,14 +129,24 @@ export const UI_SCALES: { value: number; label: MessageKey }[] = [
 
 export const BACKGROUNDS: { name: MessageKey; color: string }[] = [
   { name: "bg.white", color: "#ffffff" },
-  { name: "bg.cream", color: "#fbf8f1" },
-  { name: "bg.parchment", color: "#f3ead9" },
-  { name: "bg.green", color: "#e4ebe0" },
-  { name: "bg.sky", color: "#e6ebf2" },
-  { name: "bg.darkGray", color: "#2a2b2f" },
-  { name: "bg.night", color: "#1a1b1e" },
+  { name: "bg.cream", color: "#f7f0e0" },
+  { name: "bg.parchment", color: "#f3e7cf" },
+  { name: "bg.green", color: "#d6e8cf" },
+  { name: "bg.sky", color: "#d8e6f5" },
+  { name: "bg.rose", color: "#f4dfe2" },
+  { name: "bg.darkGray", color: "#2f3035" },
+  { name: "bg.night", color: "#18202e" },
   { name: "bg.black", color: "#000000" },
 ];
+/** Paper colours of earlier versions, by the preset that replaced them. */
+const OLD_BACKGROUNDS: Record<string, string> = {
+  "#fbf8f1": "#f7f0e0",
+  "#f3ead9": "#f3e7cf",
+  "#e4ebe0": "#d6e8cf",
+  "#e6ebf2": "#d8e6f5",
+  "#2a2b2f": "#2f3035",
+  "#1a1b1e": "#18202e",
+};
 
 /** Reading themes after Apple Books': paper, ink, typeface and weight chosen together. */
 export const READING_THEMES: {
@@ -170,8 +182,9 @@ export const FONT_STACKS: Record<FontFamily, { name: MessageKey; css: string }> 
 export function normalizeSettings(raw: unknown): Settings {
   const s = { ...DEFAULT_SETTINGS, ...(raw && typeof raw === "object" ? (raw as Partial<Settings>) : {}) };
   if (!UI_THEMES.includes(s.uiTheme)) s.uiTheme = DEFAULT_SETTINGS.uiTheme;
-  if (!ACCENTS.includes(s.accent)) s.accent = DEFAULT_SETTINGS.accent;
+  if (!ACCENTS.includes(s.accent)) s.accent = OLD_ACCENTS[s.accent] ?? DEFAULT_SETTINGS.accent;
   if (!/^#[0-9a-f]{6}$/i.test(s.background)) s.background = DEFAULT_SETTINGS.background;
+  s.background = OLD_BACKGROUNDS[s.background.toLowerCase()] ?? s.background;
   if (s.textColor !== null && !/^#[0-9a-f]{6}$/i.test(s.textColor)) s.textColor = null;
   if (!(s.fontFamily in FONT_STACKS)) s.fontFamily = DEFAULT_SETTINGS.fontFamily;
   if (!FONT_WEIGHTS.includes(s.fontWeight)) s.fontWeight = DEFAULT_SETTINGS.fontWeight;
@@ -235,7 +248,7 @@ export function themeVars(s: Settings): Record<string, string> {
   const dark = isDark(bg);
   // Text is the background pushed nearly to black, or to white short of glaring on a dark
   // page: about as crisp as a printed page or the system's document viewers, with a hint of hue.
-  const fg = s.textColor ?? mix(bg, dark ? "#ffffff" : "#000000", dark ? 0.88 : 0.93);
+  const fg = s.textColor ?? mix(bg, dark ? "#ffffff" : "#000000", dark ? 0.92 : 0.97);
   const toward = dark ? "#ffffff" : "#000000";
   return {
     "--reading-bg": bg,

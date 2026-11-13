@@ -165,3 +165,107 @@ kbd {
     display: none;
   }
 }
+
+/* PDF and DjVu pages are drawn white by the renderer. On light paper the white takes the paper's
+   colour and ink stays dark (multiply); on dark paper the page is inverted and laid over the
+   paper (screen), so text turns light on the dark background. Comics keep their colours. */
+[data-page-tint] .page {
+  background: var(--reading-bg);
+}
+[data-page-tint="light"] .page img {
+  mix-blend-mode: multiply;
+}
+[data-page-tint="dark"] .page img {
+  filter: invert(1) hue-rotate(180deg);
+  mix-blend-mode: screen;
+}
+/* The page number waiting behind the image would show through the blending. */
+[data-page-tint] .page:has(img) .page-number {
+  visibility: hidden;
+}
+
+/* --- Reading typography ------------------------------------------------------------------- */
+.flow {
+  padding-top: 56px;
+  padding-bottom: 48px;
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
+  /* Chinese and Japanese set as in print: a little space between Han characters and Latin
+     words or numbers, punctuation that doesn't leave double gaps or start a line. */
+  text-autospace: normal;
+  text-spacing-trim: trim-start;
+  line-break: strict;
+  hanging-punctuation: allow-end;
+}
+.flow.justify {
+  text-justify: inter-character;
+}
+.flow h1,
+.flow h2,
+.flow h3,
+.flow h4,
+.flow h5,
+.flow h6 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  break-after: avoid;
+}
+.flow h1,
+.flow h2 {
+  margin: 1.6em 0 1em;
+}
+/* A chapter opens with room around its title. */
+.flow > :is(h1, h2):first-child {
+  margin-top: 0.4em;
+  margin-bottom: 1.4em;
+  font-size: 1.7em;
+}
+.flow p {
+  orphans: 2;
+  widows: 2;
+}
+.flow blockquote {
+  border-left: 3px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 0 8px 8px 0;
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+  color: color-mix(in srgb, var(--fg) 82%, var(--bg));
+  padding: 0.6em 1.1em;
+}
+.flow pre {
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.flow figure img {
+  border-radius: 6px;
+}
+.flow .link {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  text-underline-offset: 0.2em;
+}
+.flow-scroller {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--fg) 22%, transparent) transparent;
+}
+
+/* --- The reader's bars and panels take the paper's colour, as in Apple Books ------------------
+   (when the paper and the interface are both light or both dark: see Reader.tsx). */
+.reader.paper-chrome {
+  --chrome-lift: #ffffff;
+  --bg: var(--reading-bg);
+  --panel: var(--reading-panel);
+  --surface: color-mix(in srgb, var(--reading-bg) 70%, var(--chrome-lift));
+  --input: var(--reading-hover);
+  --hover: var(--reading-hover);
+  --selected: var(--reading-border);
+  --line: var(--reading-border);
+  --line-strong: color-mix(in srgb, var(--reading-fg) 24%, transparent);
+}
+.reader.paper-chrome[data-scheme="dark"],
+[data-scheme="dark"] .reader.paper-chrome {
+  --chrome-lift: #3a3a3e;
+}
+.reader.paper-chrome .reader-bar {
+  background: var(--reading-bg);
+}

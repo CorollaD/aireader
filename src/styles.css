@@ -28,44 +28,40 @@
    4.5:1 or better) and one for dark (dark text on it, likewise). */
 :root,
 [data-accent="indigo"] {
-  --accent-l: #5151cd;
+  --accent-l: #4f4fcc;
   --accent-d: #a5a5f5;
 }
-[data-accent="blue"] {
-  --accent-l: #0a63d6;
-  --accent-d: #7fb0ff;
-}
-[data-accent="navy"] {
-  --accent-l: #1e3a8a;
-  --accent-d: #9db8ff;
-}
-[data-accent="teal"] {
-  --accent-l: #0f766e;
-  --accent-d: #2dd4bf;
-}
-[data-accent="mint"] {
-  --accent-l: #047857;
-  --accent-d: #5ee0b0;
-}
-[data-accent="violet"] {
-  --accent-l: #7c3aed;
-  --accent-d: #bca0f8;
-}
-[data-accent="rose"] {
-  --accent-l: #d61f45;
-  --accent-d: #fb8095;
-}
-[data-accent="cherry"] {
-  --accent-l: #9f1239;
-  --accent-d: #f78fb3;
+[data-accent="red"] {
+  --accent-l: #c8102e;
+  --accent-d: #ff7a7a;
 }
 [data-accent="orange"] {
   --accent-l: #c2410c;
   --accent-d: #fb923c;
 }
 [data-accent="amber"] {
-  --accent-l: #a16207;
-  --accent-d: #f5c04a;
+  --accent-l: #9a6400;
+  --accent-d: #f5c542;
+}
+[data-accent="green"] {
+  --accent-l: #187a3c;
+  --accent-d: #57d987;
+}
+[data-accent="teal"] {
+  --accent-l: #0b7285;
+  --accent-d: #3bc9db;
+}
+[data-accent="blue"] {
+  --accent-l: #0a63d6;
+  --accent-d: #6aa8ff;
+}
+[data-accent="purple"] {
+  --accent-l: #8e2fc9;
+  --accent-d: #cf9cf7;
+}
+[data-accent="pink"] {
+  --accent-l: #c0267a;
+  --accent-d: #f78fc4;
 }
 [data-accent="graphite"] {
   --accent-l: #3f3f46;
@@ -91,13 +87,13 @@
 }
 [data-theme="warm"] {
   color-scheme: light;
-  --bg: #fbf7ef;
-  --surface: #fffdf8;
-  --panel: #f3ecdf;
-  --input: #e9e0cf;
-  --fg: #231a12;
-  --muted: #514232;
-  --faint: #6c5b47;
+  --bg: #f6eedf;
+  --surface: #fdf8ee;
+  --panel: #ece0c9;
+  --input: #e2d3b6;
+  --fg: #2a1c0e;
+  --muted: #523f2a;
+  --faint: #6a553c;
   --hover: rgba(60, 40, 10, 0.06);
   --selected: rgba(60, 40, 10, 0.1);
   --line: rgba(60, 40, 10, 0.12);
@@ -105,9 +101,9 @@
 }
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #1c1c1e;
-  --surface: #2a2a2d;
-  --panel: #161618;
+  --bg: #242426;
+  --surface: #2d2d30;
+  --panel: #1c1c1e;
   --input: rgba(255, 255, 255, 0.08);
   --fg: #f5f5f7;
   --muted: #c7c7cc;
@@ -119,9 +115,9 @@
 }
 [data-theme="slate"] {
   color-scheme: dark;
-  --bg: #161c25;
-  --surface: #1f2733;
-  --panel: #11161d;
+  --bg: #172235;
+  --surface: #1d2a3f;
+  --panel: #111a29;
   --input: rgba(200, 220, 255, 0.08);
   --fg: #e8eef6;
   --muted: #b8c4d3;
@@ -2519,23 +2515,8 @@ button.cite:hover {
 }
 /* macOS: the window buttons sit on the top bars, except in full screen, where they go away. */
 .mac-titlebar:not(.fullscreen) .reader-bar,
-.mac-titlebar:not(.fullscreen) .review-head,
-.mac-titlebar:not(.fullscreen) .shelf-main:first-child .shelf-bar {
+.mac-titlebar:not(.fullscreen) .review-head {
   padding-left: 84px;
-}
-.mac-titlebar .sidebar {
-  padding-top: 0;
-}
-.mac-titlebar .brand {
-  display: flex;
-  align-items: center;
-  height: var(--bar-h);
-  padding-top: 0;
-  padding-bottom: 0;
-  margin-bottom: 4px;
-}
-.mac-titlebar:not(.fullscreen) .brand {
-  padding-left: 66px;
 }
 .toc {
   container: side / inline-size;

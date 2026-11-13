@@ -374,11 +374,15 @@ export default function ShelfView(props: {
       {mobile && drawer && <div className="drawer-backdrop" onClick={() => setDrawer(false)} />}
       {sidebarShown && (
         <aside
-          className="sidebar flex w-[232px] shrink-0 flex-col gap-px overflow-y-auto border-r border-[var(--line)] bg-[var(--panel)] px-2.5 py-3"
+          className="sidebar flex w-[232px] shrink-0 flex-col gap-px overflow-y-auto border-r border-[var(--line)] bg-[var(--panel)] px-2.5 py-3 [.mac-titlebar_&]:pt-0"
           // On phones, going anywhere from the drawer closes it; folding a group doesn't.
           onClick={(e) => mobile && (e.target as HTMLElement).closest("button:not(.side-fold)") && setDrawer(false)}
         >
-          <div className="brand flex items-center gap-2 px-2 pt-0.5 pb-3 text-[15px] font-bold tracking-tight" {...dragRegion}>
+          <div
+            // On macOS the window buttons sit at the top left: the name moves past them.
+            className="brand flex items-center gap-2 px-2 pt-0.5 pb-3 text-[15px] font-bold tracking-tight [.mac-titlebar_&]:mb-1 [.mac-titlebar_&]:h-[var(--bar-h)] [.mac-titlebar_&]:py-0 [.mac-titlebar:not(.fullscreen)_&]:pl-[76px]"
+            {...dragRegion}
+          >
             <img className="-my-0.5 -ml-1 size-6" src={brandMark} alt="" draggable={false} />
             AiReader
           </div>
@@ -450,7 +454,10 @@ export default function ShelfView(props: {
       )}
 
       <main className="shelf-main flex min-w-0 flex-1 flex-col">
-        <header className="shelf-bar flex min-h-[var(--bar-h)] items-center gap-1.5 px-4" {...dragRegion}>
+        <header
+          className="shelf-bar flex min-h-[var(--bar-h)] items-center gap-1.5 px-4 [.mac-titlebar:not(.fullscreen)_.shelf-main:first-child_&]:pl-[84px]"
+          {...dragRegion}
+        >
           <button
             className={`icon-button${sidebarShown ? " on" : ""}`}
             title={t("shelf.toggleSidebar")}
@@ -565,6 +572,22 @@ export default function ShelfView(props: {
         )}
 
         <div className="shelf-content flex-1 overflow-y-auto px-7 pt-4 pb-10 max-sm:px-5">
+          {shelf.books.length > 0 && (
+            <div className="mb-5 flex items-baseline gap-3">
+              <h1 className="truncate text-[26px] leading-tight font-bold tracking-tight">
+                {filter === ALL
+                  ? t("shelf.all")
+                  : filter === RECENT
+                    ? t("shelf.recent")
+                    : filter === UNGROUPED
+                      ? t("shelf.ungrouped")
+                      : filter === PAPERS
+                        ? t("shelf.papers")
+                        : labelOf(filter, null)}
+              </h1>
+              <span className="text-[13px] font-medium text-[var(--faint)] tabular-nums">{visible.length}</span>
+            </div>
+          )}
           {shelf.books.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
               <div className="text-xl font-bold tracking-tight">{t("shelf.emptyTitle")}</div>
@@ -582,7 +605,7 @@ export default function ShelfView(props: {
           ) : visible.length === 0 ? (
             !foundInBooks && <div className="flex h-full items-center justify-center text-[var(--muted)]">{t("shelf.noMatch")}</div>
           ) : settings.shelfView === "grid" ? (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-7 gap-y-9 max-sm:grid-cols-[repeat(auto-fill,minmax(108px,1fr))] max-sm:gap-x-4">
+            <div className="grid grid-cols-[repeat(auto-fill,156px)] gap-x-9 gap-y-10 max-sm:grid-cols-[repeat(auto-fill,minmax(96px,1fr))] max-sm:gap-x-4 max-sm:gap-y-7">
               {visible.map((b) => (
                 <BookCard
                   key={b.id}
