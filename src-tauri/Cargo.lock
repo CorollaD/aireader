@@ -42,7 +42,7 @@ dependencies = [
 
 [[package]]
 name = "aireader"
-version = "0.7.6"
+version = "0.7.7"
 dependencies = [
  "android-native-keyring-store",
  "anyhow",

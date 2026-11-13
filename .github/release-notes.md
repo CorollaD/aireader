@@ -1,9 +1,11 @@
-## What's new in 0.7.6 / 更新内容
+## What's new in 0.7.7 / 更新内容
 
-- **A new look, after Apple Books** / 全新界面，参照 Apple Books：the interface is rebuilt on Tailwind and daisyUI, with clearer, higher-contrast text and a heavier interface font. Books on the shelf stand like real ones, with a spine, page edges and a shadow. / 界面基于 Tailwind 和 daisyUI 重做，文字更清晰、对比度更高，界面字体加粗；书架上的书有书脊、书页厚度和阴影，看起来像真书。
-- **More colours** / 更多配色：interface themes Light, Warm, Dark, Slate and Black (Settings → General), and eleven accent colours. / 界面主题新增暖米、灰蓝、纯黑（设置 → 通用），强调色增加到 11 种。
-- **Reading themes** / 阅读主题：Original, Quiet, Paper, Bold, Calm and Focus set paper, ink, typeface and weight together, and book text has its own weight setting: regular, medium or bold. / 「原始、安静、纸张、粗体、平静、专注」一键设定纸张、文字颜色、字体和粗细；正文字重可选常规、中等、粗。
-- **System menus** / 系统下拉菜单：drop-down choices now use the system's own menus. / 下拉选择改用系统自带的菜单。
+- **PDF pages take the paper colour** / PDF 页面跟随纸张颜色：on light papers the white page takes the paper's colour; on dark papers the page turns dark with light text. Comics keep their colours. / 浅色纸张下，PDF 的白底变成纸色；深色纸张下，页面变成深底浅字。漫画保持原色。
+- **The whole reader in the paper's colour** / 阅读窗口整体纸色：the toolbar, contents, AI panel and appearance panel take the paper's tint, as in Apple Books. / 工具栏、目录、AI 面板和外观面板都带上纸张的色调，和 Apple Books 一样。
+- **Finer typesetting** / 更细致的排版：a little space between Chinese and Latin text or numbers, no doubled gaps around punctuation, roomier chapter titles, and restyled quotes, code and links. / 中文与英文、数字之间自动留空，标点不再出现双倍空隙，章节标题留白更大，引用、代码、链接样式更新。
+- **Colours easier to tell apart** / 颜色更容易区分：ten accent colours spread around the colour wheel, more distinct interface themes and paper colours, and a new Rose paper. Earlier choices move to the closest new colour. / 强调色改为沿色环均匀分布的 10 种，界面主题和纸张颜色区分更明显，新增「淡粉」纸张。之前选的颜色会自动换成最接近的新颜色。
+- **Shelf** / 书架：covers at a steady size whatever the window width, with a title and count above them. / 封面尺寸固定，不再随窗口变宽而变大；上方显示分类名和数量。
+- **macOS fix** / macOS 修复：the app name in the sidebar no longer sits under the window buttons. / 侧栏的应用名不再挡住窗口左上角的三个按钮。
 
 **Requirements** / 系统要求：macOS 11 or later (macOS 10.15 is no longer supported); iOS 16.4 or later. / 需要 macOS 11 及以上（不再支持 macOS 10.15）；iOS 16.4 及以上。
 
