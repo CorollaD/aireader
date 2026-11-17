@@ -1,15 +1,17 @@
 # AiReader
 
-跨平台桌面阅读器。界面用 [Tauri 2](https://tauri.app) + React，文档解析与渲染用 Rust。
+跨平台阅读器，带 AI 助手。界面用 [Tauri 2](https://tauri.app) + React（Tailwind CSS + daisyUI），文档解析与渲染用 Rust。
 
-**下载**：在 [Releases](https://github.com/CorollaD/aireader/releases)（最新版本 [v0.5.0](https://github.com/CorollaD/aireader/releases/tag/v0.5.0)）页面下载 macOS（Apple 芯片 / Intel）、Windows 和 Linux 的安装包，`SHA256SUMS.txt` 可用来校验文件。首次打开的方法见 Release 说明，签名情况见下文「代码签名」。
+**下载**：在 [Releases](https://github.com/CorollaD/aireader/releases)（最新版本 [v0.7.8](https://github.com/CorollaD/aireader/releases/tag/v0.7.8)）页面下载 macOS（Apple 芯片 / Intel）、Windows、Linux 的安装包，以及 Android APK 和 iOS 模拟器版（手机版为预览）。`SHA256SUMS.txt` 可用来校验文件。首次打开的方法见 Release 说明，签名情况见下文「代码签名」。
+
+**系统要求**：macOS 11 及以上；Windows 10/11；Linux 需要较新的 WebKitGTK（如 Ubuntu 22.04 及以上）；Android 8 及以上；iOS 16.4 及以上。
 
 | 格式 | 支持情况 |
 | --- | --- |
 | EPUB 2/3 | 按 spine 顺序读取章节；NCX/nav 目录（含锚点跳转）；书内链接与脚注可点击跳转；内嵌图片与封面 |
-| PDF | 使用 PDFium 渲染；书签目录；连续 / 单页 / 双页；可缩放、旋转；可选中文字、全文搜索（文字层） |
+| PDF | 使用 PDFium 渲染，按屏幕像素精确出图，可加深文字边缘；页面跟随阅读纸色（深色纸时反转为深底浅字，彩图保持原色）；书签目录；连续 / 单页 / 双页；可缩放、旋转；可选中文字、全文搜索（文字层） |
 | TXT | 自动识别编码（UTF-8/UTF-16/GBK/Big5 等）；自动识别「第X章」「Chapter N」等章节标题 |
-| Markdown | 标题、列表、引用、代码块、表格、本地图片 |
+| Markdown | 标题、列表、引用、代码块、表格（表头加粗）、任务清单、GitHub 提示框、`[[双链]]`、公式；YAML 头信息中的 title / author 作为书名和作者；导入时一并复制引用的本地图片 |
 | MOBI / AZW / AZW3 | MOBI6 与 KF8 尽量支持；**不支持 DRM 加密的书** |
 | FB2 / FB2.ZIP | 章节嵌套、诗歌、题记、内嵌图片、windows-1251 编码 |
 | DOCX | 标题样式或字号推断标题、粗体/斜体、列表、表格（按行显示）、图片 |
@@ -25,22 +27,21 @@
 - 导入单本书、多本书或整个文件夹（递归扫描），也可以把文件或文件夹拖进窗口；显示导入进度
 - 导入时会把书**复制**到书库目录，按内容哈希去重，并自动提取书名、作者和封面（PDF/CBZ 取第一页）
 - 查找重复：找出同一本书的不同文件（不同格式、不同扫描版），按是否有文字、扫描清晰度（DPI）、格式、目录和内容完整度推荐保留最好的一本；不同译本、改动大的版本按正文相似度区分开。去掉的副本的阅读进度、书签和笔记会尽量转到保留的书上。导入新书时发现可能重复也会提示
-- 网格（封面）和列表两种视图；按最近阅读、添加时间、书名、作者、阅读进度排序；按书名或作者搜索
+- 网格（立体封面，尺寸固定不随窗口拉伸）和列表（含文件大小列）两种视图；按最近阅读、添加时间、书名、作者、阅读进度排序；按书名或作者搜索
 - 全书库搜索：搜索框同时查找所有书的正文（包括 PDF 文字层），结果按书分组，点击直接跳到原文。全文索引在后台自动建立
-- 自定义分组：每本书属于一个分组（或未分组），侧栏按分组筛选；分组可新建、重命名、删除
 - 编辑书名、作者和分组；可多选后批量移到某个分组或删除
 - 显示每本书的阅读进度和最近阅读时间
-- 书籍分组：一本书属于一个分组；分组可建一级子分组，名字形如 `父-子`（`-` 前的部分是已有分组时才算子分组），点父分组时包含子分组的书
+- 书籍分组：一本书属于一个分组（或未分组），侧栏按分组筛选，分组可新建、重命名、移动、删除；分组可建一级子分组，名字形如 `父-子`（`-` 前的部分是已有分组时才算子分组），点父分组时包含子分组的书
 - 在线书库：支持 OPDS 1.x 和 OPDS 2，内置开放书源推荐（Gutenberg、Internet Archive、OpenEdition 等），维基文库可按标题搜索并导出 EPUB，Gutendex 可按语言浏览，没有接口的图书馆提供网站入口；需要登录的书源支持 Basic 和 Digest 认证，密码存在系统钥匙串
 - 扫描版 PDF 文字识别：在本机用 PP-OCRv6 识别没有文字层的页面（首次使用下载约 31MB 模型），后台运行，可停止，下次接着做；结果用于搜索、选中文字、朗读和 AI
 - 论文阅读：输入 DOI、arXiv 号、链接或标题导入开放获取的论文，查询并保存文献信息；点正文里的 `[12]` 查看参考文献，AI 论文速读（问题、方法、结果、局限）。联网查询都由手动触发，只发送输入的内容或那一条参考文献
 - 引用导出：BibTeX、RIS、CSL-JSON，以及 GB/T 7714、APA、MLA、Chicago、IEEE 格式的文字引用，可复制或批量保存为文件
-- 多设备同步：通过自建的 AiReader 服务器（账号登录，见 [server/README.md](server/README.md)）、WebDAV（坚果云、Nextcloud、群晖等）或网盘文件夹（iCloud Drive、Dropbox、OneDrive 等）同步书架、进度、书签、高亮、AI 对话、闪卡和阅读时长；书籍文件可选同步，未下载的书在打开时下载。设置和 API Key 不同步；数据不加密，同一条记录以较新的修改为准
+- 多设备同步：通过自建的 AiReader 服务器（账号登录，见 [server/README.md](server/README.md)）、WebDAV（坚果云、Nextcloud、群晖等）或网盘文件夹（iCloud Drive、Dropbox、OneDrive 等）同步书架、进度、书签、高亮、整本书笔记、AI 对话、闪卡和阅读时长；书籍文件可选同步，未下载的书在打开时下载。设置和 API Key 不同步；数据不加密，同一条记录以较新的修改为准
 - 备份书库（设置 → 通用）：导出一个 zip，含数据库和封面，可选包含书籍文件
-- 安装后可以在文件管理器中用 AiReader 打开 EPUB、MOBI/AZW3、FB2、CBZ（以及 PDF）；程序已在运行时会在当前窗口打开，不会再启动一个
+- 安装后可以在文件管理器中用 AiReader 打开 EPUB、MOBI/AZW3、FB2、CBZ、Markdown（以及 PDF 等）；程序已在运行时会在当前窗口打开，不会再启动一个
 
 **阅读**
-- 书签（⌘/Ctrl+D）、高亮（5 种颜色）与笔记，侧栏「目录 / 书签 / 笔记 / 生词」
+- 书签（⌘/Ctrl+D）、高亮（5 种颜色）与笔记，侧栏「目录 / 书签 / 笔记 / 生词」；笔记栏顶部还有不挂在原文上的「整本书笔记」（例如保存的 AI 回答），可展开、编辑、删除，PDF 和漫画也能用
 - 导出笔记：单本或全部书，支持 Markdown、Obsidian（带属性）、CSV 和 JSON；Notion 可以导入 Markdown 和 CSV
 - 朗读（R）：从当前位置或选中处开始，当前句高亮并自动翻页，可调语速和音色。默认用系统语音（Linux 上取决于系统是否提供）；也可以在「设置 → 阅读」里改用在线语音：OpenAI 兼容接口（OpenAI、硅基流动、本机运行的 Kokoro 等）、Azure 语音、火山引擎（豆包语音）或 ElevenLabs，密钥保存在系统钥匙串
 - 查词和记忆卡：选中文字后查词，释义来自添加的 StarDict / MDict 词典或 AI，可存成卡片；在书架的「复习」里按 FSRS 间隔重复算法复习，也可以管理全部卡片、导出 CSV
@@ -52,8 +53,10 @@
 - 阅读统计（书架侧栏）：连续阅读天数、全年阅读日历、读得最多的书和年度回顾
 - PDF 与漫画：连续 / 单页 / 双页（封面单独、横向跨页单独显示），适应宽度 / 整页 / 高度，页面旋转；漫画可设为从右往左翻页
 - EPUB 中的脚注、交叉引用链接可以点击跳转
-- 8 种预设背景色（纯白、米白、羊皮纸、护眼绿、天青、深灰、夜间、墨黑），也可以用取色器自定义；文字颜色可以自动匹配，也可以自定义；背景为深色时，阅读界面的工具栏和侧栏也会变深
-- 字体（黑体/宋体/楷体，也可以导入自己的 TTF/OTF/WOFF 字体）、字号、行距、版心宽度可调
+- 阅读主题（参照 Apple Books）：原始、安静、纸张、粗体、平静、专注，一键设定纸色、文字颜色、字体和字重
+- 9 种纸张颜色（纯白、米白、羊皮纸、护眼绿、天青、淡粉、深灰、夜间、墨黑），也可以用取色器自定义；文字颜色默认自动匹配（浅色纸接近纯黑，对比度有测试保证），也可以自定义；工具栏和侧栏会带上纸张的色调
+- 字体（黑体/宋体/楷体，也可以导入自己的 TTF/OTF/WOFF 字体）、字重（常规 / 中等 / 粗）、字号、行距、版心宽度可调；「文字增强」让笔画更实（默认打开，同时作用于 PDF 页面）
+- 中英文之间自动留空、标点挤压、章节标题留白等排版细节（依赖较新的 WebView）
 - 目录侧栏、全文搜索（结果高亮）、自动保存阅读位置（关闭窗口或退出前也会保存）
 
 **AI（基于 [rig](https://github.com/0xPlaygrounds/rig)）**
@@ -62,8 +65,9 @@
 - 学习：按本章或自己的划线生成闪卡（先预览再保存），或做 5 道选择题测验，答完有解析并能跳回原文
 - 防剧透：打开「只问已读部分」后，问答只使用当前阅读位置之前的内容
 - 总结本章 / 本页 / 全书（长文自动分段；每章总结按模型缓存；全书总结前显示用量和费用估算）
-- 选中文字后让 AI 解释或翻译，可以继续追问，答案可存为笔记
-- 对话按书保存，可以在历史对话中切换；面板里可以直接切换模型，每次回答显示用量（token 和服务报告或按价目估算的费用）
+- 选中文字后让 AI 解释或翻译，可以继续追问
+- 每条回答都可以「存为笔记」，也可以把整段对话存成一条笔记：针对选中文字的回答存为那段文字的高亮笔记，其余存进「整本书笔记」
+- 对话按书保存，可以在历史对话中切换，或清空当前对话（仍保留在历史里）；面板里可以直接切换模型，每次回答显示用量（token 和服务报告或按价目估算的费用）
 - 网络错误、限流时自动重试；全书总结中断后再次运行会从已完成的部分继续
 - 书架「AI 整理」：AI 为每本书建议一个分组和缺失的作者，逐条确认后才写入（已有分组的书默认不移动）
 - API Key 保存在系统钥匙串；使用云端服务前会请你确认发送书籍内容；本地服务直连，不经过系统代理
@@ -72,15 +76,15 @@
 **界面**
 - 界面语言：简体中文、繁體中文、English、Español、Italiano、Français、Deutsch、日本語、한국어、Português；默认跟随系统，可以随时切换
 - 界面大小：小 / 标准 / 大 / 特大（书架中也可以用 ⌘/Ctrl +、-、0 调整）；正文字号单独设置，不受影响
-- 外观：跟随系统、浅色、深色，与阅读背景分开设置；7 种强调色（靛蓝、蓝、青、紫、玫红、橙、石墨）
+- 外观：跟随系统、浅色、暖米、深色、灰蓝、纯黑，与阅读纸张分开设置；10 种强调色（红、橙、琥珀、绿、青、蓝、靛蓝、紫、粉、石墨）；界面文字的对比度有测试保证（正文 12:1、次要文字 7:1 以上）
 - 设置窗口（⌘/Ctrl+,）：通用、阅读、词典、同步、AI、快捷键
 - 窗口变窄时工具栏自动收纳（PDF 的适应和旋转进「更多」菜单），AI 和搜索面板浮在正文上，正文不被挤压
-- macOS 上窗口没有单独的标题栏，顶栏可以拖动窗口；Windows 和 Linux 保留系统标题栏
+- macOS 上窗口没有单独的标题栏，顶栏可以拖动窗口，内容会避开左上角的窗口按钮；Windows 和 Linux 保留系统标题栏
 - 记住窗口大小和位置；支持键盘操作（书架卡片、进度条、对话框）
 
 ## 开发
 
-需要 Rust（1.97.1 及以上，rig 0.45 的要求）和 Node.js（20 及以上）。
+需要 Rust（1.97.1 及以上，rig 0.45 的要求）和 Node.js 26（版本写在 `.nvmrc`，CI 也用它）。
 
 ```bash
 npm install
@@ -91,7 +95,7 @@ npm run tauri build                   # 打包安装程序
 
 - 也可以在命令行直接打开文件：`aireader 书.epub`。不在书架上的书会先导入，再直接进入阅读。
 - `AIREADER_LIBRARY_DIR=/path/to/dir` 让程序使用另一个书库目录（测试用，不影响正常书库）。
-- `npm run dev` 后在普通浏览器中打开 http://localhost:1420，会使用 `src/dev/mock.ts` 中的模拟后端，方便调试界面。生产构建不会包含这部分代码。
+- `npm run dev` 后在普通浏览器中打开 http://localhost:1420/?mock（加 `&mobile` 可预览手机布局），会使用 `src/dev/mock.ts` 中的模拟后端，方便调试界面。生产构建不会包含这部分代码。
 
 ### PDFium
 
@@ -103,11 +107,11 @@ npm run tauri build                   # 打包安装程序
 
 每次推送和 Pull Request 都会运行 `.github/workflows/check.yml`：前端 lint、测试和构建，`cargo fmt`、`clippy`（警告视为错误）和 `cargo test`。
 
-推送 `v*` 标签（版本号与 `package.json`、`Cargo.toml`、`tauri.conf.json` 一致，例如 `v0.5.0`）会触发 `.github/workflows/release.yml`：在 GitHub Actions 上分别构建 macOS（Apple 芯片、Intel）、Linux 和 Windows 安装包，全部成功后发布为 GitHub Release，并附上 `SHA256SUMS.txt`；也可以在 Actions 页面手动运行。Release 的说明取自 `.github/release-notes.md`，发版前更新其中的「更新内容」一节。
+推送 `v*` 标签（版本号与 `package.json`、`Cargo.toml`、`tauri.conf.json` 一致，例如 `v0.7.8`）会触发 `.github/workflows/release.yml`：在 GitHub Actions 上分别构建 macOS（Apple 芯片、Intel）、Linux、Windows 安装包和 Android APK、iOS 模拟器版，全部成功后发布为 GitHub Release，并附上 `SHA256SUMS.txt`；也可以在 Actions 页面手动运行。Release 的说明取自 `.github/release-notes.md`，发版前更新其中的「更新内容」一节。
 
 ### 手机版（Android、iOS）
 
-- Android：在 Actions 页面手动运行 `.github/workflows/android.yml`（推送 `v*` 标签时也会运行），产出用调试密钥签名的 APK，可以直接安装测试；上架需要自己的签名密钥。
+- Android：在 Actions 页面手动运行 `.github/workflows/android.yml`（推送 `v*` 标签时也会运行）。仓库 Secrets 中配置了 `ANDROID_KEYSTORE`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 时用这把密钥签名，后续版本可以覆盖安装；没有配置时用本次构建临时生成的密钥签名，可以安装，但不能覆盖其他密钥签名的版本。
 - iOS：`.github/workflows/ios.yml` 构建模拟器版 `.app`（Apple 芯片和 Intel 都能跑），没有签名，只能在模拟器里运行；装到 iPhone 需要 Apple 开发者账号。
 - 手机上：书架侧栏和阅读目录是抽屉，AI 和搜索面板全屏，对话框从底部弹出；API Key 存在 iOS 钥匙串 / Android Keystore。
 - 已知限制：手机版还没在真机上测过；Android 系统 WebView 可能不支持朗读；从 Android 文件管理器导入书籍还需要验证。
@@ -144,6 +148,9 @@ cargo run --example inspect -- book.epub a.pdf  # 打印解析结果：目录、
 
 ```
 src/                      React 前端
+  tailwind.css            样式入口：Tailwind + daisyUI（前缀 d-）；旧样式 styles.css 在较低的 legacy 层
+  components.css          立体封面、阅读排版、PDF 画布等组件样式；base.css 新样式元素的重置
+  tw.ts / ui.tsx          常用控件的类名，对话框、菜单、提示等共用组件；Select.tsx 系统原生下拉框
   shelf/                  书架：网格/列表、分组侧栏、编辑对话框、查找重复
   reader/                 阅读：文字类视图（滚动/分页、高亮）、PDF/漫画视图（连续/单页/双页）、侧栏、进度条、设置面板
   ai/                     AI 设置、AI 面板（对话/总结/思维导图）、书架整理对话框
@@ -156,7 +163,7 @@ src/                      React 前端
   SyncSettings.tsx        同步设置
   dev/mock.ts             浏览器调试用的模拟后端
   SettingsDialog.tsx      设置窗口；icons.tsx 图标；zoom.ts 界面缩放
-  settings.ts             阅读设置与配色方案（背景色预设、根据背景自动计算文字颜色）
+  settings.ts             阅读设置与配色方案（界面主题、强调色、纸张预设、阅读主题、自动文字颜色）；themes.test.ts 检查各主题对比度
   lifecycle.ts            退出前需要保存的内容；ErrorBoundary.tsx 界面出错时的兜底
   api.ts / types.ts       调用 Tauri 命令的封装，以及与 Rust 对应的数据类型
   **/*.test.ts            前端单元测试（vitest）
@@ -183,6 +190,8 @@ src-tauri/                Rust 后端
   src/i18n.rs             后端文案（错误信息、生成的章节名、导出笔记）的多语言目录
   src/commands.rs         提供给前端调用的命令，以及退出、单实例打开文件的处理
   src/protocol.rs         book:// 协议：封面、书中图片、PDF/CBZ 页面（带缓存）、自定义字体
+  src/page_look.rs        PDF/DjVu 页面的阅读效果：纸色、深色纸反转、文字增强（只改灰阶，彩色保持原样）
+server/                   自建同步服务器（axum + SQLite），见 server/README.md
 ```
 
 键盘快捷键：← / → 上一章或上一页、下一章或下一页（漫画设为从右往左时方向相反）；空格 / PgDn 翻一屏（读到章节末尾时进入下一章）；Home / End 跳到开头或末尾；Ctrl/⌘ +/- 调整字号（PDF 为缩放）；Ctrl/⌘ F 搜索（含 PDF）；Ctrl/⌘ D 书签；Ctrl/⌘ Shift A 打开或关闭 AI 面板；Alt+← / → 后退、前进；T 显示或隐藏目录；R 朗读或暂停；F 专注模式；? 快捷键帮助；⌘/Ctrl+, 设置；Esc 关闭面板，或返回书架。
