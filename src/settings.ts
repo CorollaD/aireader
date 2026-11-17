@@ -52,6 +52,8 @@ export interface Settings {
   fontFamily: FontFamily;
   /** How heavy book text is drawn. */
   fontWeight: FontWeight;
+  /** Firmer text: fuller strokes in books, darkened anti-aliasing on PDF pages. */
+  textBoost: boolean;
   /** A font file the user added (see `api.listFonts`), used before `fontFamily`. */
   customFont: string | null;
   fontSize: number;
@@ -95,6 +97,7 @@ export const DEFAULT_SETTINGS: Settings = {
   textColor: null,
   fontFamily: "sans",
   fontWeight: 400,
+  textBoost: true,
   customFont: null,
   fontSize: 19,
   lineHeight: 1.8,
@@ -188,6 +191,7 @@ export function normalizeSettings(raw: unknown): Settings {
   if (s.textColor !== null && !/^#[0-9a-f]{6}$/i.test(s.textColor)) s.textColor = null;
   if (!(s.fontFamily in FONT_STACKS)) s.fontFamily = DEFAULT_SETTINGS.fontFamily;
   if (!FONT_WEIGHTS.includes(s.fontWeight)) s.fontWeight = DEFAULT_SETTINGS.fontWeight;
+  if (typeof s.textBoost !== "boolean") s.textBoost = DEFAULT_SETTINGS.textBoost;
   if (typeof s.ttsVoice !== "string" || !s.ttsVoice) s.ttsVoice = null;
   if (typeof s.ttsRate !== "number" || !(s.ttsRate >= 0.5 && s.ttsRate <= 2)) s.ttsRate = DEFAULT_SETTINGS.ttsRate;
   s.tts = { ...DEFAULT_SETTINGS.tts, ...(s.tts && typeof s.tts === "object" ? s.tts : {}) };
@@ -234,6 +238,15 @@ export function luminance(color: string): number {
 
 export const isDark = (bg: string) => luminance(bg) < 0.25;
 
+/** The soft light grey text of document pages on dark paper (pure white glares). */
+const DARK_PAGE_INK = "#e2e2e2";
+
+/** How the backend draws a document page: `paper-ink-boost`, the page URL's last segment. */
+export function pageLook(s: Settings): string {
+  const ink = isDark(s.background) ? (s.textColor ?? DARK_PAGE_INK) : "#000000";
+  return `${s.background.slice(1)}-${ink.slice(1)}-${s.textBoost ? 1 : 0}`.toLowerCase();
+}
+
 /** The interface theme in use, with "system" resolved. */
 export function uiThemeName(pref: UiTheme, systemDark: boolean): Exclude<UiTheme, "system"> {
   return pref === "system" ? (systemDark ? "dark" : "light") : pref;
@@ -260,6 +273,7 @@ export function themeVars(s: Settings): Record<string, string> {
     "--reading-scheme": dark ? "dark" : "light",
     // An added font comes first; the chosen family covers characters it lacks.
     "--reader-weight": String(s.fontWeight),
+    "--reader-stroke": s.textBoost ? "0.012em" : "0",
     "--reader-font": s.customFont ? `"${CUSTOM_FONT}", ${FONT_STACKS[s.fontFamily].css}` : FONT_STACKS[s.fontFamily].css,
   };
 }

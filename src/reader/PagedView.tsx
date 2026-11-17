@@ -18,8 +18,8 @@ const PRELOAD_SCREENS = 1.5;
 
 /** Render width in device pixels, rounded up so small resizes reuse cached images. */
 function renderWidth(cssWidth: number): number {
-  const px = cssWidth * pixelRatio();
-  return Math.min(4096, Math.ceil(px / 256) * 256);
+  // Exactly the device pixels it fills: an image scaled by the browser draws text softer.
+  return Math.min(4096, Math.round(cssWidth * pixelRatio()));
 }
 
 function useSize(ref: React.RefObject<HTMLElement | null>) {
@@ -141,11 +141,22 @@ function TextLayer(props: { bookId: string; index: number; width: number; height
 }
 
 /** A page box; the rendered image, once loaded, covers the page-number placeholder. */
-function Page(props: { bookId: string; index: number; width: number; height: number; rotation: number; load: boolean; style?: React.CSSProperties }) {
+function Page(props: {
+  bookId: string;
+  index: number;
+  width: number;
+  height: number;
+  rotation: number;
+  look?: string;
+  load: boolean;
+  style?: React.CSSProperties;
+}) {
   return (
     <div className="page" data-page={props.index} style={{ width: props.width, height: props.height, ...props.style }}>
       <span className="page-number">{props.index + 1}</span>
-      {props.load && <img src={pageUrl(props.bookId, props.index, renderWidth(props.width), props.rotation)} alt="" draggable={false} decoding="async" />}
+      {props.load && (
+        <img src={pageUrl(props.bookId, props.index, renderWidth(props.width), props.rotation, props.look)} alt="" draggable={false} decoding="async" />
+      )}
       {props.load && <TextLayer bookId={props.bookId} index={props.index} width={props.width} height={props.height} rotation={props.rotation} />}
     </div>
   );
@@ -180,11 +191,13 @@ interface Props {
   zoom: number;
   /** Clockwise page rotation in degrees. */
   rotation: number;
+  /** How document pages are drawn (see `pageLook`); none for comics. */
+  look?: string;
   onLocation: (loc: Location, lastVisible: number) => void;
   onSelect: (selection: PageSelection | null) => void;
 }
 
-export default function PagedView({ book, jump, layout, fit, zoom, rotation, rtl, onLocation, onSelect }: Props) {
+export default function PagedView({ book, jump, layout, fit, zoom, rotation, look, rtl, onLocation, onSelect }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const size = useSize(scroller);
   const [page, setPage] = useState(() => (jump?.loc.kind === "page" ? jump.loc.page : 0));
@@ -355,11 +368,12 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, rtl
     return (
       <div className="paged-scroller single" ref={scroller} onMouseUp={checkSelection}>
         <div className={`single-stage spread${rtl ? " rtl" : ""}`} style={{ minWidth: h * perHeight + gutter + 32, minHeight: h + 32 }}>
-          {size.w > 0 && group.map((p) => <Page key={p} bookId={book.id} index={p} width={h / (aspects[p] ?? 1.414)} height={h} rotation={rotation} load />)}
+          {size.w > 0 &&
+            group.map((p) => <Page key={p} bookId={book.id} index={p} width={h / (aspects[p] ?? 1.414)} height={h} rotation={rotation} look={look} load />)}
         </div>
         {turnButtons(k === 0, k >= groups.length - 1)}
         {(groups[k + 1] ?? []).map((p) => (
-          <img key={p} className="prefetch" src={pageUrl(book.id, p, renderWidth(h / (aspects[p] ?? 1.414)), rotation)} alt="" />
+          <img key={p} className="prefetch" src={pageUrl(book.id, p, renderWidth(h / (aspects[p] ?? 1.414)), rotation, look)} alt="" />
         ))}
       </div>
     );
@@ -372,10 +386,10 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, rtl
     return (
       <div className="paged-scroller single" ref={scroller} onMouseUp={checkSelection}>
         <div className="single-stage" style={{ minWidth: w + 32, minHeight: w * aspect + 32 }}>
-          {size.w > 0 && <Page key={page} bookId={book.id} index={page} width={w} height={w * aspect} rotation={rotation} load />}
+          {size.w > 0 && <Page key={page} bookId={book.id} index={page} width={w} height={w * aspect} rotation={rotation} look={look} load />}
         </div>
         {turnButtons(page === 0, page >= count - 1)}
-        {page + 1 < count && <img className="prefetch" src={pageUrl(book.id, page + 1, renderWidth(w), rotation)} alt="" />}
+        {page + 1 < count && <img className="prefetch" src={pageUrl(book.id, page + 1, renderWidth(w), rotation, look)} alt="" />}
       </div>
     );
   }
@@ -394,6 +408,7 @@ export default function PagedView({ book, jump, layout, fit, zoom, rotation, rtl
                 width={width}
                 height={width * aspect}
                 rotation={rotation}
+                look={look}
                 load={i >= range[0] && i <= range[1]}
                 style={{ position: "absolute", top: tops[i], left: `calc(50% - ${width / 2}px)` }}
               />

@@ -25,7 +25,7 @@ use crate::model::Content;
 const MAX_PAGE_WIDTH: u32 = 4096;
 /// Total size of the encoded pages kept in memory.
 const PAGE_CACHE_BYTES: usize = 128 << 20;
-const JPEG_QUALITY: u8 = 85;
+const JPEG_QUALITY: u8 = 92;
 
 /// Encoded pages by path, most recently used last.
 struct PageCache {
@@ -144,13 +144,24 @@ fn serve<R: Runtime>(app: &AppHandle<R>, path: &str) -> anyhow::Result<Served> {
                 anyhow::bail!("not a paged document")
             };
             let width = width.parse::<u32>()?.clamp(64, MAX_PAGE_WIDTH);
-            let rotation = match rest {
-                [] => 0,
-                [r] => r.parse::<u16>()? % 360,
+            // Optional: the rotation, then how the page is drawn (see page_look).
+            let (rotation, look) = match rest {
+                [] => (0, None),
+                [r] => (r.parse::<u16>()? % 360, None),
+                [r, look] => (
+                    r.parse::<u16>()? % 360,
+                    Some(
+                        crate::page_look::Look::parse(look)
+                            .ok_or_else(|| anyhow::anyhow!("unknown path: {path}"))?,
+                    ),
+                ),
                 _ => anyhow::bail!("unknown path: {path}"),
             };
             let page: usize = page.parse()?;
-            let img = render_rotated(src.as_ref(), page, width, rotation)?;
+            let mut img = render_rotated(src.as_ref(), page, width, rotation)?;
+            if let Some(look) = &look {
+                crate::page_look::apply(&mut img, look);
+            }
             let (mime, body) = encode(&img, src.photographic(page))?;
             PAGES
                 .lock()
@@ -172,12 +183,37 @@ pub fn page_jpeg(
     Ok(encode(&img, true)?.1.to_vec())
 }
 
+/// Whether every pixel is (nearly) grey.
+fn is_grey(img: &crate::model::PageImage) -> bool {
+    img.rgba.as_chunks::<4>().0.iter().all(|p| {
+        let (max, min) = (p[0].max(p[1]).max(p[2]), p[0].min(p[1]).min(p[2]));
+        max - min <= 6
+    })
+}
+
 /// Encodes a rendered page: JPEG for pictures (much smaller), PNG for pages of text.
 fn encode(
     img: &crate::model::PageImage,
     photographic: bool,
 ) -> anyhow::Result<(&'static str, Arc<[u8]>)> {
     let mut out = Vec::new();
+    // Grey scans are encoded as grey: no colour subsampling to blur the text, and smaller.
+    if photographic && is_grey(img) {
+        let grey: Vec<u8> = img
+            .rgba
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|p| ((p[0] as u32 + p[1] as u32 + p[2] as u32) / 3) as u8)
+            .collect();
+        JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY).write_image(
+            &grey,
+            img.width,
+            img.height,
+            image::ExtendedColorType::L8,
+        )?;
+        return Ok(("image/jpeg", out.into()));
+    }
     if photographic {
         let rgb = image::DynamicImage::ImageRgba8(
             image::RgbaImage::from_raw(img.width, img.height, img.rgba.clone())

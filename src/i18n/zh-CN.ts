@@ -59,6 +59,8 @@ const zhCN = {
   "settings.pagedBooks": "PDF 与漫画",
 
   "rs.theme": "主题",
+  "rs.textBoost": "文字增强",
+  "rs.textBoostHint": "笔画更实、更黑，接近系统自带阅读器的显示；PDF 页面也会加深文字边缘",
   "rs.weight": "字重",
   "rs.weightRegular": "常规",
   "rs.weightMedium": "中等",

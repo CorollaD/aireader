@@ -59,6 +59,8 @@ const de: Messages = {
   "settings.pagedBooks": "PDFs und Comics",
 
   "rs.theme": "Thema",
+  "rs.textBoost": "Kräftigerer Text",
+  "rs.textBoostHint": "Vollere, dunklere Striche wie in den Systembetrachtern; auch auf PDF-Seiten",
   "rs.weight": "Stärke",
   "rs.weightRegular": "Normal",
   "rs.weightMedium": "Mittel",

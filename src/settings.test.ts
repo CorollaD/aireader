@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BACKGROUNDS, CUSTOM_FONT, DEFAULT_SETTINGS, isDark, luminance, normalizeSettings, themeVars } from "./settings";
+import { BACKGROUNDS, CUSTOM_FONT, DEFAULT_SETTINGS, isDark, luminance, normalizeSettings, pageLook, themeVars } from "./settings";
 
 describe("settings", () => {
   it("falls back to defaults for bad values", () => {
@@ -40,5 +40,13 @@ describe("settings", () => {
       // Light papers come close to black on white (21:1); dark ones stop short of glare.
       expect(contrast(fg, color), color).toBeGreaterThanOrEqual(isDark(color) ? 11 : 15.5);
     }
+  });
+
+  it("tells the backend how to draw document pages", () => {
+    expect(pageLook({ ...DEFAULT_SETTINGS, background: "#F7F0E0", textBoost: true })).toBe("f7f0e0-000000-1");
+    // Dark paper: soft light ink rather than glaring white, or the reader's own colour.
+    expect(pageLook({ ...DEFAULT_SETTINGS, background: "#18202e", textBoost: false })).toBe("18202e-e2e2e2-0");
+    expect(pageLook({ ...DEFAULT_SETTINGS, background: "#18202e", textColor: "#c0c0c0" })).toBe("18202e-c0c0c0-1");
+    expect(normalizeSettings({ textBoost: "yes" }).textBoost).toBe(true);
   });
 });

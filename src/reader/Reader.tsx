@@ -3,7 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, errorText } from "../api";
 import { onBeforeExit } from "../lifecycle";
 import type { UpdateSettings } from "../App";
-import { isDark, isDarkTheme, uiThemeName, type Settings } from "../settings";
+import { isDark, isDarkTheme, pageLook, uiThemeName, type Settings } from "../settings";
 import { dragRegion } from "../titlebar";
 import type { Card, Highlight, HighlightColor, Hit, Location, OpenedBook, Reference } from "../types";
 import { isTyping, Menu, MenuDivider, MenuItem, Modal, Toast } from "../ui";
@@ -840,6 +840,7 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
           className="reader-view"
           // Document pages (not comics) take the paper colour: see .page-tint in components.css.
           data-page-tint={!isFlow && book.format !== "CBZ" ? (isDark(settings.background) ? "dark" : "light") : undefined}
+          data-canvas={isFlow ? undefined : isDark(settings.background) ? "dark" : "light"}
         >
           {isFlow ? (
             <FlowView
@@ -866,6 +867,7 @@ export default function Reader(props: { bookId: string; openAt: OpenAt | null; s
                 rtl={settings.comicRtl && book.format === "CBZ"}
                 zoom={zoom}
                 rotation={rotation}
+                look={book.format === "CBZ" ? undefined : pageLook(settings)}
                 onLocation={onLocation}
                 onSelect={setPageSel}
               />

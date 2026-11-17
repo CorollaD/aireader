@@ -16,6 +16,7 @@ pub mod library;
 pub mod model;
 pub mod ocr;
 pub mod opds;
+pub mod page_look;
 pub mod paper;
 pub mod protocol;
 pub mod recall;

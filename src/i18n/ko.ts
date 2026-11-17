@@ -59,6 +59,8 @@ const ko: Messages = {
   "settings.pagedBooks": "PDF와 만화",
 
   "rs.theme": "테마",
+  "rs.textBoost": "글자 선명하게",
+  "rs.textBoostHint": "시스템 뷰어처럼 획을 더 굵고 진하게 표시합니다. PDF 페이지에도 적용됩니다",
   "rs.weight": "굵기",
   "rs.weightRegular": "보통",
   "rs.weightMedium": "중간",

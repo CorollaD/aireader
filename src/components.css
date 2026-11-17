@@ -166,18 +166,26 @@ kbd {
   }
 }
 
-/* PDF and DjVu pages are drawn white by the renderer. On light paper the white takes the paper's
-   colour and ink stays dark (multiply); on dark paper the page is inverted and laid over the
-   paper (screen), so text turns light on the dark background. Comics keep their colours. */
+/* Document pages arrive drawn on the paper (see page_look.rs); until then the page shows the
+   paper too. Around the pages, a neutral canvas lets them stand out, as in Preview. */
 [data-page-tint] .page {
   background: var(--reading-bg);
 }
-[data-page-tint="light"] .page img {
-  mix-blend-mode: multiply;
+[data-canvas="light"] .paged-scroller {
+  background: #dcdce0;
 }
-[data-page-tint="dark"] .page img {
-  filter: invert(1) hue-rotate(180deg);
-  mix-blend-mode: screen;
+[data-canvas="dark"] .paged-scroller {
+  background: #0f1012;
+}
+[data-canvas] .page {
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.14),
+    0 10px 28px -6px rgb(0 0 0 / 0.22);
+}
+[data-canvas="dark"] .page {
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.06),
+    0 10px 28px -6px rgb(0 0 0 / 0.6);
 }
 /* The page number waiting behind the image would show through the blending. */
 [data-page-tint] .page:has(img) .page-number {
@@ -252,10 +260,12 @@ kbd {
 /* --- The reader's bars and panels take the paper's colour, as in Apple Books ------------------
    (when the paper and the interface are both light or both dark: see Reader.tsx). */
 .reader.paper-chrome {
+  /* A touch of the paper, so the page stays the brightest thing on screen. */
+  --chrome-base: #fbfbfc;
   --chrome-lift: #ffffff;
-  --bg: var(--reading-bg);
-  --panel: var(--reading-panel);
-  --surface: color-mix(in srgb, var(--reading-bg) 70%, var(--chrome-lift));
+  --bg: color-mix(in srgb, var(--reading-bg) 45%, var(--chrome-base));
+  --panel: color-mix(in srgb, var(--reading-panel) 45%, var(--chrome-base));
+  --surface: color-mix(in srgb, var(--reading-bg) 35%, var(--chrome-lift));
   --input: var(--reading-hover);
   --hover: var(--reading-hover);
   --selected: var(--reading-border);
@@ -264,8 +274,14 @@ kbd {
 }
 .reader.paper-chrome[data-scheme="dark"],
 [data-scheme="dark"] .reader.paper-chrome {
+  --chrome-base: #1e1f22;
   --chrome-lift: #3a3a3e;
 }
 .reader.paper-chrome .reader-bar {
-  background: var(--reading-bg);
+  background: var(--bg);
+}
+
+/* Firmer text (Settings → Reading): a hair of stroke fills out thin strokes. */
+.flow {
+  -webkit-text-stroke: var(--reader-stroke, 0) currentColor;
 }

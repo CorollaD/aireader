@@ -59,6 +59,8 @@ const zhTW: Messages = {
   "settings.pagedBooks": "PDF 與漫畫",
 
   "rs.theme": "主題",
+  "rs.textBoost": "文字增強",
+  "rs.textBoostHint": "筆畫更實、更黑，接近系統內建閱讀器的顯示；PDF 頁面也會加深文字邊緣",
   "rs.weight": "字重",
   "rs.weightRegular": "一般",
   "rs.weightMedium": "中等",

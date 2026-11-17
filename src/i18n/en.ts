@@ -59,6 +59,8 @@ const en: Messages = {
   "settings.pagedBooks": "PDFs and comics",
 
   "rs.theme": "Theme",
+  "rs.textBoost": "Firmer text",
+  "rs.textBoostHint": "Fuller, darker strokes, as in the system's own viewers; PDF pages get darker text edges too",
   "rs.weight": "Weight",
   "rs.weightRegular": "Regular",
   "rs.weightMedium": "Medium",

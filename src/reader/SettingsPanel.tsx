@@ -192,6 +192,11 @@ export function ReadingSettings(props: { settings: Settings; update: UpdateSetti
           )}
         </div>
       </Section>
+      <Section>
+        <div title={t("rs.textBoostHint")}>
+          <Toggle label={t("rs.textBoost")} on={s.textBoost} onChange={(textBoost) => update({ textBoost })} />
+        </div>
+      </Section>
 
       {props.text && (
         <>

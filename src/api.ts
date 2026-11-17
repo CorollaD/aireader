@@ -49,7 +49,9 @@ const BASE = navigator.userAgent.includes("Windows") ? "http://book.localhost/" 
 export const coverUrl = (book: Book) => `${BASE}cover/${book.id}?v=${book.added}`;
 export const fontUrl = (name: string) => `${BASE}font/${encodeURIComponent(name)}`;
 export const imageUrl = (bookId: string, imageId: number) => `${BASE}img/${bookId}/${imageId}`;
-export const pageUrl = (bookId: string, page: number, width: number, rotation = 0) => `${BASE}page/${bookId}/${page}/${width}${rotation ? `/${rotation}` : ""}`;
+/** A page image; `look` (from `pageLook`) draws it on the reader's paper. */
+export const pageUrl = (bookId: string, page: number, width: number, rotation = 0, look?: string) =>
+  `${BASE}page/${bookId}/${page}/${width}${look ? `/${rotation}/${look}` : rotation ? `/${rotation}` : ""}`;
 
 export const api = {
   listBooks: () => invoke<Shelf>("list_books"),

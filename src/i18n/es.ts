@@ -59,6 +59,8 @@ const es: Messages = {
   "settings.pagedBooks": "PDF y cómics",
 
   "rs.theme": "Tema",
+  "rs.textBoost": "Texto más nítido",
+  "rs.textBoostHint": "Trazos más llenos y oscuros, como en los visores del sistema; también en las páginas PDF",
   "rs.weight": "Grosor",
   "rs.weightRegular": "Normal",
   "rs.weightMedium": "Medio",

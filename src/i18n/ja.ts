@@ -59,6 +59,8 @@ const ja: Messages = {
   "settings.pagedBooks": "PDF とコミック",
 
   "rs.theme": "テーマ",
+  "rs.textBoost": "文字をくっきり",
+  "rs.textBoostHint": "システムのビューアのように線を太く濃く表示します。PDF のページにも適用されます",
   "rs.weight": "太さ",
   "rs.weightRegular": "標準",
   "rs.weightMedium": "中",

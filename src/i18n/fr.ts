@@ -59,6 +59,8 @@ const fr: Messages = {
   "settings.pagedBooks": "PDF et BD",
 
   "rs.theme": "Thème",
+  "rs.textBoost": "Texte renforcé",
+  "rs.textBoostHint": "Traits plus pleins et plus sombres, comme dans les visionneuses du système ; aussi sur les pages PDF",
   "rs.weight": "Graisse",
   "rs.weightRegular": "Normal",
   "rs.weightMedium": "Moyen",

@@ -435,3 +435,81 @@ fn pdf_opens_while_other_threads_render() {
         t.join().expect("no thread failed");
     }
 }
+
+/// A real page of text, drawn for reading: firming darkens the strokes' anti-aliased edges,
+/// light paper takes the white, dark paper turns the page over.
+#[test]
+fn pdf_page_look() {
+    use aireader::page_look::{Look, apply};
+    if let Err(e) = formats::pdf::pdfium() {
+        eprintln!("skipping: {e}");
+        return;
+    }
+    let dir = temp_dir("look");
+    let path = dir.join("p.pdf");
+    std::fs::write(&path, many_page_pdf(1)).unwrap();
+    let doc = formats::open(&path).unwrap();
+    let Content::Paged(src) = &doc.content else {
+        panic!("expected a paged document")
+    };
+    let plain = src.render(0, 600).unwrap();
+    // Average darkness of the text: the sum of how far each pixel is from white.
+    let ink = |img: &aireader::model::PageImage| -> u64 {
+        img.rgba
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|p| 255 - p[0] as u64)
+            .sum()
+    };
+    let white = [255u8; 3];
+
+    let mut firm = src.render(0, 600).unwrap();
+    apply(
+        &mut firm,
+        &Look {
+            paper: white,
+            ink: [0; 3],
+            boost: true,
+        },
+    );
+    assert!(
+        ink(&firm) > ink(&plain) * 11 / 10,
+        "firmed text is darker: {} vs {}",
+        ink(&firm),
+        ink(&plain)
+    );
+
+    let paper = [0xf7, 0xf0, 0xe0];
+    let mut tinted = src.render(0, 600).unwrap();
+    apply(
+        &mut tinted,
+        &Look {
+            paper,
+            ink: [0; 3],
+            boost: false,
+        },
+    );
+    assert_eq!(
+        &tinted.rgba[..3],
+        &paper,
+        "the page's corner (white) takes the paper"
+    );
+
+    let night = [0x18, 0x20, 0x2e];
+    let mut dark = src.render(0, 600).unwrap();
+    apply(
+        &mut dark,
+        &Look {
+            paper: night,
+            ink: [0xe2; 3],
+            boost: false,
+        },
+    );
+    assert_eq!(
+        &dark.rgba[..3],
+        &night,
+        "on dark paper the white becomes the paper"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
